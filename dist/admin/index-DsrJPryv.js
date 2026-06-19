@@ -35,7 +35,7 @@ const index = {
       icon: PluginIcon,
       intlLabel: { id: getTranslation("menu.label"), defaultMessage: "AI Studio" },
       permissions: PERMISSIONS.chat,
-      Component: () => Promise.resolve().then(() => require("./Chat-DsbLMrG1.js")).then((mod) => ({ default: mod.Chat }))
+      Component: () => Promise.resolve().then(() => require("./Chat-C2G8zt6p.js")).then((mod) => ({ default: mod.Chat }))
     });
     app.addSettingsLink(
       {
@@ -47,7 +47,7 @@ const index = {
         to: PLUGIN_ID,
         intlLabel: { id: getTranslation("settings.link"), defaultMessage: "Configuration" },
         permissions: PERMISSIONS.settingsRead,
-        Component: () => Promise.resolve().then(() => require("./Settings-BoslbZ80.js")).then((mod) => ({ default: mod.Settings }))
+        Component: () => Promise.resolve().then(() => require("./Settings-C1qQTMTO.js")).then((mod) => ({ default: mod.Settings }))
       }
     );
     app.registerPlugin({

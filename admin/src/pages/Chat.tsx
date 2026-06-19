@@ -4,12 +4,113 @@ import { DefaultChatTransport, getToolName, isToolUIPart, type UIMessage } from 
 import { useAuth, Page } from '@strapi/strapi/admin';
 import { useIntl } from 'react-intl';
 import { Box, Flex, Typography, Textarea, Button, Loader, Status } from '@strapi/design-system';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { styled } from 'styled-components';
 import { getTranslation } from '../utils/getTranslation';
 
 const backendURL = (): string => {
   const w = window as unknown as { strapi?: { backendURL?: string } };
   return w.strapi?.backendURL ?? '';
 };
+
+/**
+ * Renders assistant markdown (bold, lists, inline code, code blocks, links, tables) using
+ * Strapi theme tokens so it matches the admin (and adapts to light/dark). react-markdown does
+ * NOT render raw HTML, so this is XSS-safe.
+ */
+const MarkdownBody = styled.div`
+  font-size: 1.4rem;
+  line-height: 1.5;
+
+  & > *:first-child {
+    margin-top: 0;
+  }
+  & > *:last-child {
+    margin-bottom: 0;
+  }
+
+  p {
+    margin: 0 0 0.8rem;
+  }
+  strong {
+    font-weight: 600;
+  }
+  em {
+    font-style: italic;
+  }
+  ul,
+  ol {
+    margin: 0.4rem 0 0.8rem;
+    padding-left: 2rem;
+  }
+  ul {
+    list-style: disc;
+  }
+  ol {
+    list-style: decimal;
+  }
+  li {
+    margin: 0.2rem 0;
+  }
+  a {
+    color: ${({ theme }) => theme.colors.primary600};
+    text-decoration: underline;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin: 1rem 0 0.4rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  h1 {
+    font-size: 1.8rem;
+  }
+  h2 {
+    font-size: 1.6rem;
+  }
+  h3,
+  h4 {
+    font-size: 1.4rem;
+  }
+  code {
+    font-family: 'Menlo', 'Consolas', monospace;
+    font-size: 0.875em;
+    background: ${({ theme }) => theme.colors.neutral150};
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+  }
+  pre {
+    margin: 0.4rem 0 0.8rem;
+    padding: 0.8rem;
+    overflow-x: auto;
+    background: ${({ theme }) => theme.colors.neutral150};
+    border-radius: 4px;
+  }
+  pre code {
+    background: transparent;
+    padding: 0;
+    font-size: 0.8125rem;
+  }
+  blockquote {
+    margin: 0.4rem 0;
+    padding-left: 0.8rem;
+    border-left: 3px solid ${({ theme }) => theme.colors.neutral200};
+    color: ${({ theme }) => theme.colors.neutral600};
+  }
+  table {
+    margin: 0.4rem 0 0.8rem;
+    border-collapse: collapse;
+  }
+  th,
+  td {
+    padding: 0.4rem 0.8rem;
+    border: 1px solid ${({ theme }) => theme.colors.neutral200};
+    text-align: left;
+  }
+`;
 
 const toolStateLabel = (state: string, name: string): { text: string; danger: boolean } => {
   switch (state) {
@@ -92,9 +193,9 @@ export const Chat = () => {
                 {message.parts.map((part, index) => {
                   if (part.type === 'text') {
                     return (
-                      <Typography key={index} tag="p">
-                        {part.text}
-                      </Typography>
+                      <MarkdownBody key={index}>
+                        <Markdown remarkPlugins={[remarkGfm]}>{part.text}</Markdown>
+                      </MarkdownBody>
                     );
                   }
 

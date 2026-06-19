@@ -3,7 +3,7 @@ import * as React from "react";
 import { useIntl } from "react-intl";
 import { Page, useFetchClient, useNotification } from "@strapi/strapi/admin";
 import { Box, Typography, Flex, Field, SingleSelect, SingleSelectOption, Toggle, Button } from "@strapi/design-system";
-import { P as PERMISSIONS, g as getTranslation } from "./index-UCHkpuZ4.mjs";
+import { P as PERMISSIONS, g as getTranslation } from "./index-Duzaf2O2.mjs";
 const PROVIDERS = ["anthropic", "google", "openai"];
 const PROVIDER_LABELS = {
   anthropic: "Anthropic",

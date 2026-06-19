@@ -1,6 +1,6 @@
 {
   "name": "strapi-plugin-ai-content-studio",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Multi-provider AI assistant embedded in the Strapi v5 admin panel (chat + tool calling over the Document Service, encrypted provider keys, RBAC).",
   "license": "MIT",
   "keywords": [
@@ -59,7 +59,9 @@
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-intl": "^6.0.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.0.0",
+    "remark-gfm": "^4.0.1",
     "styled-components": "^6.0.0",
     "typescript": "^5",
     "zod": "^4"
