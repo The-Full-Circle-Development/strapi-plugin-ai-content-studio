@@ -21,12 +21,43 @@ export class ProviderConfigError extends Error {
   }
 }
 
+export interface ActiveModel {
+  model: LanguageModel;
+  provider: ProviderId;
+  modelId: string;
+  /** Whether the active model accepts image input. If false, attachments still work for
+   *  setting/replacing media (by id), we just don't send the image bytes to the model. */
+  supportsVision: boolean;
+}
+
+/**
+ * Conservative image-input capability check. Default-deny: only models we're confident accept
+ * images return true, so an image is NEVER sent to a model that would reject it (which would break
+ * the whole request). All Anthropic/Gemini chat models are multimodal; modern OpenAI gpt-4+/o-series
+ * are too. Text-only/audio/embedding models return false.
+ */
+export function modelSupportsVision(provider: string, model: string): boolean {
+  const m = model.toLowerCase();
+  if (provider === 'anthropic') {
+    return m.startsWith('claude-');
+  }
+  if (provider === 'google') {
+    return m.startsWith('gemini-');
+  }
+  if (provider === 'openai') {
+    if (m.startsWith('gpt-3.5')) return false;
+    if (/embedding|tts|whisper|moderation|audio|realtime/.test(m)) return false;
+    return m.startsWith('gpt-4') || m.startsWith('gpt-5') || /^o\d/.test(m);
+  }
+  return false;
+}
+
 const registryService = ({ strapi }: { strapi: Core.Strapi }) => ({
   /**
    * Builds the active language model from the persisted config, per request.
    * Rebuilt every call so a rotated key / changed model takes effect on the next message.
    */
-  async getActiveModel(): Promise<LanguageModel> {
+  async getActiveModel(): Promise<ActiveModel> {
     const configSvc = strapi.plugin('ai-content-studio').service('config');
     const cfg = await configSvc.get();
     const { activeProvider, activeModel, providers } = cfg;
@@ -71,7 +102,12 @@ const registryService = ({ strapi }: { strapi: Core.Strapi }) => ({
     }
 
     const registry = createProviderRegistry(factories as never);
-    return registry.languageModel(`${activeProvider}:${activeModel}` as never);
+    return {
+      model: registry.languageModel(`${activeProvider}:${activeModel}` as never),
+      provider: activeProvider as ProviderId,
+      modelId: activeModel,
+      supportsVision: modelSupportsVision(activeProvider, activeModel),
+    };
   },
 });
 

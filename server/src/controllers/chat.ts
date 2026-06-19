@@ -34,6 +34,9 @@ You can inspect and edit the website's content using the provided tools.
   Harder — media nested in a component (e.g. homepage or page hero.slides[].image): getEntry first,
   rebuild the whole component with the new image id, and send it WITHOUT component ids (Strapi
   recreates them). Tell the user this rebuilds the component.
+- You may or may not be able to SEE the image (depends on the active model). If you cannot see it,
+  you can still set/replace media fields using the provided media id — just tell the user you can't
+  visually analyze the image with the current model.
 - Always confirm the target field and document before replacing, then report what changed.
 
 ## Style
@@ -75,8 +78,11 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     const userAbility = ctx.state.userAbility;
 
     let model;
+    let supportsVision = false;
     try {
-      model = await strapi.plugin('ai-content-studio').service('registry').getActiveModel();
+      const active = await strapi.plugin('ai-content-studio').service('registry').getActiveModel();
+      model = active.model;
+      supportsVision = active.supportsVision;
     } catch (err) {
       // Config / key problems happen BEFORE streaming -> ordinary HTTP error (no key leaked).
       if (err instanceof ProviderConfigError) {
@@ -93,13 +99,17 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       strapi.config.get('plugin::ai-content-studio.showProviderErrorDetails', false)
     );
 
-    // Drop file (image) parts from older turns so we don't re-send base64 every request; keep them
-    // on the last (current) message so a vision model can analyze freshly-attached images.
-    const trimmed = messages.map((message, index) =>
-      index === messages.length - 1
+    // Image handling that works with ALL models:
+    //  - Drop file parts from older turns so we don't re-send base64 every request.
+    //  - Keep file parts on the last message ONLY if the active model accepts images; otherwise
+    //    strip them too, so a non-vision model never receives an image (which would error). The
+    //    media id is still in the message text, so "replace this media field" works on any model.
+    const trimmed = messages.map((message, index) => {
+      const keepFiles = index === messages.length - 1 && supportsVision;
+      return keepFiles
         ? message
-        : { ...message, parts: (message.parts ?? []).filter((part) => part.type !== 'file') }
-    );
+        : { ...message, parts: (message.parts ?? []).filter((part) => part.type !== 'file') };
+    });
 
     const result = streamText({
       model,

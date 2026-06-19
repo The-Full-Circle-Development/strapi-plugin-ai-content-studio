@@ -36112,6 +36112,21 @@ class ProviderConfigError extends Error {
     this.code = code;
   }
 }
+function modelSupportsVision(provider, model) {
+  const m = model.toLowerCase();
+  if (provider === "anthropic") {
+    return m.startsWith("claude-");
+  }
+  if (provider === "google") {
+    return m.startsWith("gemini-");
+  }
+  if (provider === "openai") {
+    if (m.startsWith("gpt-3.5")) return false;
+    if (/embedding|tts|whisper|moderation|audio|realtime/.test(m)) return false;
+    return m.startsWith("gpt-4") || m.startsWith("gpt-5") || /^o\d/.test(m);
+  }
+  return false;
+}
 const registryService = ({ strapi }) => ({
   /**
    * Builds the active language model from the persisted config, per request.
@@ -36156,7 +36171,12 @@ const registryService = ({ strapi }) => ({
         throw new ProviderConfigError(`Unknown provider "${activeProvider}".`, "UNKNOWN_PROVIDER");
     }
     const registry2 = createProviderRegistry(factories);
-    return registry2.languageModel(`${activeProvider}:${activeModel}`);
+    return {
+      model: registry2.languageModel(`${activeProvider}:${activeModel}`),
+      provider: activeProvider,
+      modelId: activeModel,
+      supportsVision: modelSupportsVision(activeProvider, activeModel)
+    };
   }
 });
 const SYSTEM_PROMPT = `You are the Concept Bath content assistant, embedded in the Strapi admin panel.
@@ -36191,6 +36211,9 @@ You can inspect and edit the website's content using the provided tools.
   Harder — media nested in a component (e.g. homepage or page hero.slides[].image): getEntry first,
   rebuild the whole component with the new image id, and send it WITHOUT component ids (Strapi
   recreates them). Tell the user this rebuilds the component.
+- You may or may not be able to SEE the image (depends on the active model). If you cannot see it,
+  you can still set/replace media fields using the provided media id — just tell the user you can't
+  visually analyze the image with the current model.
 - Always confirm the target field and document before replacing, then report what changed.
 
 ## Style
@@ -36216,8 +36239,11 @@ const chatController = ({ strapi }) => ({
     }
     const userAbility = ctx.state.userAbility;
     let model;
+    let supportsVision = false;
     try {
-      model = await strapi.plugin("ai-content-studio").service("registry").getActiveModel();
+      const active = await strapi.plugin("ai-content-studio").service("registry").getActiveModel();
+      model = active.model;
+      supportsVision = active.supportsVision;
     } catch (err) {
       if (err instanceof ProviderConfigError) {
         return ctx.badRequest(err.message, { code: err.code });
@@ -36229,9 +36255,10 @@ const chatController = ({ strapi }) => ({
     const showErrorDetails = Boolean(
       strapi.config.get("plugin::ai-content-studio.showProviderErrorDetails", false)
     );
-    const trimmed = messages.map(
-      (message, index2) => index2 === messages.length - 1 ? message : { ...message, parts: (message.parts ?? []).filter((part) => part.type !== "file") }
-    );
+    const trimmed = messages.map((message, index2) => {
+      const keepFiles = index2 === messages.length - 1 && supportsVision;
+      return keepFiles ? message : { ...message, parts: (message.parts ?? []).filter((part) => part.type !== "file") };
+    });
     const result = streamText({
       model,
       system: SYSTEM_PROMPT,

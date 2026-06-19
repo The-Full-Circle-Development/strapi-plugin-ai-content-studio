@@ -267,6 +267,32 @@ export const Chat = () => {
     setAttachments([]);
   };
 
+  // Paste images straight from the clipboard (e.g. a screenshot) into the attachments.
+  const onPasteImages = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = event.clipboardData?.items;
+    if (!items) {
+      return;
+    }
+    const images: File[] = [];
+    for (const item of Array.from(items)) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          const ext = (file.type.split('/')[1] || 'png').replace('+xml', '');
+          images.push(
+            file.name && file.name !== 'image.png'
+              ? file
+              : new File([file], `pasted-${images.length + 1}.${ext}`, { type: file.type })
+          );
+        }
+      }
+    }
+    if (images.length > 0) {
+      event.preventDefault();
+      setAttachments((a) => [...a, ...images]);
+    }
+  };
+
   return (
     <Page.Main>
       <Box padding={6}>
