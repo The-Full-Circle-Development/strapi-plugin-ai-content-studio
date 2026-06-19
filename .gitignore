@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+
+# Caches / logs
+.cache/
+*.log
+.DS_Store
+
+# NOTE: dist/ is intentionally NOT ignored.
+# Consumers install this package as a git dependency, so the built output is
+# committed to the repo (see README → "Releasing"). Rebuild before committing.

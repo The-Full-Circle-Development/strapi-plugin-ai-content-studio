@@ -1,0 +1,75 @@
+"use strict";
+const jsxRuntime = require("react/jsx-runtime");
+const icons = require("@strapi/icons");
+const __variableDynamicImportRuntimeHelper = (glob, path, segs) => {
+  const v = glob[path];
+  if (v) {
+    return typeof v === "function" ? v() : Promise.resolve(v);
+  }
+  return new Promise((_, reject) => {
+    (typeof queueMicrotask === "function" ? queueMicrotask : setTimeout)(
+      reject.bind(
+        null,
+        new Error(
+          "Unknown variable dynamic import: " + path + (path.split("/").length !== segs ? ". Note that variables only represent file names one level deep." : "")
+        )
+      )
+    );
+  });
+};
+const PLUGIN_ID = "ai-content-studio";
+const PERMISSIONS = {
+  chat: [{ action: "plugin::ai-content-studio.chat.use", subject: null }],
+  settingsRead: [{ action: "plugin::ai-content-studio.settings.read", subject: null }]
+};
+const getTranslation = (id) => `${PLUGIN_ID}.${id}`;
+const prefixPluginTranslations = (trad, pluginId) => Object.keys(trad).reduce((acc, key) => {
+  acc[`${pluginId}.${key}`] = trad[key];
+  return acc;
+}, {});
+const PluginIcon = () => /* @__PURE__ */ jsxRuntime.jsx(icons.Sparkle, {});
+const index = {
+  register(app) {
+    app.addMenuLink({
+      to: `plugins/${PLUGIN_ID}`,
+      icon: PluginIcon,
+      intlLabel: { id: getTranslation("menu.label"), defaultMessage: "AI Studio" },
+      permissions: PERMISSIONS.chat,
+      Component: () => Promise.resolve().then(() => require("./Chat-CNABdRmJ.js")).then((mod) => ({ default: mod.Chat }))
+    });
+    app.addSettingsLink(
+      {
+        id: PLUGIN_ID,
+        intlLabel: { id: getTranslation("settings.section"), defaultMessage: "AI Content Studio" }
+      },
+      {
+        id: `${PLUGIN_ID}.settings`,
+        to: PLUGIN_ID,
+        intlLabel: { id: getTranslation("settings.link"), defaultMessage: "Configuration" },
+        permissions: PERMISSIONS.settingsRead,
+        Component: () => Promise.resolve().then(() => require("./Settings-iqQV3eEG.js")).then((mod) => ({ default: mod.Settings }))
+      }
+    );
+    app.registerPlugin({
+      id: PLUGIN_ID,
+      name: "AI Content Studio"
+    });
+  },
+  bootstrap(_app) {
+  },
+  async registerTrads({ locales }) {
+    return Promise.all(
+      locales.map(async (locale) => {
+        try {
+          const { default: data } = await __variableDynamicImportRuntimeHelper(/* @__PURE__ */ Object.assign({ "./translations/en.json": () => Promise.resolve().then(() => require("./en-CQLL3x-9.js")) }), `./translations/${locale}.json`, 3);
+          return { data: prefixPluginTranslations(data, PLUGIN_ID), locale };
+        } catch {
+          return { data: {}, locale };
+        }
+      })
+    );
+  }
+};
+exports.PERMISSIONS = PERMISSIONS;
+exports.getTranslation = getTranslation;
+exports.index = index;

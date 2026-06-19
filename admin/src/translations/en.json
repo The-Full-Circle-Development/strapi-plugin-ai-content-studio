@@ -1,0 +1,23 @@
+{
+  "plugin.name": "AI Content Studio",
+  "menu.label": "AI Studio",
+  "settings.section": "AI Content Studio",
+  "settings.link": "Configuration",
+  "chat.title": "AI Content Studio",
+  "chat.subtitle": "Ask the assistant to find, draft, edit, or publish content.",
+  "chat.placeholder": "Ask the assistant to draft, search, or create content…",
+  "chat.send": "Send",
+  "chat.stop": "Stop",
+  "chat.you": "You",
+  "chat.assistant": "Assistant",
+  "chat.thinking": "Thinking…",
+  "settings.title": "AI Content Studio — Configuration",
+  "settings.subtitle": "Choose the active provider and model, and manage API keys. Keys are encrypted at rest and never shown again.",
+  "settings.activeProvider": "Active provider",
+  "settings.activeModel": "Active model",
+  "settings.apiKey": "API key",
+  "settings.save": "Save",
+  "settings.loadError": "Failed to load AI settings.",
+  "settings.saveSuccess": "AI settings saved.",
+  "settings.saveError": "Could not save AI settings."
+}
