@@ -5,7 +5,7 @@ const React = require("react");
 const reactIntl = require("react-intl");
 const admin = require("@strapi/strapi/admin");
 const designSystem = require("@strapi/design-system");
-const index = require("./index-Cpu0CcIj.js");
+const index = require("./index-Be-9eWct.js");
 function _interopNamespace(e) {
   if (e && e.__esModule) return e;
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });

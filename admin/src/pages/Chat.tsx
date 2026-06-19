@@ -2,12 +2,11 @@ import * as React from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, getToolName, isToolUIPart, isFileUIPart, type UIMessage } from 'ai';
 import { useAuth, Page, useNotification } from '@strapi/strapi/admin';
-import { useIntl } from 'react-intl';
-import { Box, Flex, Typography, Textarea, Button, Loader, Status } from '@strapi/design-system';
+import { Loader } from '@strapi/design-system';
+import { Sparkle, Paperclip, ArrowUp, Stop, Cross } from '@strapi/icons';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { styled } from 'styled-components';
-import { getTranslation } from '../utils/getTranslation';
 import { LOADING_WORDS } from '../data/loadingWords';
 
 const backendURL = (): string => {
@@ -28,7 +27,6 @@ async function uploadToLibrary(file: File, token: string | null): Promise<Upload
   formData.append('files', file);
   const res = await fetch(`${backendURL()}/upload`, {
     method: 'POST',
-    // Do NOT set Content-Type — the browser adds the multipart boundary.
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
   });
@@ -64,14 +62,216 @@ async function filesToUIParts(files: File[]) {
   );
 }
 
-/**
- * Renders assistant markdown (bold, lists, inline code, code blocks, links, tables) using
- * Strapi theme tokens so it matches the admin (and adapts to light/dark). react-markdown does
- * NOT render raw HTML, so this is XSS-safe.
- */
-const MarkdownBody = styled.div`
+/** Cycles through a random "working…" word while `active` (Claude Code-style). */
+function useCyclingWord(active: boolean, words: string[], intervalMs = 2500): string {
+  const pick = React.useCallback(
+    () => words[Math.floor(Math.random() * words.length)] ?? 'Working',
+    [words]
+  );
+  const [word, setWord] = React.useState<string>(pick);
+  React.useEffect(() => {
+    if (!active) {
+      return undefined;
+    }
+    setWord(pick());
+    const id = window.setInterval(() => setWord(pick()), intervalMs);
+    return () => window.clearInterval(id);
+  }, [active, pick, intervalMs]);
+  return word;
+}
+
+const toolLabel = (state: string, name: string): { text: string; danger: boolean } => {
+  switch (state) {
+    case 'input-streaming':
+    case 'input-available':
+      return { text: `Using ${name}…`, danger: false };
+    case 'output-available':
+      return { text: `Used ${name}`, danger: false };
+    case 'output-error':
+      return { text: `${name} failed`, danger: true };
+    default:
+      return { text: name, danger: false };
+  }
+};
+
+const SUGGESTIONS = [
+  'List the content types I can edit',
+  'Find the 5 most recent blog posts',
+  'Draft a new service called "Heated Floors"',
+  'What does the homepage hero say right now?',
+];
+
+/* ----------------------------------------------------------------------------- styling */
+
+const COLUMN = '46rem';
+
+const Shell = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 6rem);
+  background: ${({ theme }) => theme.colors.neutral0};
+`;
+
+const Scroll = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem 1.5rem 1rem;
+`;
+
+const Column = styled.div`
+  width: 100%;
+  max-width: ${COLUMN};
+  margin: 0 auto;
+`;
+
+const Empty = styled.div`
+  min-height: calc(100vh - 18rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 1.2rem;
+`;
+
+const EmptyLogo = styled.div`
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${({ theme }) => theme.colors.primary100};
+  color: ${({ theme }) => theme.colors.primary600};
+  svg {
+    width: 2rem;
+    height: 2rem;
+  }
+`;
+
+const Greeting = styled.div`
+  font-size: 2rem;
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.neutral800};
+`;
+
+const Suggestions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  justify-content: center;
+  margin-top: 0.8rem;
+`;
+
+const Suggestion = styled.button`
+  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  background: ${({ theme }) => theme.colors.neutral0};
+  color: ${({ theme }) => theme.colors.neutral700};
+  border-radius: 1.2rem;
+  padding: 0.7rem 1.2rem;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  &:hover {
+    background: ${({ theme }) => theme.colors.neutral100};
+    border-color: ${({ theme }) => theme.colors.neutral300};
+  }
+`;
+
+const Turn = styled.div`
+  margin-bottom: 2.4rem;
+`;
+
+const UserRow = styled(Turn)`
+  display: flex;
+  justify-content: flex-end;
+`;
+
+const UserBubble = styled.div`
+  max-width: 85%;
+  background: ${({ theme }) => theme.colors.primary100};
+  color: ${({ theme }) => theme.colors.neutral800};
+  border-radius: 1.4rem;
+  padding: 0.9rem 1.3rem;
   font-size: 1.4rem;
   line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+`;
+
+const AssistantRow = styled(Turn)`
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+`;
+
+const Avatar = styled.div`
+  flex: 0 0 auto;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${({ theme }) => theme.colors.primary100};
+  color: ${({ theme }) => theme.colors.primary600};
+  svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+`;
+
+const AssistantContent = styled.div`
+  flex: 1;
+  min-width: 0;
+  padding-top: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  color: ${({ theme }) => theme.colors.neutral800};
+`;
+
+const ToolPill = styled.div<{ $danger?: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  align-self: flex-start;
+  font-size: 1.2rem;
+  color: ${({ theme, $danger }) => ($danger ? theme.colors.danger600 : theme.colors.neutral600)};
+  background: ${({ theme }) => theme.colors.neutral100};
+  border: 1px solid ${({ theme }) => theme.colors.neutral150};
+  border-radius: 1.2rem;
+  padding: 0.4rem 0.9rem;
+  &::before {
+    content: '';
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: ${({ theme, $danger }) => ($danger ? theme.colors.danger600 : theme.colors.success600)};
+  }
+`;
+
+const Working = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: ${({ theme }) => theme.colors.neutral500};
+  font-size: 1.3rem;
+`;
+
+const MsgImage = styled.img`
+  max-width: 22rem;
+  max-height: 22rem;
+  border-radius: 0.8rem;
+  display: block;
+`;
+
+const MarkdownBody = styled.div`
+  font-size: 1.4rem;
+  line-height: 1.6;
 
   & > *:first-child {
     margin-top: 0;
@@ -79,15 +279,11 @@ const MarkdownBody = styled.div`
   & > *:last-child {
     margin-bottom: 0;
   }
-
   p {
     margin: 0 0 0.8rem;
   }
   strong {
     font-weight: 600;
-  }
-  em {
-    font-style: italic;
   }
   ul,
   ol {
@@ -162,46 +358,152 @@ const MarkdownBody = styled.div`
   }
 `;
 
-/**
- * Cycles through a random "working…" word while `active`, changing every `intervalMs`
- * (Claude Code-style). Returns the current word.
- */
-function useCyclingWord(active: boolean, words: string[], intervalMs = 2500): string {
-  const pick = React.useCallback(
-    () => words[Math.floor(Math.random() * words.length)] ?? 'Working',
-    [words]
-  );
-  const [word, setWord] = React.useState<string>(pick);
-  React.useEffect(() => {
-    if (!active) {
-      return undefined;
-    }
-    setWord(pick());
-    const id = window.setInterval(() => setWord(pick()), intervalMs);
-    return () => window.clearInterval(id);
-  }, [active, pick, intervalMs]);
-  return word;
-}
+const ComposerWrap = styled.div`
+  padding: 0.5rem 1.5rem 1.5rem;
+`;
 
-const toolStateLabel = (state: string, name: string): { text: string; danger: boolean } => {
-  switch (state) {
-    case 'input-streaming':
-    case 'input-available':
-      return { text: `Running tool: ${name}…`, danger: false };
-    case 'output-available':
-      return { text: `Tool ${name} finished`, danger: false };
-    case 'output-error':
-      return { text: `Tool ${name} failed`, danger: true };
-    default:
-      return { text: `Tool ${name}`, danger: false };
+const Composer = styled.div`
+  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  background: ${({ theme }) => theme.colors.neutral0};
+  border-radius: 1.6rem;
+  padding: 0.8rem 0.8rem 0.6rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  &:focus-within {
+    border-color: ${({ theme }) => theme.colors.primary600};
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
   }
-};
+`;
+
+const Thumbs = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.2rem 0.4rem 0.6rem;
+`;
+
+const Thumb = styled.div`
+  position: relative;
+  width: 4.4rem;
+  height: 4.4rem;
+  border-radius: 0.6rem;
+  overflow: hidden;
+  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+`;
+
+const ThumbRemove = styled.button`
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  svg {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+  svg path {
+    fill: #fff;
+  }
+`;
+
+const Editor = styled.textarea`
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.neutral800};
+  font-family: inherit;
+  font-size: 1.4rem;
+  line-height: 1.5;
+  padding: 0.6rem 0.6rem 0.2rem;
+  max-height: 18rem;
+  &::placeholder {
+    color: ${({ theme }) => theme.colors.neutral500};
+  }
+`;
+
+const Bar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.2rem 0.2rem 0;
+`;
+
+const IconButton = styled.button`
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 50%;
+  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  background: ${({ theme }) => theme.colors.neutral0};
+  color: ${({ theme }) => theme.colors.neutral600};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 120ms ease;
+  &:hover:not(:disabled) {
+    background: ${({ theme }) => theme.colors.neutral100};
+  }
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  svg {
+    width: 1.7rem;
+    height: 1.7rem;
+  }
+`;
+
+const SendButton = styled(IconButton)`
+  border: none;
+  background: ${({ theme }) => theme.colors.primary600};
+  color: #fff;
+  svg path {
+    fill: #fff;
+  }
+  &:hover:not(:disabled) {
+    background: ${({ theme }) => theme.colors.primary700};
+  }
+  &:disabled {
+    background: ${({ theme }) => theme.colors.neutral200};
+  }
+`;
+
+const Hint = styled.div`
+  text-align: center;
+  font-size: 1.1rem;
+  color: ${({ theme }) => theme.colors.neutral500};
+  margin-top: 0.6rem;
+`;
+
+const ErrorText = styled.div`
+  color: ${({ theme }) => theme.colors.danger600};
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+`;
+
+/* ----------------------------------------------------------------------------- component */
 
 export const Chat = () => {
-  const { formatMessage } = useIntl();
+  const { toggleNotification } = useNotification();
 
-  // The admin JWT lives in Redux (not localStorage in Strapi 5.42); surface it via useAuth.
-  // Keep it in a ref so the transport's header function always reads the freshest token.
+  // Admin JWT lives in Redux (not localStorage in Strapi 5.42); surface it via useAuth and keep
+  // it in a ref so the transport's header function always reads the freshest token.
   const token = useAuth('AiContentStudioChat', (state) => state.token);
   const tokenRef = React.useRef<string | null>(token);
   React.useEffect(() => {
@@ -218,14 +520,42 @@ export const Chat = () => {
     []
   );
 
-  const { toggleNotification } = useNotification();
   const { messages, sendMessage, status, stop, error } = useChat({ transport });
   const [input, setInput] = React.useState('');
   const [attachments, setAttachments] = React.useState<File[]>([]);
   const [uploading, setUploading] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const editorRef = React.useRef<HTMLTextAreaElement>(null);
+  const bottomRef = React.useRef<HTMLDivElement>(null);
+
   const busy = status === 'submitted' || status === 'streaming';
   const loadingWord = useCyclingWord(busy, LOADING_WORDS);
+  const canSend = !busy && !uploading && (input.trim() !== '' || attachments.length > 0);
+
+  // Object-URL thumbnails for composer chips (revoked on change/unmount).
+  const [previews, setPreviews] = React.useState<string[]>([]);
+  React.useEffect(() => {
+    const urls = attachments.map((file) => URL.createObjectURL(file));
+    setPreviews(urls);
+    return () => urls.forEach((url) => URL.revokeObjectURL(url));
+  }, [attachments]);
+
+  // Auto-scroll to the latest content.
+  React.useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages, status]);
+
+  // Auto-grow the editor.
+  const autoGrow = React.useCallback(() => {
+    const el = editorRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.min(el.scrollHeight, 288)}px`;
+    }
+  }, []);
+  React.useEffect(() => {
+    autoGrow();
+  }, [input, autoGrow]);
 
   const onSend = async () => {
     const text = input.trim();
@@ -239,8 +569,6 @@ export const Chat = () => {
     if (attachments.length > 0) {
       setUploading(true);
       try {
-        // Upload to the media library (so the assistant can set/replace fields by id) AND
-        // attach as data-URL file parts (so a vision model can analyze the image).
         const uploaded = await Promise.all(
           attachments.map((file) => uploadToLibrary(file, tokenRef.current))
         );
@@ -267,7 +595,6 @@ export const Chat = () => {
     setAttachments([]);
   };
 
-  // Paste images straight from the clipboard (e.g. a screenshot) into the attachments.
   const onPasteImages = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = event.clipboardData?.items;
     if (!items) {
@@ -293,209 +620,193 @@ export const Chat = () => {
     }
   };
 
+  const renderImageParts = (message: UIMessage) =>
+    message.parts.map((part, index) =>
+      isFileUIPart(part) && part.mediaType?.startsWith('image/') ? (
+        <MsgImage key={`img-${index}`} src={part.url} alt={part.filename ?? 'attachment'} />
+      ) : null
+    );
+
   return (
     <Page.Main>
-      <Box padding={6}>
-        <Typography variant="alpha" tag="h1">
-          {formatMessage({ id: getTranslation('chat.title'), defaultMessage: 'AI Content Studio' })}
-        </Typography>
-        <Box paddingTop={2}>
-          <Typography variant="epsilon" textColor="neutral600">
-            {formatMessage({
-              id: getTranslation('chat.subtitle'),
-              defaultMessage: 'Ask the assistant to find, draft, edit, or publish content.',
-            })}
-          </Typography>
-        </Box>
+      <Shell>
+        <Scroll>
+          <Column>
+            {messages.length === 0 ? (
+              <Empty>
+                <EmptyLogo>
+                  <Sparkle />
+                </EmptyLogo>
+                <Greeting>How can I help with your content?</Greeting>
+                <Suggestions>
+                  {SUGGESTIONS.map((s) => (
+                    <Suggestion
+                      key={s}
+                      onClick={() => {
+                        setInput(s);
+                        editorRef.current?.focus();
+                      }}
+                    >
+                      {s}
+                    </Suggestion>
+                  ))}
+                </Suggestions>
+              </Empty>
+            ) : (
+              messages.map((message) =>
+                message.role === 'user' ? (
+                  <UserRow key={message.id}>
+                    <UserBubble>
+                      {renderImageParts(message)}
+                      {message.parts.map((part, index) =>
+                        part.type === 'text' ? <span key={index}>{part.text}</span> : null
+                      )}
+                    </UserBubble>
+                  </UserRow>
+                ) : (
+                  <AssistantRow key={message.id}>
+                    <Avatar>
+                      <Sparkle />
+                    </Avatar>
+                    <AssistantContent>
+                      {message.parts.map((part, index) => {
+                        if (part.type === 'text') {
+                          return (
+                            <MarkdownBody key={index}>
+                              <Markdown remarkPlugins={[remarkGfm]}>{part.text}</Markdown>
+                            </MarkdownBody>
+                          );
+                        }
+                        if (part.type === 'reasoning') {
+                          return (
+                            <Working key={index} style={{ fontStyle: 'italic' }}>
+                              {part.text}
+                            </Working>
+                          );
+                        }
+                        if (isToolUIPart(part)) {
+                          const { text, danger } = toolLabel(part.state, String(getToolName(part)));
+                          return (
+                            <ToolPill key={index} $danger={danger}>
+                              {text}
+                            </ToolPill>
+                          );
+                        }
+                        if (isFileUIPart(part) && part.mediaType?.startsWith('image/')) {
+                          return (
+                            <MsgImage key={index} src={part.url} alt={part.filename ?? 'image'} />
+                          );
+                        }
+                        return null;
+                      })}
+                    </AssistantContent>
+                  </AssistantRow>
+                )
+              )
+            )}
 
-        <Flex direction="column" alignItems="stretch" gap={3} marginTop={6}>
-          {messages.map((message) => (
-            <Box
-              key={message.id}
-              padding={4}
-              hasRadius
-              background={message.role === 'user' ? 'primary100' : 'neutral100'}
-            >
-              <Typography variant="sigma" textColor="neutral600">
-                {message.role === 'user'
-                  ? formatMessage({ id: getTranslation('chat.you'), defaultMessage: 'You' })
-                  : formatMessage({ id: getTranslation('chat.assistant'), defaultMessage: 'Assistant' })}
-              </Typography>
-
-              <Flex direction="column" alignItems="stretch" gap={2} marginTop={2}>
-                {message.parts.map((part, index) => {
-                  if (part.type === 'text') {
-                    return (
-                      <MarkdownBody key={index}>
-                        <Markdown remarkPlugins={[remarkGfm]}>{part.text}</Markdown>
-                      </MarkdownBody>
-                    );
-                  }
-
-                  if (part.type === 'reasoning') {
-                    return (
-                      <Typography key={index} variant="pi" textColor="neutral500" fontWeight="regular">
-                        {part.text}
-                      </Typography>
-                    );
-                  }
-
-                  if (isFileUIPart(part)) {
-                    if (part.mediaType?.startsWith('image/')) {
-                      return (
-                        <img
-                          key={index}
-                          src={part.url}
-                          alt={part.filename ?? 'attachment'}
-                          style={{
-                            maxWidth: 240,
-                            maxHeight: 240,
-                            borderRadius: 4,
-                            display: 'block',
-                          }}
-                        />
-                      );
-                    }
-                    return (
-                      <Typography key={index} variant="pi" textColor="neutral600">
-                        {`📎 ${part.filename ?? 'file'}`}
-                      </Typography>
-                    );
-                  }
-
-                  if (isToolUIPart(part)) {
-                    const name = getToolName(part);
-                    const { text, danger } = toolStateLabel(part.state, String(name));
-                    const rawInput = 'input' in part ? part.input : undefined;
-                    const inputStr =
-                      rawInput == null
-                        ? ''
-                        : typeof rawInput === 'string'
-                          ? rawInput
-                          : JSON.stringify(rawInput);
-                    // Hide empty/no-arg tool inputs (e.g. listContentTypes -> "{}").
-                    const showInput = inputStr !== '' && inputStr !== '{}' && inputStr !== 'null';
-                    return (
-                      <Box key={index} padding={2} background="neutral0" hasRadius>
-                        <Status variant={danger ? 'danger' : 'secondary'} size="S">
-                          <Typography variant="omega">{text}</Typography>
-                        </Status>
-                        {showInput ? (
-                          <Box paddingTop={1}>
-                            <Typography variant="pi" textColor="neutral600">
-                              {inputStr}
-                            </Typography>
-                          </Box>
-                        ) : null}
-                      </Box>
-                    );
-                  }
-
-                  return null;
-                })}
-              </Flex>
-            </Box>
-          ))}
-
-          {busy ? (
-            <Flex gap={2} alignItems="center" paddingTop={1}>
-              <Loader small>
-                {formatMessage({ id: getTranslation('chat.thinking'), defaultMessage: 'Working…' })}
-              </Loader>
-              <Typography variant="omega" textColor="neutral600">
-                {`${loadingWord}…`}
-              </Typography>
-            </Flex>
-          ) : null}
-
-          {error ? (
-            <Typography textColor="danger600">{error.message}</Typography>
-          ) : null}
-        </Flex>
-
-        <Box marginTop={4}>
-          {attachments.length > 0 ? (
-            <Flex gap={2} marginBottom={2} wrap="wrap">
-              {attachments.map((file, i) => (
-                <Flex
-                  key={`${file.name}-${i}`}
-                  gap={1}
-                  alignItems="center"
-                  background="neutral100"
-                  paddingLeft={2}
-                  paddingRight={1}
-                  paddingTop={1}
-                  paddingBottom={1}
-                  hasRadius
-                >
-                  <Typography variant="pi">{file.name}</Typography>
-                  <Button
-                    variant="tertiary"
-                    size="S"
-                    onClick={() => setAttachments((a) => a.filter((_, j) => j !== i))}
-                  >
-                    ✕
-                  </Button>
-                </Flex>
-              ))}
-            </Flex>
-          ) : null}
-
-          <Textarea
-            name="prompt"
-            aria-label="prompt"
-            value={input}
-            onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setInput(event.target.value)}
-            placeholder={formatMessage({
-              id: getTranslation('chat.placeholder'),
-              defaultMessage: 'Ask the assistant to draft, search, or create content…',
-            })}
-            onKeyDown={(event: React.KeyboardEvent) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                onSend();
-              }
-            }}
-          />
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            style={{ display: 'none' }}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-              const list = event.target.files;
-              if (list && list.length > 0) {
-                setAttachments((a) => [...a, ...Array.from(list)]);
-              }
-              event.target.value = '';
-            }}
-          />
-
-          <Flex gap={2} marginTop={2}>
-            <Button
-              onClick={onSend}
-              disabled={busy || uploading || (input.trim() === '' && attachments.length === 0)}
-              loading={status === 'submitted' || uploading}
-            >
-              {formatMessage({ id: getTranslation('chat.send'), defaultMessage: 'Send' })}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={busy || uploading}
-            >
-              {formatMessage({ id: getTranslation('chat.attach'), defaultMessage: 'Attach image' })}
-            </Button>
-            {busy ? (
-              <Button variant="danger-light" onClick={() => stop()}>
-                {formatMessage({ id: getTranslation('chat.stop'), defaultMessage: 'Stop' })}
-              </Button>
+            {status === 'submitted' ? (
+              <AssistantRow>
+                <Avatar>
+                  <Sparkle />
+                </Avatar>
+                <AssistantContent>
+                  <Working>
+                    <Loader small>Working…</Loader>
+                    {`${loadingWord}…`}
+                  </Working>
+                </AssistantContent>
+              </AssistantRow>
             ) : null}
-          </Flex>
-        </Box>
-      </Box>
+
+            {error ? <ErrorText>{error.message}</ErrorText> : null}
+            <div ref={bottomRef} />
+          </Column>
+        </Scroll>
+
+        <ComposerWrap>
+          <Column>
+            <Composer>
+              {attachments.length > 0 ? (
+                <Thumbs>
+                  {attachments.map((file, i) => (
+                    <Thumb key={`${file.name}-${i}`}>
+                      {previews[i] ? <img src={previews[i]} alt={file.name} /> : null}
+                      <ThumbRemove
+                        type="button"
+                        aria-label={`Remove ${file.name}`}
+                        onClick={() => setAttachments((a) => a.filter((_, j) => j !== i))}
+                      >
+                        <Cross />
+                      </ThumbRemove>
+                    </Thumb>
+                  ))}
+                </Thumbs>
+              ) : null}
+
+              <Editor
+                ref={editorRef}
+                rows={1}
+                value={input}
+                placeholder="How can I help with your content?"
+                onChange={(e) => setInput(e.target.value)}
+                onInput={autoGrow}
+                onPaste={onPasteImages}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    void onSend();
+                  }
+                }}
+              />
+
+              <Bar>
+                <IconButton
+                  type="button"
+                  aria-label="Attach image"
+                  title="Attach image"
+                  disabled={busy || uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip />
+                </IconButton>
+
+                {busy ? (
+                  <IconButton type="button" aria-label="Stop" title="Stop" onClick={() => stop()}>
+                    <Stop />
+                  </IconButton>
+                ) : (
+                  <SendButton
+                    type="button"
+                    aria-label="Send"
+                    title="Send"
+                    disabled={!canSend}
+                    onClick={() => void onSend()}
+                  >
+                    <ArrowUp />
+                  </SendButton>
+                )}
+              </Bar>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={(event) => {
+                  const list = event.target.files;
+                  if (list && list.length > 0) {
+                    setAttachments((a) => [...a, ...Array.from(list)]);
+                  }
+                  event.target.value = '';
+                }}
+              />
+            </Composer>
+            <Hint>AI Content Studio can edit live content — review important changes.</Hint>
+          </Column>
+        </ComposerWrap>
+      </Shell>
     </Page.Main>
   );
 };

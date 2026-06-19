@@ -1,11 +1,10 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import * as React from "react";
 import { useRef, useCallback, useSyncExternalStore, useEffect } from "react";
-import { useAuth, useNotification, Page } from "@strapi/strapi/admin";
-import { useIntl } from "react-intl";
-import { Box, Typography, Flex, Status, Loader, Button, Textarea } from "@strapi/design-system";
+import { useNotification, useAuth, Page } from "@strapi/strapi/admin";
+import { Loader } from "@strapi/design-system";
+import { Sparkle, Cross, Paperclip, Stop, ArrowUp } from "@strapi/icons";
 import { styled } from "styled-components";
-import { g as getTranslation } from "./index-CH4WsU6n.mjs";
 var marker = "vercel.ai.error";
 var symbol = Symbol.for(marker);
 var _a$2, _b;
@@ -22146,7 +22145,6 @@ async function uploadToLibrary(file, token) {
   formData.append("files", file);
   const res = await fetch(`${backendURL()}/upload`, {
     method: "POST",
-    // Do NOT set Content-Type — the browser adds the multipart boundary.
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData
   });
@@ -22178,9 +22176,192 @@ async function filesToUIParts(files) {
     }))
   );
 }
-const MarkdownBody = styled.div`
+function useCyclingWord(active, words, intervalMs = 2500) {
+  const pick2 = React.useCallback(
+    () => words[Math.floor(Math.random() * words.length)] ?? "Working",
+    [words]
+  );
+  const [word, setWord] = React.useState(pick2);
+  React.useEffect(() => {
+    if (!active) {
+      return void 0;
+    }
+    setWord(pick2());
+    const id = window.setInterval(() => setWord(pick2()), intervalMs);
+    return () => window.clearInterval(id);
+  }, [active, pick2, intervalMs]);
+  return word;
+}
+const toolLabel = (state, name2) => {
+  switch (state) {
+    case "input-streaming":
+    case "input-available":
+      return { text: `Using ${name2}…`, danger: false };
+    case "output-available":
+      return { text: `Used ${name2}`, danger: false };
+    case "output-error":
+      return { text: `${name2} failed`, danger: true };
+    default:
+      return { text: name2, danger: false };
+  }
+};
+const SUGGESTIONS = [
+  "List the content types I can edit",
+  "Find the 5 most recent blog posts",
+  'Draft a new service called "Heated Floors"',
+  "What does the homepage hero say right now?"
+];
+const COLUMN = "46rem";
+const Shell = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 6rem);
+  background: ${({ theme }) => theme.colors.neutral0};
+`;
+const Scroll = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem 1.5rem 1rem;
+`;
+const Column = styled.div`
+  width: 100%;
+  max-width: ${COLUMN};
+  margin: 0 auto;
+`;
+const Empty = styled.div`
+  min-height: calc(100vh - 18rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 1.2rem;
+`;
+const EmptyLogo = styled.div`
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${({ theme }) => theme.colors.primary100};
+  color: ${({ theme }) => theme.colors.primary600};
+  svg {
+    width: 2rem;
+    height: 2rem;
+  }
+`;
+const Greeting = styled.div`
+  font-size: 2rem;
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.neutral800};
+`;
+const Suggestions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  justify-content: center;
+  margin-top: 0.8rem;
+`;
+const Suggestion = styled.button`
+  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  background: ${({ theme }) => theme.colors.neutral0};
+  color: ${({ theme }) => theme.colors.neutral700};
+  border-radius: 1.2rem;
+  padding: 0.7rem 1.2rem;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  &:hover {
+    background: ${({ theme }) => theme.colors.neutral100};
+    border-color: ${({ theme }) => theme.colors.neutral300};
+  }
+`;
+const Turn = styled.div`
+  margin-bottom: 2.4rem;
+`;
+const UserRow = styled(Turn)`
+  display: flex;
+  justify-content: flex-end;
+`;
+const UserBubble = styled.div`
+  max-width: 85%;
+  background: ${({ theme }) => theme.colors.primary100};
+  color: ${({ theme }) => theme.colors.neutral800};
+  border-radius: 1.4rem;
+  padding: 0.9rem 1.3rem;
   font-size: 1.4rem;
   line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+`;
+const AssistantRow = styled(Turn)`
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+`;
+const Avatar = styled.div`
+  flex: 0 0 auto;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${({ theme }) => theme.colors.primary100};
+  color: ${({ theme }) => theme.colors.primary600};
+  svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+`;
+const AssistantContent = styled.div`
+  flex: 1;
+  min-width: 0;
+  padding-top: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  color: ${({ theme }) => theme.colors.neutral800};
+`;
+const ToolPill = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  align-self: flex-start;
+  font-size: 1.2rem;
+  color: ${({ theme, $danger }) => $danger ? theme.colors.danger600 : theme.colors.neutral600};
+  background: ${({ theme }) => theme.colors.neutral100};
+  border: 1px solid ${({ theme }) => theme.colors.neutral150};
+  border-radius: 1.2rem;
+  padding: 0.4rem 0.9rem;
+  &::before {
+    content: '';
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: ${({ theme, $danger }) => $danger ? theme.colors.danger600 : theme.colors.success600};
+  }
+`;
+const Working = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: ${({ theme }) => theme.colors.neutral500};
+  font-size: 1.3rem;
+`;
+const MsgImage = styled.img`
+  max-width: 22rem;
+  max-height: 22rem;
+  border-radius: 0.8rem;
+  display: block;
+`;
+const MarkdownBody = styled.div`
+  font-size: 1.4rem;
+  line-height: 1.6;
 
   & > *:first-child {
     margin-top: 0;
@@ -22188,15 +22369,11 @@ const MarkdownBody = styled.div`
   & > *:last-child {
     margin-bottom: 0;
   }
-
   p {
     margin: 0 0 0.8rem;
   }
   strong {
     font-weight: 600;
-  }
-  em {
-    font-style: italic;
   }
   ul,
   ol {
@@ -22270,37 +22447,136 @@ const MarkdownBody = styled.div`
     text-align: left;
   }
 `;
-function useCyclingWord(active, words, intervalMs = 2500) {
-  const pick2 = React.useCallback(
-    () => words[Math.floor(Math.random() * words.length)] ?? "Working",
-    [words]
-  );
-  const [word, setWord] = React.useState(pick2);
-  React.useEffect(() => {
-    if (!active) {
-      return void 0;
-    }
-    setWord(pick2());
-    const id = window.setInterval(() => setWord(pick2()), intervalMs);
-    return () => window.clearInterval(id);
-  }, [active, pick2, intervalMs]);
-  return word;
-}
-const toolStateLabel = (state, name2) => {
-  switch (state) {
-    case "input-streaming":
-    case "input-available":
-      return { text: `Running tool: ${name2}…`, danger: false };
-    case "output-available":
-      return { text: `Tool ${name2} finished`, danger: false };
-    case "output-error":
-      return { text: `Tool ${name2} failed`, danger: true };
-    default:
-      return { text: `Tool ${name2}`, danger: false };
+const ComposerWrap = styled.div`
+  padding: 0.5rem 1.5rem 1.5rem;
+`;
+const Composer = styled.div`
+  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  background: ${({ theme }) => theme.colors.neutral0};
+  border-radius: 1.6rem;
+  padding: 0.8rem 0.8rem 0.6rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  &:focus-within {
+    border-color: ${({ theme }) => theme.colors.primary600};
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
   }
-};
+`;
+const Thumbs = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.2rem 0.4rem 0.6rem;
+`;
+const Thumb = styled.div`
+  position: relative;
+  width: 4.4rem;
+  height: 4.4rem;
+  border-radius: 0.6rem;
+  overflow: hidden;
+  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+`;
+const ThumbRemove = styled.button`
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  svg {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+  svg path {
+    fill: #fff;
+  }
+`;
+const Editor = styled.textarea`
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.neutral800};
+  font-family: inherit;
+  font-size: 1.4rem;
+  line-height: 1.5;
+  padding: 0.6rem 0.6rem 0.2rem;
+  max-height: 18rem;
+  &::placeholder {
+    color: ${({ theme }) => theme.colors.neutral500};
+  }
+`;
+const Bar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.2rem 0.2rem 0;
+`;
+const IconButton = styled.button`
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 50%;
+  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  background: ${({ theme }) => theme.colors.neutral0};
+  color: ${({ theme }) => theme.colors.neutral600};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 120ms ease;
+  &:hover:not(:disabled) {
+    background: ${({ theme }) => theme.colors.neutral100};
+  }
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  svg {
+    width: 1.7rem;
+    height: 1.7rem;
+  }
+`;
+const SendButton = styled(IconButton)`
+  border: none;
+  background: ${({ theme }) => theme.colors.primary600};
+  color: #fff;
+  svg path {
+    fill: #fff;
+  }
+  &:hover:not(:disabled) {
+    background: ${({ theme }) => theme.colors.primary700};
+  }
+  &:disabled {
+    background: ${({ theme }) => theme.colors.neutral200};
+  }
+`;
+const Hint = styled.div`
+  text-align: center;
+  font-size: 1.1rem;
+  color: ${({ theme }) => theme.colors.neutral500};
+  margin-top: 0.6rem;
+`;
+const ErrorText = styled.div`
+  color: ${({ theme }) => theme.colors.danger600};
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+`;
 const Chat2 = () => {
-  const { formatMessage } = useIntl();
+  const { toggleNotification } = useNotification();
   const token = useAuth("AiContentStudioChat", (state) => state.token);
   const tokenRef = React.useRef(token);
   React.useEffect(() => {
@@ -22314,14 +22590,35 @@ const Chat2 = () => {
     }),
     []
   );
-  const { toggleNotification } = useNotification();
   const { messages, sendMessage, status, stop, error } = useChat({ transport });
   const [input, setInput] = React.useState("");
   const [attachments, setAttachments] = React.useState([]);
   const [uploading, setUploading] = React.useState(false);
   const fileInputRef = React.useRef(null);
+  const editorRef = React.useRef(null);
+  const bottomRef = React.useRef(null);
   const busy = status === "submitted" || status === "streaming";
   const loadingWord = useCyclingWord(busy, LOADING_WORDS);
+  const canSend = !busy && !uploading && (input.trim() !== "" || attachments.length > 0);
+  const [previews, setPreviews] = React.useState([]);
+  React.useEffect(() => {
+    const urls = attachments.map((file) => URL.createObjectURL(file));
+    setPreviews(urls);
+    return () => urls.forEach((url) => URL.revokeObjectURL(url));
+  }, [attachments]);
+  React.useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, status]);
+  const autoGrow = React.useCallback(() => {
+    const el = editorRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, 288)}px`;
+    }
+  }, []);
+  React.useEffect(() => {
+    autoGrow();
+  }, [input, autoGrow]);
   const onSend = async () => {
     const text2 = input.trim();
     if (!text2 && attachments.length === 0 || busy || uploading) {
@@ -22352,155 +22649,159 @@ const Chat2 = () => {
     setInput("");
     setAttachments([]);
   };
-  return /* @__PURE__ */ jsx(Page.Main, { children: /* @__PURE__ */ jsxs(Box, { padding: 6, children: [
-    /* @__PURE__ */ jsx(Typography, { variant: "alpha", tag: "h1", children: formatMessage({ id: getTranslation("chat.title"), defaultMessage: "AI Content Studio" }) }),
-    /* @__PURE__ */ jsx(Box, { paddingTop: 2, children: /* @__PURE__ */ jsx(Typography, { variant: "epsilon", textColor: "neutral600", children: formatMessage({
-      id: getTranslation("chat.subtitle"),
-      defaultMessage: "Ask the assistant to find, draft, edit, or publish content."
-    }) }) }),
-    /* @__PURE__ */ jsxs(Flex, { direction: "column", alignItems: "stretch", gap: 3, marginTop: 6, children: [
-      messages.map((message) => /* @__PURE__ */ jsxs(
-        Box,
-        {
-          padding: 4,
-          hasRadius: true,
-          background: message.role === "user" ? "primary100" : "neutral100",
-          children: [
-            /* @__PURE__ */ jsx(Typography, { variant: "sigma", textColor: "neutral600", children: message.role === "user" ? formatMessage({ id: getTranslation("chat.you"), defaultMessage: "You" }) : formatMessage({ id: getTranslation("chat.assistant"), defaultMessage: "Assistant" }) }),
-            /* @__PURE__ */ jsx(Flex, { direction: "column", alignItems: "stretch", gap: 2, marginTop: 2, children: message.parts.map((part, index2) => {
-              if (part.type === "text") {
-                return /* @__PURE__ */ jsx(MarkdownBody, { children: /* @__PURE__ */ jsx(Markdown, { remarkPlugins: [remarkGfm], children: part.text }) }, index2);
-              }
-              if (part.type === "reasoning") {
-                return /* @__PURE__ */ jsx(Typography, { variant: "pi", textColor: "neutral500", fontWeight: "regular", children: part.text }, index2);
-              }
-              if (isFileUIPart(part)) {
-                if (part.mediaType?.startsWith("image/")) {
-                  return /* @__PURE__ */ jsx(
-                    "img",
-                    {
-                      src: part.url,
-                      alt: part.filename ?? "attachment",
-                      style: {
-                        maxWidth: 240,
-                        maxHeight: 240,
-                        borderRadius: 4,
-                        display: "block"
-                      }
-                    },
-                    index2
-                  );
-                }
-                return /* @__PURE__ */ jsx(Typography, { variant: "pi", textColor: "neutral600", children: `📎 ${part.filename ?? "file"}` }, index2);
-              }
-              if (isToolUIPart(part)) {
-                const name2 = getToolName(part);
-                const { text: text2, danger } = toolStateLabel(part.state, String(name2));
-                const rawInput = "input" in part ? part.input : void 0;
-                const inputStr = rawInput == null ? "" : typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput);
-                const showInput = inputStr !== "" && inputStr !== "{}" && inputStr !== "null";
-                return /* @__PURE__ */ jsxs(Box, { padding: 2, background: "neutral0", hasRadius: true, children: [
-                  /* @__PURE__ */ jsx(Status, { variant: danger ? "danger" : "secondary", size: "S", children: /* @__PURE__ */ jsx(Typography, { variant: "omega", children: text2 }) }),
-                  showInput ? /* @__PURE__ */ jsx(Box, { paddingTop: 1, children: /* @__PURE__ */ jsx(Typography, { variant: "pi", textColor: "neutral600", children: inputStr }) }) : null
-                ] }, index2);
-              }
-              return null;
-            }) })
-          ]
-        },
-        message.id
-      )),
-      busy ? /* @__PURE__ */ jsxs(Flex, { gap: 2, alignItems: "center", paddingTop: 1, children: [
-        /* @__PURE__ */ jsx(Loader, { small: true, children: formatMessage({ id: getTranslation("chat.thinking"), defaultMessage: "Working…" }) }),
-        /* @__PURE__ */ jsx(Typography, { variant: "omega", textColor: "neutral600", children: `${loadingWord}…` })
+  const onPasteImages = (event) => {
+    const items = event.clipboardData?.items;
+    if (!items) {
+      return;
+    }
+    const images = [];
+    for (const item of Array.from(items)) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          const ext = (file.type.split("/")[1] || "png").replace("+xml", "");
+          images.push(
+            file.name && file.name !== "image.png" ? file : new File([file], `pasted-${images.length + 1}.${ext}`, { type: file.type })
+          );
+        }
+      }
+    }
+    if (images.length > 0) {
+      event.preventDefault();
+      setAttachments((a) => [...a, ...images]);
+    }
+  };
+  const renderImageParts = (message) => message.parts.map(
+    (part, index2) => isFileUIPart(part) && part.mediaType?.startsWith("image/") ? /* @__PURE__ */ jsx(MsgImage, { src: part.url, alt: part.filename ?? "attachment" }, `img-${index2}`) : null
+  );
+  return /* @__PURE__ */ jsx(Page.Main, { children: /* @__PURE__ */ jsxs(Shell, { children: [
+    /* @__PURE__ */ jsx(Scroll, { children: /* @__PURE__ */ jsxs(Column, { children: [
+      messages.length === 0 ? /* @__PURE__ */ jsxs(Empty, { children: [
+        /* @__PURE__ */ jsx(EmptyLogo, { children: /* @__PURE__ */ jsx(Sparkle, {}) }),
+        /* @__PURE__ */ jsx(Greeting, { children: "How can I help with your content?" }),
+        /* @__PURE__ */ jsx(Suggestions, { children: SUGGESTIONS.map((s) => /* @__PURE__ */ jsx(
+          Suggestion,
+          {
+            onClick: () => {
+              setInput(s);
+              editorRef.current?.focus();
+            },
+            children: s
+          },
+          s
+        )) })
+      ] }) : messages.map(
+        (message) => message.role === "user" ? /* @__PURE__ */ jsx(UserRow, { children: /* @__PURE__ */ jsxs(UserBubble, { children: [
+          renderImageParts(message),
+          message.parts.map(
+            (part, index2) => part.type === "text" ? /* @__PURE__ */ jsx("span", { children: part.text }, index2) : null
+          )
+        ] }) }, message.id) : /* @__PURE__ */ jsxs(AssistantRow, { children: [
+          /* @__PURE__ */ jsx(Avatar, { children: /* @__PURE__ */ jsx(Sparkle, {}) }),
+          /* @__PURE__ */ jsx(AssistantContent, { children: message.parts.map((part, index2) => {
+            if (part.type === "text") {
+              return /* @__PURE__ */ jsx(MarkdownBody, { children: /* @__PURE__ */ jsx(Markdown, { remarkPlugins: [remarkGfm], children: part.text }) }, index2);
+            }
+            if (part.type === "reasoning") {
+              return /* @__PURE__ */ jsx(Working, { style: { fontStyle: "italic" }, children: part.text }, index2);
+            }
+            if (isToolUIPart(part)) {
+              const { text: text2, danger } = toolLabel(part.state, String(getToolName(part)));
+              return /* @__PURE__ */ jsx(ToolPill, { $danger: danger, children: text2 }, index2);
+            }
+            if (isFileUIPart(part) && part.mediaType?.startsWith("image/")) {
+              return /* @__PURE__ */ jsx(MsgImage, { src: part.url, alt: part.filename ?? "image" }, index2);
+            }
+            return null;
+          }) })
+        ] }, message.id)
+      ),
+      status === "submitted" ? /* @__PURE__ */ jsxs(AssistantRow, { children: [
+        /* @__PURE__ */ jsx(Avatar, { children: /* @__PURE__ */ jsx(Sparkle, {}) }),
+        /* @__PURE__ */ jsx(AssistantContent, { children: /* @__PURE__ */ jsxs(Working, { children: [
+          /* @__PURE__ */ jsx(Loader, { small: true, children: "Working…" }),
+          `${loadingWord}…`
+        ] }) })
       ] }) : null,
-      error ? /* @__PURE__ */ jsx(Typography, { textColor: "danger600", children: error.message }) : null
-    ] }),
-    /* @__PURE__ */ jsxs(Box, { marginTop: 4, children: [
-      attachments.length > 0 ? /* @__PURE__ */ jsx(Flex, { gap: 2, marginBottom: 2, wrap: "wrap", children: attachments.map((file, i) => /* @__PURE__ */ jsxs(
-        Flex,
-        {
-          gap: 1,
-          alignItems: "center",
-          background: "neutral100",
-          paddingLeft: 2,
-          paddingRight: 1,
-          paddingTop: 1,
-          paddingBottom: 1,
-          hasRadius: true,
-          children: [
-            /* @__PURE__ */ jsx(Typography, { variant: "pi", children: file.name }),
-            /* @__PURE__ */ jsx(
-              Button,
-              {
-                variant: "tertiary",
-                size: "S",
-                onClick: () => setAttachments((a) => a.filter((_, j) => j !== i)),
-                children: "✕"
+      error ? /* @__PURE__ */ jsx(ErrorText, { children: error.message }) : null,
+      /* @__PURE__ */ jsx("div", { ref: bottomRef })
+    ] }) }),
+    /* @__PURE__ */ jsx(ComposerWrap, { children: /* @__PURE__ */ jsxs(Column, { children: [
+      /* @__PURE__ */ jsxs(Composer, { children: [
+        attachments.length > 0 ? /* @__PURE__ */ jsx(Thumbs, { children: attachments.map((file, i) => /* @__PURE__ */ jsxs(Thumb, { children: [
+          previews[i] ? /* @__PURE__ */ jsx("img", { src: previews[i], alt: file.name }) : null,
+          /* @__PURE__ */ jsx(
+            ThumbRemove,
+            {
+              type: "button",
+              "aria-label": `Remove ${file.name}`,
+              onClick: () => setAttachments((a) => a.filter((_, j) => j !== i)),
+              children: /* @__PURE__ */ jsx(Cross, {})
+            }
+          )
+        ] }, `${file.name}-${i}`)) }) : null,
+        /* @__PURE__ */ jsx(
+          Editor,
+          {
+            ref: editorRef,
+            rows: 1,
+            value: input,
+            placeholder: "How can I help with your content?",
+            onChange: (e) => setInput(e.target.value),
+            onInput: autoGrow,
+            onPaste: onPasteImages,
+            onKeyDown: (e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void onSend();
               }
-            )
-          ]
-        },
-        `${file.name}-${i}`
-      )) }) : null,
-      /* @__PURE__ */ jsx(
-        Textarea,
-        {
-          name: "prompt",
-          "aria-label": "prompt",
-          value: input,
-          onChange: (event) => setInput(event.target.value),
-          placeholder: formatMessage({
-            id: getTranslation("chat.placeholder"),
-            defaultMessage: "Ask the assistant to draft, search, or create content…"
-          }),
-          onKeyDown: (event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              onSend();
             }
           }
-        }
-      ),
-      /* @__PURE__ */ jsx(
-        "input",
-        {
-          ref: fileInputRef,
-          type: "file",
-          accept: "image/*",
-          multiple: true,
-          style: { display: "none" },
-          onChange: (event) => {
-            const list2 = event.target.files;
-            if (list2 && list2.length > 0) {
-              setAttachments((a) => [...a, ...Array.from(list2)]);
+        ),
+        /* @__PURE__ */ jsxs(Bar, { children: [
+          /* @__PURE__ */ jsx(
+            IconButton,
+            {
+              type: "button",
+              "aria-label": "Attach image",
+              title: "Attach image",
+              disabled: busy || uploading,
+              onClick: () => fileInputRef.current?.click(),
+              children: /* @__PURE__ */ jsx(Paperclip, {})
             }
-            event.target.value = "";
-          }
-        }
-      ),
-      /* @__PURE__ */ jsxs(Flex, { gap: 2, marginTop: 2, children: [
+          ),
+          busy ? /* @__PURE__ */ jsx(IconButton, { type: "button", "aria-label": "Stop", title: "Stop", onClick: () => stop(), children: /* @__PURE__ */ jsx(Stop, {}) }) : /* @__PURE__ */ jsx(
+            SendButton,
+            {
+              type: "button",
+              "aria-label": "Send",
+              title: "Send",
+              disabled: !canSend,
+              onClick: () => void onSend(),
+              children: /* @__PURE__ */ jsx(ArrowUp, {})
+            }
+          )
+        ] }),
         /* @__PURE__ */ jsx(
-          Button,
+          "input",
           {
-            onClick: onSend,
-            disabled: busy || uploading || input.trim() === "" && attachments.length === 0,
-            loading: status === "submitted" || uploading,
-            children: formatMessage({ id: getTranslation("chat.send"), defaultMessage: "Send" })
+            ref: fileInputRef,
+            type: "file",
+            accept: "image/*",
+            multiple: true,
+            style: { display: "none" },
+            onChange: (event) => {
+              const list2 = event.target.files;
+              if (list2 && list2.length > 0) {
+                setAttachments((a) => [...a, ...Array.from(list2)]);
+              }
+              event.target.value = "";
+            }
           }
-        ),
-        /* @__PURE__ */ jsx(
-          Button,
-          {
-            variant: "secondary",
-            onClick: () => fileInputRef.current?.click(),
-            disabled: busy || uploading,
-            children: formatMessage({ id: getTranslation("chat.attach"), defaultMessage: "Attach image" })
-          }
-        ),
-        busy ? /* @__PURE__ */ jsx(Button, { variant: "danger-light", onClick: () => stop(), children: formatMessage({ id: getTranslation("chat.stop"), defaultMessage: "Stop" }) }) : null
-      ] })
-    ] })
+        )
+      ] }),
+      /* @__PURE__ */ jsx(Hint, { children: "AI Content Studio can edit live content — review important changes." })
+    ] }) })
   ] }) });
 };
 export {
