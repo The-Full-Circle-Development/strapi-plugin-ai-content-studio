@@ -1,3 +1,5 @@
+"use strict";
+Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 const en = {
   "plugin.name": "AI Content Studio",
   "menu.label": "AI Studio",
@@ -8,6 +10,7 @@ const en = {
   "chat.placeholder": "Ask the assistant to draft, search, or create content…",
   "chat.send": "Send",
   "chat.stop": "Stop",
+  "chat.attach": "Attach image",
   "chat.you": "You",
   "chat.assistant": "Assistant",
   "chat.thinking": "Thinking…",
@@ -21,6 +24,4 @@ const en = {
   "settings.saveSuccess": "AI settings saved.",
   "settings.saveError": "Could not save AI settings."
 };
-export {
-  en as default
-};
+exports.default = en;

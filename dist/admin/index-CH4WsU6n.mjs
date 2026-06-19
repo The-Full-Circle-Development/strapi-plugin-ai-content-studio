@@ -34,7 +34,7 @@ const index = {
       icon: PluginIcon,
       intlLabel: { id: getTranslation("menu.label"), defaultMessage: "AI Studio" },
       permissions: PERMISSIONS.chat,
-      Component: () => import("./Chat-C9lwgW1W.mjs").then((mod) => ({ default: mod.Chat }))
+      Component: () => import("./Chat-CUReP2V9.mjs").then((mod) => ({ default: mod.Chat }))
     });
     app.addSettingsLink(
       {
@@ -46,7 +46,7 @@ const index = {
         to: PLUGIN_ID,
         intlLabel: { id: getTranslation("settings.link"), defaultMessage: "Configuration" },
         permissions: PERMISSIONS.settingsRead,
-        Component: () => import("./Settings-CKrjvEEm.mjs").then((mod) => ({ default: mod.Settings }))
+        Component: () => import("./Settings-CzWDp6XY.mjs").then((mod) => ({ default: mod.Settings }))
       }
     );
     app.registerPlugin({
@@ -60,7 +60,7 @@ const index = {
     return Promise.all(
       locales.map(async (locale) => {
         try {
-          const { default: data } = await __variableDynamicImportRuntimeHelper(/* @__PURE__ */ Object.assign({ "./translations/en.json": () => import("./en-BC8DCjXC.mjs") }), `./translations/${locale}.json`, 3);
+          const { default: data } = await __variableDynamicImportRuntimeHelper(/* @__PURE__ */ Object.assign({ "./translations/en.json": () => import("./en-CIB-6s-p.mjs") }), `./translations/${locale}.json`, 3);
           return { data: prefixPluginTranslations(data, PLUGIN_ID), locale };
         } catch {
           return { data: {}, locale };

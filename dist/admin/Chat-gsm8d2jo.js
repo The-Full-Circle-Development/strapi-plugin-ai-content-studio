@@ -6,7 +6,7 @@ const admin = require("@strapi/strapi/admin");
 const reactIntl = require("react-intl");
 const designSystem = require("@strapi/design-system");
 const styledComponents = require("styled-components");
-const index$1 = require("./index-BNzrZVUw.js");
+const index$1 = require("./index-Cpu0CcIj.js");
 function _interopNamespace(e) {
   if (e && e.__esModule) return e;
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
@@ -7950,6 +7950,9 @@ function isDataUIMessageChunk(chunk) {
 }
 function createIdMap() {
   return /* @__PURE__ */ Object.create(null);
+}
+function isFileUIPart(part) {
+  return part.type === "file";
 }
 function isStaticToolUIPart(part) {
   return part.type.startsWith("tool-");
@@ -22157,6 +22160,43 @@ const backendURL = () => {
   const w = window;
   return w.strapi?.backendURL ?? "";
 };
+async function uploadToLibrary(file, token) {
+  const formData = new FormData();
+  formData.append("files", file);
+  const res = await fetch(`${backendURL()}/upload`, {
+    method: "POST",
+    // Do NOT set Content-Type — the browser adds the multipart boundary.
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  const files = await res.json();
+  const f = files?.[0];
+  if (!f) {
+    throw new Error("upload returned no file");
+  }
+  return { id: f.id, name: f.name, url: f.url, mime: f.mime };
+}
+function fileToDataUrl(file) {
+  return new Promise((resolve2, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve2(reader.result);
+    reader.onerror = () => reject(reader.error ?? new Error("read failed"));
+    reader.readAsDataURL(file);
+  });
+}
+async function filesToUIParts(files) {
+  return Promise.all(
+    files.map(async (file) => ({
+      type: "file",
+      mediaType: file.type || "application/octet-stream",
+      filename: file.name,
+      url: await fileToDataUrl(file)
+    }))
+  );
+}
 const MarkdownBody = styledComponents.styled.div`
   font-size: 1.4rem;
   line-height: 1.5;
@@ -22293,17 +22333,43 @@ const Chat2 = () => {
     }),
     []
   );
+  const { toggleNotification } = admin.useNotification();
   const { messages, sendMessage, status, stop, error } = useChat({ transport });
   const [input, setInput] = React__namespace.useState("");
+  const [attachments, setAttachments] = React__namespace.useState([]);
+  const [uploading, setUploading] = React__namespace.useState(false);
+  const fileInputRef = React__namespace.useRef(null);
   const busy = status === "submitted" || status === "streaming";
   const loadingWord = useCyclingWord(busy, LOADING_WORDS);
-  const onSend = () => {
+  const onSend = async () => {
     const text2 = input.trim();
-    if (!text2 || busy) {
+    if (!text2 && attachments.length === 0 || busy || uploading) {
       return;
     }
-    sendMessage({ text: text2 });
+    let mediaNote = "";
+    let fileParts = [];
+    if (attachments.length > 0) {
+      setUploading(true);
+      try {
+        const uploaded = await Promise.all(
+          attachments.map((file) => uploadToLibrary(file, tokenRef.current))
+        );
+        mediaNote = "\n\n[Attached image(s) uploaded to the media library — " + uploaded.map((m) => `id ${m.id}: "${m.name}" (${m.mime}) ${m.url}`).join("; ") + "]";
+        fileParts = await filesToUIParts(attachments);
+      } catch (err) {
+        toggleNotification({
+          type: "danger",
+          message: err instanceof Error ? `Image upload failed: ${err.message}` : "Image upload failed."
+        });
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
+    const body = (text2 || "Please look at the attached image(s).") + mediaNote;
+    sendMessage(fileParts.length > 0 ? { text: body, files: fileParts } : { text: body });
     setInput("");
+    setAttachments([]);
   };
   return /* @__PURE__ */ jsxRuntime.jsx(admin.Page.Main, { children: /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { padding: 6, children: [
     /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "alpha", tag: "h1", children: formatMessage({ id: index$1.getTranslation("chat.title"), defaultMessage: "AI Content Studio" }) }),
@@ -22326,6 +22392,25 @@ const Chat2 = () => {
               }
               if (part.type === "reasoning") {
                 return /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral500", fontWeight: "regular", children: part.text }, index2);
+              }
+              if (isFileUIPart(part)) {
+                if (part.mediaType?.startsWith("image/")) {
+                  return /* @__PURE__ */ jsxRuntime.jsx(
+                    "img",
+                    {
+                      src: part.url,
+                      alt: part.filename ?? "attachment",
+                      style: {
+                        maxWidth: 240,
+                        maxHeight: 240,
+                        borderRadius: 4,
+                        display: "block"
+                      }
+                    },
+                    index2
+                  );
+                }
+                return /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral600", children: `📎 ${part.filename ?? "file"}` }, index2);
               }
               if (isToolUIPart(part)) {
                 const name2 = getToolName(part);
@@ -22351,6 +22436,32 @@ const Chat2 = () => {
       error ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { textColor: "danger600", children: error.message }) : null
     ] }),
     /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { marginTop: 4, children: [
+      attachments.length > 0 ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Flex, { gap: 2, marginBottom: 2, wrap: "wrap", children: attachments.map((file, i) => /* @__PURE__ */ jsxRuntime.jsxs(
+        designSystem.Flex,
+        {
+          gap: 1,
+          alignItems: "center",
+          background: "neutral100",
+          paddingLeft: 2,
+          paddingRight: 1,
+          paddingTop: 1,
+          paddingBottom: 1,
+          hasRadius: true,
+          children: [
+            /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", children: file.name }),
+            /* @__PURE__ */ jsxRuntime.jsx(
+              designSystem.Button,
+              {
+                variant: "tertiary",
+                size: "S",
+                onClick: () => setAttachments((a) => a.filter((_, j) => j !== i)),
+                children: "✕"
+              }
+            )
+          ]
+        },
+        `${file.name}-${i}`
+      )) }) : null,
       /* @__PURE__ */ jsxRuntime.jsx(
         designSystem.Textarea,
         {
@@ -22370,8 +22481,42 @@ const Chat2 = () => {
           }
         }
       ),
+      /* @__PURE__ */ jsxRuntime.jsx(
+        "input",
+        {
+          ref: fileInputRef,
+          type: "file",
+          accept: "image/*",
+          multiple: true,
+          style: { display: "none" },
+          onChange: (event) => {
+            const list2 = event.target.files;
+            if (list2 && list2.length > 0) {
+              setAttachments((a) => [...a, ...Array.from(list2)]);
+            }
+            event.target.value = "";
+          }
+        }
+      ),
       /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Flex, { gap: 2, marginTop: 2, children: [
-        /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { onClick: onSend, disabled: busy || input.trim() === "", loading: status === "submitted", children: formatMessage({ id: index$1.getTranslation("chat.send"), defaultMessage: "Send" }) }),
+        /* @__PURE__ */ jsxRuntime.jsx(
+          designSystem.Button,
+          {
+            onClick: onSend,
+            disabled: busy || uploading || input.trim() === "" && attachments.length === 0,
+            loading: status === "submitted" || uploading,
+            children: formatMessage({ id: index$1.getTranslation("chat.send"), defaultMessage: "Send" })
+          }
+        ),
+        /* @__PURE__ */ jsxRuntime.jsx(
+          designSystem.Button,
+          {
+            variant: "secondary",
+            onClick: () => fileInputRef.current?.click(),
+            disabled: busy || uploading,
+            children: formatMessage({ id: index$1.getTranslation("chat.attach"), defaultMessage: "Attach image" })
+          }
+        ),
         busy ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { variant: "danger-light", onClick: () => stop(), children: formatMessage({ id: index$1.getTranslation("chat.stop"), defaultMessage: "Stop" }) }) : null
       ] })
     ] })

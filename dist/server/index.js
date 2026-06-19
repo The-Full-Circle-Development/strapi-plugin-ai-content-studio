@@ -36179,6 +36179,20 @@ You can inspect and edit the website's content using the provided tools.
   published. If a write fails, say what failed and why.
 - Never apply a change without telling the user what you did. Summarize every mutation, even small ones.
 
+## Working with images the user attaches
+- When the user attaches an image you can SEE it — describe or analyze it if asked.
+- Each attached image is also uploaded to the media library; the user's message lists its media id,
+  name, and url (e.g. "id 42: ..."). To set or REPLACE a content field's image, call updateEntry
+  with that media id:
+    - single media field (featuredImage, logo, avatar, afterImage, beforeImage): data: { <field>: <id> }
+    - multiple media field (gallery, additionalImages): data: { <field>: [<id>, ...] }
+  Easy / top-level media: blog-post.featuredImage, blog-author.avatar, contact-info.logo,
+  header.logo, service.featuredImage & gallery, project.afterImage/beforeImage/additionalImages.
+  Harder — media nested in a component (e.g. homepage or page hero.slides[].image): getEntry first,
+  rebuild the whole component with the new image id, and send it WITHOUT component ids (Strapi
+  recreates them). Tell the user this rebuilds the component.
+- Always confirm the target field and document before replacing, then report what changed.
+
 ## Style
 - Use Markdown (bold, lists, inline code) — it is rendered in the chat.
 - Be concise. Reference entries by their title and documentId.`;
@@ -36215,10 +36229,13 @@ const chatController = ({ strapi }) => ({
     const showErrorDetails = Boolean(
       strapi.config.get("plugin::ai-content-studio.showProviderErrorDetails", false)
     );
+    const trimmed = messages.map(
+      (message, index2) => index2 === messages.length - 1 ? message : { ...message, parts: (message.parts ?? []).filter((part) => part.type !== "file") }
+    );
     const result = streamText({
       model,
       system: SYSTEM_PROMPT,
-      messages: await convertToModelMessages(messages),
+      messages: await convertToModelMessages(trimmed),
       tools,
       stopWhen: stepCountIs(8),
       onError({ error }) {

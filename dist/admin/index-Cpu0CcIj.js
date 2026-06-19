@@ -35,7 +35,7 @@ const index = {
       icon: PluginIcon,
       intlLabel: { id: getTranslation("menu.label"), defaultMessage: "AI Studio" },
       permissions: PERMISSIONS.chat,
-      Component: () => Promise.resolve().then(() => require("./Chat-DuC4rkXO.js")).then((mod) => ({ default: mod.Chat }))
+      Component: () => Promise.resolve().then(() => require("./Chat-gsm8d2jo.js")).then((mod) => ({ default: mod.Chat }))
     });
     app.addSettingsLink(
       {
@@ -47,7 +47,7 @@ const index = {
         to: PLUGIN_ID,
         intlLabel: { id: getTranslation("settings.link"), defaultMessage: "Configuration" },
         permissions: PERMISSIONS.settingsRead,
-        Component: () => Promise.resolve().then(() => require("./Settings-DduRIjxV.js")).then((mod) => ({ default: mod.Settings }))
+        Component: () => Promise.resolve().then(() => require("./Settings-C2Oc_Tt6.js")).then((mod) => ({ default: mod.Settings }))
       }
     );
     app.registerPlugin({
@@ -61,7 +61,7 @@ const index = {
     return Promise.all(
       locales.map(async (locale) => {
         try {
-          const { default: data } = await __variableDynamicImportRuntimeHelper(/* @__PURE__ */ Object.assign({ "./translations/en.json": () => Promise.resolve().then(() => require("./en-CQLL3x-9.js")) }), `./translations/${locale}.json`, 3);
+          const { default: data } = await __variableDynamicImportRuntimeHelper(/* @__PURE__ */ Object.assign({ "./translations/en.json": () => Promise.resolve().then(() => require("./en-Dk1d4WHf.js")) }), `./translations/${locale}.json`, 3);
           return { data: prefixPluginTranslations(data, PLUGIN_ID), locale };
         } catch {
           return { data: {}, locale };

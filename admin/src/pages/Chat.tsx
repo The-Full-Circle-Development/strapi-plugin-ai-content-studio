@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport, getToolName, isToolUIPart, type UIMessage } from 'ai';
-import { useAuth, Page } from '@strapi/strapi/admin';
+import { DefaultChatTransport, getToolName, isToolUIPart, isFileUIPart, type UIMessage } from 'ai';
+import { useAuth, Page, useNotification } from '@strapi/strapi/admin';
 import { useIntl } from 'react-intl';
 import { Box, Flex, Typography, Textarea, Button, Loader, Status } from '@strapi/design-system';
 import Markdown from 'react-markdown';
@@ -14,6 +14,55 @@ const backendURL = (): string => {
   const w = window as unknown as { strapi?: { backendURL?: string } };
   return w.strapi?.backendURL ?? '';
 };
+
+interface UploadedMedia {
+  id: number;
+  name: string;
+  url: string;
+  mime: string;
+}
+
+/** Upload a file to Strapi's media library via the admin /upload endpoint (raw fetch + JWT). */
+async function uploadToLibrary(file: File, token: string | null): Promise<UploadedMedia> {
+  const formData = new FormData();
+  formData.append('files', file);
+  const res = await fetch(`${backendURL()}/upload`, {
+    method: 'POST',
+    // Do NOT set Content-Type — the browser adds the multipart boundary.
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  const files = (await res.json()) as Array<{ id: number; name: string; url: string; mime: string }>;
+  const f = files?.[0];
+  if (!f) {
+    throw new Error('upload returned no file');
+  }
+  return { id: f.id, name: f.name, url: f.url, mime: f.mime };
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error('read failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Convert File[] to AI SDK FileUIParts (data URLs) so a vision model can see them. */
+async function filesToUIParts(files: File[]) {
+  return Promise.all(
+    files.map(async (file) => ({
+      type: 'file' as const,
+      mediaType: file.type || 'application/octet-stream',
+      filename: file.name,
+      url: await fileToDataUrl(file),
+    }))
+  );
+}
 
 /**
  * Renders assistant markdown (bold, lists, inline code, code blocks, links, tables) using
@@ -169,18 +218,53 @@ export const Chat = () => {
     []
   );
 
+  const { toggleNotification } = useNotification();
   const { messages, sendMessage, status, stop, error } = useChat({ transport });
   const [input, setInput] = React.useState('');
+  const [attachments, setAttachments] = React.useState<File[]>([]);
+  const [uploading, setUploading] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const busy = status === 'submitted' || status === 'streaming';
   const loadingWord = useCyclingWord(busy, LOADING_WORDS);
 
-  const onSend = () => {
+  const onSend = async () => {
     const text = input.trim();
-    if (!text || busy) {
+    if ((!text && attachments.length === 0) || busy || uploading) {
       return;
     }
-    sendMessage({ text });
+
+    let mediaNote = '';
+    let fileParts: Awaited<ReturnType<typeof filesToUIParts>> = [];
+
+    if (attachments.length > 0) {
+      setUploading(true);
+      try {
+        // Upload to the media library (so the assistant can set/replace fields by id) AND
+        // attach as data-URL file parts (so a vision model can analyze the image).
+        const uploaded = await Promise.all(
+          attachments.map((file) => uploadToLibrary(file, tokenRef.current))
+        );
+        mediaNote =
+          '\n\n[Attached image(s) uploaded to the media library — ' +
+          uploaded.map((m) => `id ${m.id}: "${m.name}" (${m.mime}) ${m.url}`).join('; ') +
+          ']';
+        fileParts = await filesToUIParts(attachments);
+      } catch (err) {
+        toggleNotification({
+          type: 'danger',
+          message:
+            err instanceof Error ? `Image upload failed: ${err.message}` : 'Image upload failed.',
+        });
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+    }
+
+    const body = (text || 'Please look at the attached image(s).') + mediaNote;
+    sendMessage(fileParts.length > 0 ? { text: body, files: fileParts } : { text: body });
     setInput('');
+    setAttachments([]);
   };
 
   return (
@@ -226,6 +310,29 @@ export const Chat = () => {
                     return (
                       <Typography key={index} variant="pi" textColor="neutral500" fontWeight="regular">
                         {part.text}
+                      </Typography>
+                    );
+                  }
+
+                  if (isFileUIPart(part)) {
+                    if (part.mediaType?.startsWith('image/')) {
+                      return (
+                        <img
+                          key={index}
+                          src={part.url}
+                          alt={part.filename ?? 'attachment'}
+                          style={{
+                            maxWidth: 240,
+                            maxHeight: 240,
+                            borderRadius: 4,
+                            display: 'block',
+                          }}
+                        />
+                      );
+                    }
+                    return (
+                      <Typography key={index} variant="pi" textColor="neutral600">
+                        {`📎 ${part.filename ?? 'file'}`}
                       </Typography>
                     );
                   }
@@ -281,6 +388,33 @@ export const Chat = () => {
         </Flex>
 
         <Box marginTop={4}>
+          {attachments.length > 0 ? (
+            <Flex gap={2} marginBottom={2} wrap="wrap">
+              {attachments.map((file, i) => (
+                <Flex
+                  key={`${file.name}-${i}`}
+                  gap={1}
+                  alignItems="center"
+                  background="neutral100"
+                  paddingLeft={2}
+                  paddingRight={1}
+                  paddingTop={1}
+                  paddingBottom={1}
+                  hasRadius
+                >
+                  <Typography variant="pi">{file.name}</Typography>
+                  <Button
+                    variant="tertiary"
+                    size="S"
+                    onClick={() => setAttachments((a) => a.filter((_, j) => j !== i))}
+                  >
+                    ✕
+                  </Button>
+                </Flex>
+              ))}
+            </Flex>
+          ) : null}
+
           <Textarea
             name="prompt"
             aria-label="prompt"
@@ -297,9 +431,36 @@ export const Chat = () => {
               }
             }}
           />
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            style={{ display: 'none' }}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+              const list = event.target.files;
+              if (list && list.length > 0) {
+                setAttachments((a) => [...a, ...Array.from(list)]);
+              }
+              event.target.value = '';
+            }}
+          />
+
           <Flex gap={2} marginTop={2}>
-            <Button onClick={onSend} disabled={busy || input.trim() === ''} loading={status === 'submitted'}>
+            <Button
+              onClick={onSend}
+              disabled={busy || uploading || (input.trim() === '' && attachments.length === 0)}
+              loading={status === 'submitted' || uploading}
+            >
               {formatMessage({ id: getTranslation('chat.send'), defaultMessage: 'Send' })}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy || uploading}
+            >
+              {formatMessage({ id: getTranslation('chat.attach'), defaultMessage: 'Attach image' })}
             </Button>
             {busy ? (
               <Button variant="danger-light" onClick={() => stop()}>
