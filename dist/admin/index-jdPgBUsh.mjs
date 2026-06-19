@@ -1,6 +1,5 @@
-"use strict";
-const jsxRuntime = require("react/jsx-runtime");
-const icons = require("@strapi/icons");
+import { jsx } from "react/jsx-runtime";
+import { Sparkle } from "@strapi/icons";
 const __variableDynamicImportRuntimeHelper = (glob, path, segs) => {
   const v = glob[path];
   if (v) {
@@ -27,7 +26,7 @@ const prefixPluginTranslations = (trad, pluginId) => Object.keys(trad).reduce((a
   acc[`${pluginId}.${key}`] = trad[key];
   return acc;
 }, {});
-const PluginIcon = () => /* @__PURE__ */ jsxRuntime.jsx(icons.Sparkle, {});
+const PluginIcon = () => /* @__PURE__ */ jsx(Sparkle, {});
 const index = {
   register(app) {
     app.addMenuLink({
@@ -35,7 +34,7 @@ const index = {
       icon: PluginIcon,
       intlLabel: { id: getTranslation("menu.label"), defaultMessage: "AI Studio" },
       permissions: PERMISSIONS.chat,
-      Component: () => Promise.resolve().then(() => require("./Chat-DlpTmX8U.js")).then((mod) => ({ default: mod.Chat }))
+      Component: () => import("./Chat-C9lwgW1W.mjs").then((mod) => ({ default: mod.Chat }))
     });
     app.addSettingsLink(
       {
@@ -47,7 +46,7 @@ const index = {
         to: PLUGIN_ID,
         intlLabel: { id: getTranslation("settings.link"), defaultMessage: "Configuration" },
         permissions: PERMISSIONS.settingsRead,
-        Component: () => Promise.resolve().then(() => require("./Settings-snp9rQJ0.js")).then((mod) => ({ default: mod.Settings }))
+        Component: () => import("./Settings-CKrjvEEm.mjs").then((mod) => ({ default: mod.Settings }))
       }
     );
     app.registerPlugin({
@@ -61,7 +60,7 @@ const index = {
     return Promise.all(
       locales.map(async (locale) => {
         try {
-          const { default: data } = await __variableDynamicImportRuntimeHelper(/* @__PURE__ */ Object.assign({ "./translations/en.json": () => Promise.resolve().then(() => require("./en-CQLL3x-9.js")) }), `./translations/${locale}.json`, 3);
+          const { default: data } = await __variableDynamicImportRuntimeHelper(/* @__PURE__ */ Object.assign({ "./translations/en.json": () => import("./en-BC8DCjXC.mjs") }), `./translations/${locale}.json`, 3);
           return { data: prefixPluginTranslations(data, PLUGIN_ID), locale };
         } catch {
           return { data: {}, locale };
@@ -70,6 +69,8 @@ const index = {
     );
   }
 };
-exports.PERMISSIONS = PERMISSIONS;
-exports.getTranslation = getTranslation;
-exports.index = index;
+export {
+  PERMISSIONS as P,
+  getTranslation as g,
+  index as i
+};

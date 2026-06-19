@@ -233,15 +233,24 @@ export const Chat = () => {
                   if (isToolUIPart(part)) {
                     const name = getToolName(part);
                     const { text, danger } = toolStateLabel(part.state, String(name));
+                    const rawInput = 'input' in part ? part.input : undefined;
+                    const inputStr =
+                      rawInput == null
+                        ? ''
+                        : typeof rawInput === 'string'
+                          ? rawInput
+                          : JSON.stringify(rawInput);
+                    // Hide empty/no-arg tool inputs (e.g. listContentTypes -> "{}").
+                    const showInput = inputStr !== '' && inputStr !== '{}' && inputStr !== 'null';
                     return (
                       <Box key={index} padding={2} background="neutral0" hasRadius>
                         <Status variant={danger ? 'danger' : 'secondary'} size="S">
                           <Typography variant="omega">{text}</Typography>
                         </Status>
-                        {'input' in part && part.input != null ? (
+                        {showInput ? (
                           <Box paddingTop={1}>
                             <Typography variant="pi" textColor="neutral600">
-                              {JSON.stringify(part.input)}
+                              {inputStr}
                             </Typography>
                           </Box>
                         ) : null}

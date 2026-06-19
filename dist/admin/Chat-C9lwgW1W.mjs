@@ -5,7 +5,7 @@ import { useAuth, Page } from "@strapi/strapi/admin";
 import { useIntl } from "react-intl";
 import { Box, Typography, Flex, Status, Loader, Textarea, Button } from "@strapi/design-system";
 import { styled } from "styled-components";
-import { g as getTranslation } from "./index-zHWwm-K1.mjs";
+import { g as getTranslation } from "./index-jdPgBUsh.mjs";
 var marker = "vercel.ai.error";
 var symbol = Symbol.for(marker);
 var _a$2, _b;
@@ -22311,9 +22311,12 @@ const Chat2 = () => {
               if (isToolUIPart(part)) {
                 const name2 = getToolName(part);
                 const { text: text2, danger } = toolStateLabel(part.state, String(name2));
+                const rawInput = "input" in part ? part.input : void 0;
+                const inputStr = rawInput == null ? "" : typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput);
+                const showInput = inputStr !== "" && inputStr !== "{}" && inputStr !== "null";
                 return /* @__PURE__ */ jsxs(Box, { padding: 2, background: "neutral0", hasRadius: true, children: [
                   /* @__PURE__ */ jsx(Status, { variant: danger ? "danger" : "secondary", size: "S", children: /* @__PURE__ */ jsx(Typography, { variant: "omega", children: text2 }) }),
-                  "input" in part && part.input != null ? /* @__PURE__ */ jsx(Box, { paddingTop: 1, children: /* @__PURE__ */ jsx(Typography, { variant: "pi", textColor: "neutral600", children: JSON.stringify(part.input) }) }) : null
+                  showInput ? /* @__PURE__ */ jsx(Box, { paddingTop: 1, children: /* @__PURE__ */ jsx(Typography, { variant: "pi", textColor: "neutral600", children: inputStr }) }) : null
                 ] }, index2);
               }
               return null;

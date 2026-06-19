@@ -6,7 +6,7 @@ const admin = require("@strapi/strapi/admin");
 const reactIntl = require("react-intl");
 const designSystem = require("@strapi/design-system");
 const styledComponents = require("styled-components");
-const index$1 = require("./index-B-JLusQF.js");
+const index$1 = require("./index-BNzrZVUw.js");
 function _interopNamespace(e) {
   if (e && e.__esModule) return e;
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
@@ -22330,9 +22330,12 @@ const Chat2 = () => {
               if (isToolUIPart(part)) {
                 const name2 = getToolName(part);
                 const { text: text2, danger } = toolStateLabel(part.state, String(name2));
+                const rawInput = "input" in part ? part.input : void 0;
+                const inputStr = rawInput == null ? "" : typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput);
+                const showInput = inputStr !== "" && inputStr !== "{}" && inputStr !== "null";
                 return /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { padding: 2, background: "neutral0", hasRadius: true, children: [
                   /* @__PURE__ */ jsxRuntime.jsx(designSystem.Status, { variant: danger ? "danger" : "secondary", size: "S", children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "omega", children: text2 }) }),
-                  "input" in part && part.input != null ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 1, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral600", children: JSON.stringify(part.input) }) }) : null
+                  showInput ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 1, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral600", children: inputStr }) }) : null
                 ] }, index2);
               }
               return null;
