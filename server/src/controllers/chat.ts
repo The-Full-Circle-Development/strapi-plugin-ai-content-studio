@@ -13,6 +13,30 @@ You can inspect and edit the website's content using the provided tools. Guideli
   their account lacks that permission and do NOT retry the same operation.
 - Keep answers concise. Reference entries by their title and documentId.`;
 
+/**
+ * Strip anything that could be an API key / token from a string before it is logged or surfaced.
+ * Providers do not normally echo the key, but some put it in a request URL (?key=…) — redact
+ * defensively so neither the server log nor the UI can ever leak it.
+ */
+function redactSecrets(text: string): string {
+  return text
+    .replace(/([?&](?:key|api[_-]?key|access_token)=)[^&\s"']+/gi, '$1[redacted]')
+    .replace(/AIza[0-9A-Za-z\-_]{10,}/g, '[redacted]')
+    .replace(/sk-(?:ant-)?[A-Za-z0-9\-_]{6,}/g, '[redacted]')
+    .replace(/Bearer\s+[A-Za-z0-9\-_.]+/gi, 'Bearer [redacted]');
+}
+
+/** Build a concise, key-free description of a provider / stream error. */
+function describeProviderError(error: unknown): string {
+  const e = error as { name?: string; statusCode?: number; message?: string };
+  const parts: string[] = [];
+  if (e?.name && e.name !== 'Error') parts.push(String(e.name));
+  if (e?.statusCode) parts.push(`HTTP ${e.statusCode}`);
+  if (e?.message) parts.push(String(e.message));
+  else if (typeof error === 'string') parts.push(error);
+  return redactSecrets(parts.join(' — ') || 'unknown error');
+}
+
 const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
   async chat(ctx: any) {
     const { messages } = (ctx.request.body ?? {}) as { messages?: UIMessage[] };
@@ -37,6 +61,11 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
 
     const tools = strapi.plugin('ai-content-studio').service('tools').buildTools({ userAbility });
 
+    // Debug flag: surface the real (redacted) provider error to the UI instead of a generic one.
+    const showErrorDetails = Boolean(
+      strapi.config.get('plugin::ai-content-studio.showProviderErrorDetails', false)
+    );
+
     const result = streamText({
       model,
       system: SYSTEM_PROMPT,
@@ -44,8 +73,8 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       tools,
       stopWhen: stepCountIs(8),
       onError({ error }) {
-        // Server-side only. Never logs API keys.
-        strapi.log.error('[ai-content-studio] stream error', error);
+        // Server-side only — redacted so a provider error that echoes a key/url can't leak it.
+        strapi.log.error(`[ai-content-studio] stream error: ${describeProviderError(error)}`);
       },
     });
 
@@ -55,6 +84,9 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       onError(error: unknown) {
         if (error instanceof ProviderConfigError) {
           return error.message;
+        }
+        if (showErrorDetails) {
+          return `AI provider error: ${describeProviderError(error)}`;
         }
         return 'The AI provider returned an error. Please try again or check the provider settings.';
       },

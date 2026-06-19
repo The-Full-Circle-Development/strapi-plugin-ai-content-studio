@@ -50,6 +50,7 @@ configuration lives in **Settings → AI Content Studio**.
 | Var | Purpose |
 |-----|---------|
 | `AI_STUDIO_ENC_KEY` | **Required.** 32-byte key (base64) that encrypts provider API keys at rest. Distinct from `APP_KEYS` and `ENCRYPTION_KEY`. |
+| `AI_STUDIO_SHOW_ERROR_DETAILS` | Optional, default `false`. Set `true` to surface the **real provider error message** (redacted of anything key-like) in the chat UI instead of a generic message — useful for debugging "The AI provider returned an error". Keep `false` in production. Equivalent to `config: { showProviderErrorDetails: true }` in `config/plugins.ts`. |
 
 ```bash
 openssl rand -base64 32

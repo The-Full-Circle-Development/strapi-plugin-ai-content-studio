@@ -26,7 +26,9 @@ const bootstrap = async ({ strapi }) => {
   await strapi.admin.services.permission.actionProvider.registerMany(actions);
 };
 const config$1 = {
-  default: {},
+  default: {
+    showProviderErrorDetails: process.env.AI_STUDIO_SHOW_ERROR_DETAILS === "true"
+  },
   validator() {
   }
 };
@@ -36163,6 +36165,18 @@ You can inspect and edit the website's content using the provided tools. Guideli
 - Tools return structured results. If a tool returns "permission_denied", tell the user plainly that
   their account lacks that permission and do NOT retry the same operation.
 - Keep answers concise. Reference entries by their title and documentId.`;
+function redactSecrets(text2) {
+  return text2.replace(/([?&](?:key|api[_-]?key|access_token)=)[^&\s"']+/gi, "$1[redacted]").replace(/AIza[0-9A-Za-z\-_]{10,}/g, "[redacted]").replace(/sk-(?:ant-)?[A-Za-z0-9\-_]{6,}/g, "[redacted]").replace(/Bearer\s+[A-Za-z0-9\-_.]+/gi, "Bearer [redacted]");
+}
+function describeProviderError(error) {
+  const e = error;
+  const parts = [];
+  if (e?.name && e.name !== "Error") parts.push(String(e.name));
+  if (e?.statusCode) parts.push(`HTTP ${e.statusCode}`);
+  if (e?.message) parts.push(String(e.message));
+  else if (typeof error === "string") parts.push(error);
+  return redactSecrets(parts.join(" — ") || "unknown error");
+}
 const chatController = ({ strapi }) => ({
   async chat(ctx) {
     const { messages } = ctx.request.body ?? {};
@@ -36181,6 +36195,9 @@ const chatController = ({ strapi }) => ({
       return ctx.internalServerError("AI provider initialization failed.");
     }
     const tools = strapi.plugin("ai-content-studio").service("tools").buildTools({ userAbility });
+    const showErrorDetails = Boolean(
+      strapi.config.get("plugin::ai-content-studio.showProviderErrorDetails", false)
+    );
     const result = streamText({
       model,
       system: SYSTEM_PROMPT,
@@ -36188,7 +36205,7 @@ const chatController = ({ strapi }) => ({
       tools,
       stopWhen: stepCountIs(8),
       onError({ error }) {
-        strapi.log.error("[ai-content-studio] stream error", error);
+        strapi.log.error(`[ai-content-studio] stream error: ${describeProviderError(error)}`);
       }
     });
     ctx.respond = false;
@@ -36196,6 +36213,9 @@ const chatController = ({ strapi }) => ({
       onError(error) {
         if (error instanceof ProviderConfigError) {
           return error.message;
+        }
+        if (showErrorDetails) {
+          return `AI provider error: ${describeProviderError(error)}`;
         }
         return "The AI provider returned an error. Please try again or check the provider settings.";
       },

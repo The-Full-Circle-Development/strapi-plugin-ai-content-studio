@@ -30,7 +30,14 @@ export const MODELS: Record<ProviderId, ModelOption[]> = {
     { id: 'o4-mini', label: 'o4-mini' },
   ],
   google: [
+    // Gemini 3.x — latest generation
+    { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
+    { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (preview)' },
+    { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite' },
+    { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (preview)' },
+    // Gemini 2.5 — stable workhorses
     { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
     { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
   ],
 };

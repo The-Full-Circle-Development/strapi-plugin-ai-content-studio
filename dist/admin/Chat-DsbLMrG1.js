@@ -1,10 +1,29 @@
-import { jsx, jsxs } from "react/jsx-runtime";
-import * as React from "react";
-import { useRef, useCallback, useSyncExternalStore, useEffect } from "react";
-import { useAuth, Page } from "@strapi/strapi/admin";
-import { useIntl } from "react-intl";
-import { Box, Typography, Flex, Status, Loader, Textarea, Button } from "@strapi/design-system";
-import { g as getTranslation } from "./index-CgulefZK.mjs";
+"use strict";
+Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+const jsxRuntime = require("react/jsx-runtime");
+const React = require("react");
+const admin = require("@strapi/strapi/admin");
+const reactIntl = require("react-intl");
+const designSystem = require("@strapi/design-system");
+const index = require("./index-pNp9tVuj.js");
+function _interopNamespace(e) {
+  if (e && e.__esModule) return e;
+  const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
+  if (e) {
+    for (const k in e) {
+      if (k !== "default") {
+        const d = Object.getOwnPropertyDescriptor(e, k);
+        Object.defineProperty(n, k, d.get ? d : {
+          enumerable: true,
+          get: () => e[k]
+        });
+      }
+    }
+  }
+  n.default = e;
+  return Object.freeze(n);
+}
+const React__namespace = /* @__PURE__ */ _interopNamespace(React);
 var marker = "vercel.ai.error";
 var symbol = Symbol.for(marker);
 var _a$2, _b;
@@ -1743,11 +1762,11 @@ const $ZodNever = /* @__PURE__ */ $constructor("$ZodNever", (inst, def) => {
     return payload;
   };
 });
-function handleArrayResult(result, final, index) {
+function handleArrayResult(result, final, index2) {
   if (result.issues.length) {
-    final.issues.push(...prefixIssues(index, result.issues));
+    final.issues.push(...prefixIssues(index2, result.issues));
   }
-  final.value[index] = result.value;
+  final.value[index2] = result.value;
 }
 const $ZodArray = /* @__PURE__ */ $constructor("$ZodArray", (inst, def) => {
   $ZodType.init(inst, def);
@@ -2228,14 +2247,14 @@ function mergeValues(a, b) {
       return { valid: false, mergeErrorPath: [] };
     }
     const newArray = [];
-    for (let index = 0; index < a.length; index++) {
-      const itemA = a[index];
-      const itemB = b[index];
+    for (let index2 = 0; index2 < a.length; index2++) {
+      const itemA = a[index2];
+      const itemB = b[index2];
       const sharedValue = mergeValues(itemA, itemB);
       if (!sharedValue.valid) {
         return {
           valid: false,
-          mergeErrorPath: [index, ...sharedValue.mergeErrorPath]
+          mergeErrorPath: [index2, ...sharedValue.mergeErrorPath]
         };
       }
       newArray.push(sharedValue.data);
@@ -6511,7 +6530,7 @@ var get$ref = (item, refs) => {
       return { $ref: getRelativePath(refs.currentPath, item.path) };
     case "none":
     case "seen": {
-      if (item.path.length < refs.currentPath.length && item.path.every((value, index) => refs.currentPath[index] === value)) {
+      if (item.path.length < refs.currentPath.length && item.path.every((value, index2) => refs.currentPath[index2] === value)) {
         console.warn(
           `Recursive reference detected at ${refs.currentPath.join(
             "/"
@@ -9165,12 +9184,12 @@ var ReactChatState = class {
       __privateSet(this, _messages, __privateGet(this, _messages).slice(0, -1));
       __privateGet(this, _callMessagesCallbacks).call(this);
     };
-    this.replaceMessage = (index, message) => {
+    this.replaceMessage = (index2, message) => {
       __privateSet(this, _messages, [
-        ...__privateGet(this, _messages).slice(0, index),
+        ...__privateGet(this, _messages).slice(0, index2),
         // We deep clone the message here to ensure the new React Compiler (currently in RC) detects deeply nested parts/metadata changes:
         this.snapshot(message),
-        ...__privateGet(this, _messages).slice(index + 1)
+        ...__privateGet(this, _messages).slice(index2 + 1)
       ]);
       __privateGet(this, _callMessagesCallbacks).call(this);
     };
@@ -9254,7 +9273,7 @@ function useChat({
   resume = false,
   ...options
 } = {}) {
-  const callbacksRef = useRef(
+  const callbacksRef = React.useRef(
     !("chat" in options) ? {
       onToolCall: options.onToolCall,
       onData: options.onData,
@@ -9295,35 +9314,35 @@ function useChat({
       return (_c = (_b2 = (_a2 = callbacksRef.current).sendAutomaticallyWhen) == null ? void 0 : _b2.call(_a2, arg)) != null ? _c : false;
     }
   };
-  const chatRef = useRef(
+  const chatRef = React.useRef(
     "chat" in options ? options.chat : new Chat$1(optionsWithCallbacks)
   );
   const shouldRecreateChat = "chat" in options && options.chat !== chatRef.current || "id" in options && chatRef.current.id !== options.id;
   if (shouldRecreateChat) {
     chatRef.current = "chat" in options ? options.chat : new Chat$1(optionsWithCallbacks);
   }
-  const subscribeToMessages = useCallback(
+  const subscribeToMessages = React.useCallback(
     (update) => chatRef.current["~registerMessagesCallback"](update, throttleWaitMs),
     // `chatRef.current.id` is required to trigger re-subscription when the chat ID changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [throttleWaitMs, chatRef.current.id]
   );
-  const messages = useSyncExternalStore(
+  const messages = React.useSyncExternalStore(
     subscribeToMessages,
     () => chatRef.current.messages,
     () => chatRef.current.messages
   );
-  const status = useSyncExternalStore(
+  const status = React.useSyncExternalStore(
     chatRef.current["~registerStatusCallback"],
     () => chatRef.current.status,
     () => chatRef.current.status
   );
-  const error = useSyncExternalStore(
+  const error = React.useSyncExternalStore(
     chatRef.current["~registerErrorCallback"],
     () => chatRef.current.error,
     () => chatRef.current.error
   );
-  const setMessages = useCallback(
+  const setMessages = React.useCallback(
     (messagesParam) => {
       if (typeof messagesParam === "function") {
         messagesParam = messagesParam(chatRef.current.messages);
@@ -9332,7 +9351,7 @@ function useChat({
     },
     [chatRef]
   );
-  useEffect(() => {
+  React.useEffect(() => {
     if (resume) {
       chatRef.current.resumeStream();
     }
@@ -9374,13 +9393,13 @@ const toolStateLabel = (state, name) => {
   }
 };
 const Chat2 = () => {
-  const { formatMessage } = useIntl();
-  const token = useAuth("AiContentStudioChat", (state) => state.token);
-  const tokenRef = React.useRef(token);
-  React.useEffect(() => {
+  const { formatMessage } = reactIntl.useIntl();
+  const token = admin.useAuth("AiContentStudioChat", (state) => state.token);
+  const tokenRef = React__namespace.useRef(token);
+  React__namespace.useEffect(() => {
     tokenRef.current = token;
   }, [token]);
-  const transport = React.useMemo(
+  const transport = React__namespace.useMemo(
     () => new DefaultChatTransport({
       api: `${backendURL()}/ai-content-studio/chat`,
       credentials: "same-origin",
@@ -9389,7 +9408,7 @@ const Chat2 = () => {
     []
   );
   const { messages, sendMessage, status, stop, error } = useChat({ transport });
-  const [input, setInput] = React.useState("");
+  const [input, setInput] = React__namespace.useState("");
   const busy = status === "submitted" || status === "streaming";
   const onSend = () => {
     const text2 = input.trim();
@@ -9399,35 +9418,35 @@ const Chat2 = () => {
     sendMessage({ text: text2 });
     setInput("");
   };
-  return /* @__PURE__ */ jsx(Page.Main, { children: /* @__PURE__ */ jsxs(Box, { padding: 6, children: [
-    /* @__PURE__ */ jsx(Typography, { variant: "alpha", tag: "h1", children: formatMessage({ id: getTranslation("chat.title"), defaultMessage: "AI Content Studio" }) }),
-    /* @__PURE__ */ jsx(Box, { paddingTop: 2, children: /* @__PURE__ */ jsx(Typography, { variant: "epsilon", textColor: "neutral600", children: formatMessage({
-      id: getTranslation("chat.subtitle"),
+  return /* @__PURE__ */ jsxRuntime.jsx(admin.Page.Main, { children: /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { padding: 6, children: [
+    /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "alpha", tag: "h1", children: formatMessage({ id: index.getTranslation("chat.title"), defaultMessage: "AI Content Studio" }) }),
+    /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 2, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "epsilon", textColor: "neutral600", children: formatMessage({
+      id: index.getTranslation("chat.subtitle"),
       defaultMessage: "Ask the assistant to find, draft, edit, or publish content."
     }) }) }),
-    /* @__PURE__ */ jsxs(Flex, { direction: "column", alignItems: "stretch", gap: 3, marginTop: 6, children: [
-      messages.map((message) => /* @__PURE__ */ jsxs(
-        Box,
+    /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Flex, { direction: "column", alignItems: "stretch", gap: 3, marginTop: 6, children: [
+      messages.map((message) => /* @__PURE__ */ jsxRuntime.jsxs(
+        designSystem.Box,
         {
           padding: 4,
           hasRadius: true,
           background: message.role === "user" ? "primary100" : "neutral100",
           children: [
-            /* @__PURE__ */ jsx(Typography, { variant: "sigma", textColor: "neutral600", children: message.role === "user" ? formatMessage({ id: getTranslation("chat.you"), defaultMessage: "You" }) : formatMessage({ id: getTranslation("chat.assistant"), defaultMessage: "Assistant" }) }),
-            /* @__PURE__ */ jsx(Flex, { direction: "column", alignItems: "stretch", gap: 2, marginTop: 2, children: message.parts.map((part, index) => {
+            /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "sigma", textColor: "neutral600", children: message.role === "user" ? formatMessage({ id: index.getTranslation("chat.you"), defaultMessage: "You" }) : formatMessage({ id: index.getTranslation("chat.assistant"), defaultMessage: "Assistant" }) }),
+            /* @__PURE__ */ jsxRuntime.jsx(designSystem.Flex, { direction: "column", alignItems: "stretch", gap: 2, marginTop: 2, children: message.parts.map((part, index2) => {
               if (part.type === "text") {
-                return /* @__PURE__ */ jsx(Typography, { tag: "p", children: part.text }, index);
+                return /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { tag: "p", children: part.text }, index2);
               }
               if (part.type === "reasoning") {
-                return /* @__PURE__ */ jsx(Typography, { variant: "pi", textColor: "neutral500", fontWeight: "regular", children: part.text }, index);
+                return /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral500", fontWeight: "regular", children: part.text }, index2);
               }
               if (isToolUIPart(part)) {
                 const name = getToolName(part);
                 const { text: text2, danger } = toolStateLabel(part.state, String(name));
-                return /* @__PURE__ */ jsxs(Box, { padding: 2, background: "neutral0", hasRadius: true, children: [
-                  /* @__PURE__ */ jsx(Status, { variant: danger ? "danger" : "secondary", size: "S", children: /* @__PURE__ */ jsx(Typography, { variant: "omega", children: text2 }) }),
-                  "input" in part && part.input != null ? /* @__PURE__ */ jsx(Box, { paddingTop: 1, children: /* @__PURE__ */ jsx(Typography, { variant: "pi", textColor: "neutral600", children: JSON.stringify(part.input) }) }) : null
-                ] }, index);
+                return /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { padding: 2, background: "neutral0", hasRadius: true, children: [
+                  /* @__PURE__ */ jsxRuntime.jsx(designSystem.Status, { variant: danger ? "danger" : "secondary", size: "S", children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "omega", children: text2 }) }),
+                  "input" in part && part.input != null ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 1, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral600", children: JSON.stringify(part.input) }) }) : null
+                ] }, index2);
               }
               return null;
             }) })
@@ -9435,19 +9454,19 @@ const Chat2 = () => {
         },
         message.id
       )),
-      status === "submitted" ? /* @__PURE__ */ jsx(Loader, { small: true, children: formatMessage({ id: getTranslation("chat.thinking"), defaultMessage: "Thinking…" }) }) : null,
-      error ? /* @__PURE__ */ jsx(Typography, { textColor: "danger600", children: error.message }) : null
+      status === "submitted" ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Loader, { small: true, children: formatMessage({ id: index.getTranslation("chat.thinking"), defaultMessage: "Thinking…" }) }) : null,
+      error ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { textColor: "danger600", children: error.message }) : null
     ] }),
-    /* @__PURE__ */ jsxs(Box, { marginTop: 4, children: [
-      /* @__PURE__ */ jsx(
-        Textarea,
+    /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { marginTop: 4, children: [
+      /* @__PURE__ */ jsxRuntime.jsx(
+        designSystem.Textarea,
         {
           name: "prompt",
           "aria-label": "prompt",
           value: input,
           onChange: (event) => setInput(event.target.value),
           placeholder: formatMessage({
-            id: getTranslation("chat.placeholder"),
+            id: index.getTranslation("chat.placeholder"),
             defaultMessage: "Ask the assistant to draft, search, or create content…"
           }),
           onKeyDown: (event) => {
@@ -9458,13 +9477,11 @@ const Chat2 = () => {
           }
         }
       ),
-      /* @__PURE__ */ jsxs(Flex, { gap: 2, marginTop: 2, children: [
-        /* @__PURE__ */ jsx(Button, { onClick: onSend, disabled: busy || input.trim() === "", loading: status === "submitted", children: formatMessage({ id: getTranslation("chat.send"), defaultMessage: "Send" }) }),
-        busy ? /* @__PURE__ */ jsx(Button, { variant: "danger-light", onClick: () => stop(), children: formatMessage({ id: getTranslation("chat.stop"), defaultMessage: "Stop" }) }) : null
+      /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Flex, { gap: 2, marginTop: 2, children: [
+        /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { onClick: onSend, disabled: busy || input.trim() === "", loading: status === "submitted", children: formatMessage({ id: index.getTranslation("chat.send"), defaultMessage: "Send" }) }),
+        busy ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { variant: "danger-light", onClick: () => stop(), children: formatMessage({ id: index.getTranslation("chat.stop"), defaultMessage: "Stop" }) }) : null
       ] })
     ] })
   ] }) });
 };
-export {
-  Chat2 as Chat
-};
+exports.Chat = Chat2;
