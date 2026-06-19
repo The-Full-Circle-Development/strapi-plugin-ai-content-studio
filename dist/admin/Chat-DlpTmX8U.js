@@ -1,11 +1,30 @@
-import { jsxs, jsx, Fragment } from "react/jsx-runtime";
-import * as React from "react";
-import { useRef, useCallback, useSyncExternalStore, useEffect } from "react";
-import { useAuth, Page } from "@strapi/strapi/admin";
-import { useIntl } from "react-intl";
-import { Box, Typography, Flex, Status, Loader, Textarea, Button } from "@strapi/design-system";
-import { styled } from "styled-components";
-import { g as getTranslation } from "./index-Duzaf2O2.mjs";
+"use strict";
+Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+const jsxRuntime = require("react/jsx-runtime");
+const React = require("react");
+const admin = require("@strapi/strapi/admin");
+const reactIntl = require("react-intl");
+const designSystem = require("@strapi/design-system");
+const styledComponents = require("styled-components");
+const index$1 = require("./index-B-JLusQF.js");
+function _interopNamespace(e) {
+  if (e && e.__esModule) return e;
+  const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
+  if (e) {
+    for (const k in e) {
+      if (k !== "default") {
+        const d = Object.getOwnPropertyDescriptor(e, k);
+        Object.defineProperty(n, k, d.get ? d : {
+          enumerable: true,
+          get: () => e[k]
+        });
+      }
+    }
+  }
+  n.default = e;
+  return Object.freeze(n);
+}
+const React__namespace = /* @__PURE__ */ _interopNamespace(React);
 var marker = "vercel.ai.error";
 var symbol = Symbol.for(marker);
 var _a$2, _b;
@@ -9255,7 +9274,7 @@ function useChat({
   resume = false,
   ...options
 } = {}) {
-  const callbacksRef = useRef(
+  const callbacksRef = React.useRef(
     !("chat" in options) ? {
       onToolCall: options.onToolCall,
       onData: options.onData,
@@ -9296,35 +9315,35 @@ function useChat({
       return (_c = (_b2 = (_a2 = callbacksRef.current).sendAutomaticallyWhen) == null ? void 0 : _b2.call(_a2, arg)) != null ? _c : false;
     }
   };
-  const chatRef = useRef(
+  const chatRef = React.useRef(
     "chat" in options ? options.chat : new Chat$1(optionsWithCallbacks)
   );
   const shouldRecreateChat = "chat" in options && options.chat !== chatRef.current || "id" in options && chatRef.current.id !== options.id;
   if (shouldRecreateChat) {
     chatRef.current = "chat" in options ? options.chat : new Chat$1(optionsWithCallbacks);
   }
-  const subscribeToMessages = useCallback(
+  const subscribeToMessages = React.useCallback(
     (update) => chatRef.current["~registerMessagesCallback"](update, throttleWaitMs),
     // `chatRef.current.id` is required to trigger re-subscription when the chat ID changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [throttleWaitMs, chatRef.current.id]
   );
-  const messages = useSyncExternalStore(
+  const messages = React.useSyncExternalStore(
     subscribeToMessages,
     () => chatRef.current.messages,
     () => chatRef.current.messages
   );
-  const status = useSyncExternalStore(
+  const status = React.useSyncExternalStore(
     chatRef.current["~registerStatusCallback"],
     () => chatRef.current.status,
     () => chatRef.current.status
   );
-  const error = useSyncExternalStore(
+  const error = React.useSyncExternalStore(
     chatRef.current["~registerErrorCallback"],
     () => chatRef.current.error,
     () => chatRef.current.error
   );
-  const setMessages = useCallback(
+  const setMessages = React.useCallback(
     (messagesParam) => {
       if (typeof messagesParam === "function") {
         messagesParam = messagesParam(chatRef.current.messages);
@@ -9333,7 +9352,7 @@ function useChat({
     },
     [chatRef]
   );
-  useEffect(() => {
+  React.useEffect(() => {
     if (resume) {
       chatRef.current.resumeStream();
     }
@@ -11176,11 +11195,11 @@ function addChildren(props, children) {
     }
   }
 }
-function productionCreate(_, jsx2, jsxs2) {
+function productionCreate(_, jsx, jsxs) {
   return create2;
   function create2(_2, type, props, key) {
     const isStaticChildren = Array.isArray(props.children);
-    const fn = isStaticChildren ? jsxs2 : jsx2;
+    const fn = isStaticChildren ? jsxs : jsx;
     return key ? fn(type, props, key) : fn(type, props);
   }
 }
@@ -18951,11 +18970,11 @@ function post(tree, options) {
   }
   visit(tree, transform2);
   return toJsxRuntime(tree, {
-    Fragment,
+    Fragment: jsxRuntime.Fragment,
     components,
     ignoreInvalidStyle: true,
-    jsx,
-    jsxs,
+    jsx: jsxRuntime.jsx,
+    jsxs: jsxRuntime.jsxs,
     passKeys: true,
     passNode: true
   });
@@ -21945,11 +21964,200 @@ function remarkGfm(options) {
   fromMarkdownExtensions.push(gfmFromMarkdown());
   toMarkdownExtensions.push(gfmToMarkdown(settings));
 }
+const LOADING_WORDS = [
+  "Accomplishing",
+  "Actioning",
+  "Actualizing",
+  "Architecting",
+  "Baking",
+  "Beaming",
+  "Beboppin'",
+  "Befuddling",
+  "Billowing",
+  "Blanching",
+  "Bloviating",
+  "Boogieing",
+  "Boondoggling",
+  "Booping",
+  "Bootstrapping",
+  "Brewing",
+  "Bunning",
+  "Burrowing",
+  "Calculating",
+  "Canoodling",
+  "Caramelizing",
+  "Cascading",
+  "Catapulting",
+  "Cerebrating",
+  "Channeling",
+  "Channelling",
+  "Choreographing",
+  "Churning",
+  "Clauding",
+  "Coalescing",
+  "Cogitating",
+  "Combobulating",
+  "Composing",
+  "Computing",
+  "Concocting",
+  "Considering",
+  "Contemplating",
+  "Cooking",
+  "Crafting",
+  "Creating",
+  "Crunching",
+  "Crystallizing",
+  "Cultivating",
+  "Deciphering",
+  "Deliberating",
+  "Determining",
+  "Dilly-dallying",
+  "Discombobulating",
+  "Doing",
+  "Doodling",
+  "Drizzling",
+  "Ebbing",
+  "Effecting",
+  "Elucidating",
+  "Embellishing",
+  "Enchanting",
+  "Envisioning",
+  "Evaporating",
+  "Fermenting",
+  "Fiddle-faddling",
+  "Finagling",
+  "Flambéing",
+  "Flibbertigibbeting",
+  "Flowing",
+  "Flummoxing",
+  "Fluttering",
+  "Forging",
+  "Forming",
+  "Frolicking",
+  "Frosting",
+  "Gallivanting",
+  "Galloping",
+  "Garnishing",
+  "Generating",
+  "Gesticulating",
+  "Germinating",
+  "Gitifying",
+  "Grooving",
+  "Gusting",
+  "Harmonizing",
+  "Hashing",
+  "Hatching",
+  "Herding",
+  "Honking",
+  "Hullaballooing",
+  "Hyperspacing",
+  "Ideating",
+  "Imagining",
+  "Improvising",
+  "Incubating",
+  "Inferring",
+  "Infusing",
+  "Ionizing",
+  "Jitterbugging",
+  "Julienning",
+  "Kneading",
+  "Leavening",
+  "Levitating",
+  "Lollygagging",
+  "Manifesting",
+  "Marinating",
+  "Meandering",
+  "Metamorphosing",
+  "Misting",
+  "Moonwalking",
+  "Moseying",
+  "Mulling",
+  "Mustering",
+  "Musing",
+  "Nebulizing",
+  "Nesting",
+  "Newspapering",
+  "Noodling",
+  "Nucleating",
+  "Orbiting",
+  "Orchestrating",
+  "Osmosing",
+  "Perambulating",
+  "Percolating",
+  "Perusing",
+  "Philosophising",
+  "Photosynthesizing",
+  "Pollinating",
+  "Pondering",
+  "Pontificating",
+  "Pouncing",
+  "Precipitating",
+  "Prestidigitating",
+  "Processing",
+  "Proofing",
+  "Propagating",
+  "Puttering",
+  "Puzzling",
+  "Quantumizing",
+  "Razzle-dazzling",
+  "Razzmatazzing",
+  "Recombobulating",
+  "Reticulating",
+  "Roosting",
+  "Ruminating",
+  "Sautéing",
+  "Scampering",
+  "Schlepping",
+  "Scurrying",
+  "Seasoning",
+  "Shenaniganing",
+  "Shimmying",
+  "Simmering",
+  "Skedaddling",
+  "Sketching",
+  "Slithering",
+  "Smooshing",
+  "Sock-hopping",
+  "Spelunking",
+  "Spinning",
+  "Sprouting",
+  "Stewing",
+  "Sublimating",
+  "Swirling",
+  "Swooping",
+  "Symbioting",
+  "Synthesizing",
+  "Tempering",
+  "Thinking",
+  "Thundering",
+  "Tinkering",
+  "Tomfoolering",
+  "Topsy-turvying",
+  "Transfiguring",
+  "Transmuting",
+  "Twisting",
+  "Undulating",
+  "Unfurling",
+  "Unravelling",
+  "Vibing",
+  "Waddling",
+  "Wandering",
+  "Warping",
+  "Whatchamacalliting",
+  "Whirlpooling",
+  "Whirring",
+  "Whisking",
+  "Wibbling",
+  "Working",
+  "Wrangling",
+  "Zesting",
+  "Zigzagging"
+];
 const backendURL = () => {
   const w = window;
   return w.strapi?.backendURL ?? "";
 };
-const MarkdownBody = styled.div`
+const MarkdownBody = styledComponents.styled.div`
   font-size: 1.4rem;
   line-height: 1.5;
 
@@ -22041,6 +22249,22 @@ const MarkdownBody = styled.div`
     text-align: left;
   }
 `;
+function useCyclingWord(active, words, intervalMs = 2500) {
+  const pick2 = React__namespace.useCallback(
+    () => words[Math.floor(Math.random() * words.length)] ?? "Working",
+    [words]
+  );
+  const [word, setWord] = React__namespace.useState(pick2);
+  React__namespace.useEffect(() => {
+    if (!active) {
+      return void 0;
+    }
+    setWord(pick2());
+    const id = window.setInterval(() => setWord(pick2()), intervalMs);
+    return () => window.clearInterval(id);
+  }, [active, pick2, intervalMs]);
+  return word;
+}
 const toolStateLabel = (state, name2) => {
   switch (state) {
     case "input-streaming":
@@ -22055,13 +22279,13 @@ const toolStateLabel = (state, name2) => {
   }
 };
 const Chat2 = () => {
-  const { formatMessage } = useIntl();
-  const token = useAuth("AiContentStudioChat", (state) => state.token);
-  const tokenRef = React.useRef(token);
-  React.useEffect(() => {
+  const { formatMessage } = reactIntl.useIntl();
+  const token = admin.useAuth("AiContentStudioChat", (state) => state.token);
+  const tokenRef = React__namespace.useRef(token);
+  React__namespace.useEffect(() => {
     tokenRef.current = token;
   }, [token]);
-  const transport = React.useMemo(
+  const transport = React__namespace.useMemo(
     () => new DefaultChatTransport({
       api: `${backendURL()}/ai-content-studio/chat`,
       credentials: "same-origin",
@@ -22070,8 +22294,9 @@ const Chat2 = () => {
     []
   );
   const { messages, sendMessage, status, stop, error } = useChat({ transport });
-  const [input, setInput] = React.useState("");
+  const [input, setInput] = React__namespace.useState("");
   const busy = status === "submitted" || status === "streaming";
+  const loadingWord = useCyclingWord(busy, LOADING_WORDS);
   const onSend = () => {
     const text2 = input.trim();
     if (!text2 || busy) {
@@ -22080,34 +22305,34 @@ const Chat2 = () => {
     sendMessage({ text: text2 });
     setInput("");
   };
-  return /* @__PURE__ */ jsx(Page.Main, { children: /* @__PURE__ */ jsxs(Box, { padding: 6, children: [
-    /* @__PURE__ */ jsx(Typography, { variant: "alpha", tag: "h1", children: formatMessage({ id: getTranslation("chat.title"), defaultMessage: "AI Content Studio" }) }),
-    /* @__PURE__ */ jsx(Box, { paddingTop: 2, children: /* @__PURE__ */ jsx(Typography, { variant: "epsilon", textColor: "neutral600", children: formatMessage({
-      id: getTranslation("chat.subtitle"),
+  return /* @__PURE__ */ jsxRuntime.jsx(admin.Page.Main, { children: /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { padding: 6, children: [
+    /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "alpha", tag: "h1", children: formatMessage({ id: index$1.getTranslation("chat.title"), defaultMessage: "AI Content Studio" }) }),
+    /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 2, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "epsilon", textColor: "neutral600", children: formatMessage({
+      id: index$1.getTranslation("chat.subtitle"),
       defaultMessage: "Ask the assistant to find, draft, edit, or publish content."
     }) }) }),
-    /* @__PURE__ */ jsxs(Flex, { direction: "column", alignItems: "stretch", gap: 3, marginTop: 6, children: [
-      messages.map((message) => /* @__PURE__ */ jsxs(
-        Box,
+    /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Flex, { direction: "column", alignItems: "stretch", gap: 3, marginTop: 6, children: [
+      messages.map((message) => /* @__PURE__ */ jsxRuntime.jsxs(
+        designSystem.Box,
         {
           padding: 4,
           hasRadius: true,
           background: message.role === "user" ? "primary100" : "neutral100",
           children: [
-            /* @__PURE__ */ jsx(Typography, { variant: "sigma", textColor: "neutral600", children: message.role === "user" ? formatMessage({ id: getTranslation("chat.you"), defaultMessage: "You" }) : formatMessage({ id: getTranslation("chat.assistant"), defaultMessage: "Assistant" }) }),
-            /* @__PURE__ */ jsx(Flex, { direction: "column", alignItems: "stretch", gap: 2, marginTop: 2, children: message.parts.map((part, index2) => {
+            /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "sigma", textColor: "neutral600", children: message.role === "user" ? formatMessage({ id: index$1.getTranslation("chat.you"), defaultMessage: "You" }) : formatMessage({ id: index$1.getTranslation("chat.assistant"), defaultMessage: "Assistant" }) }),
+            /* @__PURE__ */ jsxRuntime.jsx(designSystem.Flex, { direction: "column", alignItems: "stretch", gap: 2, marginTop: 2, children: message.parts.map((part, index2) => {
               if (part.type === "text") {
-                return /* @__PURE__ */ jsx(MarkdownBody, { children: /* @__PURE__ */ jsx(Markdown, { remarkPlugins: [remarkGfm], children: part.text }) }, index2);
+                return /* @__PURE__ */ jsxRuntime.jsx(MarkdownBody, { children: /* @__PURE__ */ jsxRuntime.jsx(Markdown, { remarkPlugins: [remarkGfm], children: part.text }) }, index2);
               }
               if (part.type === "reasoning") {
-                return /* @__PURE__ */ jsx(Typography, { variant: "pi", textColor: "neutral500", fontWeight: "regular", children: part.text }, index2);
+                return /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral500", fontWeight: "regular", children: part.text }, index2);
               }
               if (isToolUIPart(part)) {
                 const name2 = getToolName(part);
                 const { text: text2, danger } = toolStateLabel(part.state, String(name2));
-                return /* @__PURE__ */ jsxs(Box, { padding: 2, background: "neutral0", hasRadius: true, children: [
-                  /* @__PURE__ */ jsx(Status, { variant: danger ? "danger" : "secondary", size: "S", children: /* @__PURE__ */ jsx(Typography, { variant: "omega", children: text2 }) }),
-                  "input" in part && part.input != null ? /* @__PURE__ */ jsx(Box, { paddingTop: 1, children: /* @__PURE__ */ jsx(Typography, { variant: "pi", textColor: "neutral600", children: JSON.stringify(part.input) }) }) : null
+                return /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { padding: 2, background: "neutral0", hasRadius: true, children: [
+                  /* @__PURE__ */ jsxRuntime.jsx(designSystem.Status, { variant: danger ? "danger" : "secondary", size: "S", children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "omega", children: text2 }) }),
+                  "input" in part && part.input != null ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 1, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral600", children: JSON.stringify(part.input) }) }) : null
                 ] }, index2);
               }
               return null;
@@ -22116,19 +22341,22 @@ const Chat2 = () => {
         },
         message.id
       )),
-      status === "submitted" ? /* @__PURE__ */ jsx(Loader, { small: true, children: formatMessage({ id: getTranslation("chat.thinking"), defaultMessage: "Thinking…" }) }) : null,
-      error ? /* @__PURE__ */ jsx(Typography, { textColor: "danger600", children: error.message }) : null
+      busy ? /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Flex, { gap: 2, alignItems: "center", paddingTop: 1, children: [
+        /* @__PURE__ */ jsxRuntime.jsx(designSystem.Loader, { small: true, children: formatMessage({ id: index$1.getTranslation("chat.thinking"), defaultMessage: "Working…" }) }),
+        /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "omega", textColor: "neutral600", children: `${loadingWord}…` })
+      ] }) : null,
+      error ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { textColor: "danger600", children: error.message }) : null
     ] }),
-    /* @__PURE__ */ jsxs(Box, { marginTop: 4, children: [
-      /* @__PURE__ */ jsx(
-        Textarea,
+    /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { marginTop: 4, children: [
+      /* @__PURE__ */ jsxRuntime.jsx(
+        designSystem.Textarea,
         {
           name: "prompt",
           "aria-label": "prompt",
           value: input,
           onChange: (event) => setInput(event.target.value),
           placeholder: formatMessage({
-            id: getTranslation("chat.placeholder"),
+            id: index$1.getTranslation("chat.placeholder"),
             defaultMessage: "Ask the assistant to draft, search, or create content…"
           }),
           onKeyDown: (event) => {
@@ -22139,13 +22367,11 @@ const Chat2 = () => {
           }
         }
       ),
-      /* @__PURE__ */ jsxs(Flex, { gap: 2, marginTop: 2, children: [
-        /* @__PURE__ */ jsx(Button, { onClick: onSend, disabled: busy || input.trim() === "", loading: status === "submitted", children: formatMessage({ id: getTranslation("chat.send"), defaultMessage: "Send" }) }),
-        busy ? /* @__PURE__ */ jsx(Button, { variant: "danger-light", onClick: () => stop(), children: formatMessage({ id: getTranslation("chat.stop"), defaultMessage: "Stop" }) }) : null
+      /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Flex, { gap: 2, marginTop: 2, children: [
+        /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { onClick: onSend, disabled: busy || input.trim() === "", loading: status === "submitted", children: formatMessage({ id: index$1.getTranslation("chat.send"), defaultMessage: "Send" }) }),
+        busy ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { variant: "danger-light", onClick: () => stop(), children: formatMessage({ id: index$1.getTranslation("chat.stop"), defaultMessage: "Stop" }) }) : null
       ] })
     ] })
   ] }) });
 };
-export {
-  Chat2 as Chat
-};
+exports.Chat = Chat2;

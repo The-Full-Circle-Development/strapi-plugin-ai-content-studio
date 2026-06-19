@@ -8,6 +8,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { styled } from 'styled-components';
 import { getTranslation } from '../utils/getTranslation';
+import { LOADING_WORDS } from '../data/loadingWords';
 
 const backendURL = (): string => {
   const w = window as unknown as { strapi?: { backendURL?: string } };
@@ -112,6 +113,27 @@ const MarkdownBody = styled.div`
   }
 `;
 
+/**
+ * Cycles through a random "working…" word while `active`, changing every `intervalMs`
+ * (Claude Code-style). Returns the current word.
+ */
+function useCyclingWord(active: boolean, words: string[], intervalMs = 2500): string {
+  const pick = React.useCallback(
+    () => words[Math.floor(Math.random() * words.length)] ?? 'Working',
+    [words]
+  );
+  const [word, setWord] = React.useState<string>(pick);
+  React.useEffect(() => {
+    if (!active) {
+      return undefined;
+    }
+    setWord(pick());
+    const id = window.setInterval(() => setWord(pick()), intervalMs);
+    return () => window.clearInterval(id);
+  }, [active, pick, intervalMs]);
+  return word;
+}
+
 const toolStateLabel = (state: string, name: string): { text: string; danger: boolean } => {
   switch (state) {
     case 'input-streaming':
@@ -150,6 +172,7 @@ export const Chat = () => {
   const { messages, sendMessage, status, stop, error } = useChat({ transport });
   const [input, setInput] = React.useState('');
   const busy = status === 'submitted' || status === 'streaming';
+  const loadingWord = useCyclingWord(busy, LOADING_WORDS);
 
   const onSend = () => {
     const text = input.trim();
@@ -232,10 +255,15 @@ export const Chat = () => {
             </Box>
           ))}
 
-          {status === 'submitted' ? (
-            <Loader small>
-              {formatMessage({ id: getTranslation('chat.thinking'), defaultMessage: 'Thinking…' })}
-            </Loader>
+          {busy ? (
+            <Flex gap={2} alignItems="center" paddingTop={1}>
+              <Loader small>
+                {formatMessage({ id: getTranslation('chat.thinking'), defaultMessage: 'Working…' })}
+              </Loader>
+              <Typography variant="omega" textColor="neutral600">
+                {`${loadingWord}…`}
+              </Typography>
+            </Flex>
           ) : null}
 
           {error ? (
