@@ -86,22 +86,49 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       });
     }
 
-    // Image handling that works with ALL models:
-    //  - Drop file parts from older turns so we don't re-send base64 every request.
-    //  - Keep file parts on the last message ONLY if the active model accepts images; otherwise
-    //    strip them too, so a non-vision model never receives an image (which would error). The
-    //    media id is still in the message text, so "replace this media field" works on any model.
-    const trimmed = messages.map((message, index) => {
-      const keepFiles = index === messages.length - 1 && supportsVision;
-      return keepFiles
-        ? message
-        : { ...message, parts: (message.parts ?? []).filter((part) => part.type !== 'file') };
-    });
+    /**
+     * History comes from the SERVER, not the client (FR-020). The browser's list is a view; the
+     * thread is the record. Rebuilding it here means a reload continues the same conversation, a
+     * client cannot inject turns that were never sent, and context never crosses threads or users.
+     *
+     * Older turns are condensed rather than dropped, so a long thread degrades instead of failing
+     * (FR-021).
+     */
+    const context = (await threads().buildContext(threadId, ownerId)) as {
+      summary: string | null;
+      messages: Array<{ id: string; role: 'user' | 'assistant'; parts: unknown[] }>;
+      condensed: boolean;
+    } | null;
+    const history = context?.messages ?? [];
+
+    // Image handling that works with ALL models: keep file parts from the incoming last message
+    // ONLY if the active model accepts images, so a non-vision model never receives an image
+    // (which would error). Stored history never holds file parts, so nothing re-sends base64.
+    const incomingFileParts =
+      supportsVision && lastMessage?.role === 'user'
+        ? (lastMessage.parts ?? []).filter((part: any) => part?.type === 'file')
+        : [];
+
+    const replayed = history.map((message, index) => ({
+      id: message.id,
+      role: message.role,
+      parts:
+        index === history.length - 1 && incomingFileParts.length > 0
+          ? [...message.parts, ...incomingFileParts]
+          : message.parts,
+    })) as UIMessage[];
 
     const result = streamText({
       model,
-      system: plugin.service('prompt').build({ mode, supportsVision }),
-      messages: await convertToModelMessages(trimmed),
+      system: [
+        plugin.service('prompt').build({ mode, supportsVision }),
+        context?.summary
+          ? `## Earlier in this conversation (condensed)\nThese notes replace older turns that were summarized to stay inside the model's context. Treat them as fact.\n\n${context.summary}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+      messages: await convertToModelMessages(replayed),
       tools,
       stopWhen: stepCountIs(8),
       onError({ error }) {

@@ -93,8 +93,11 @@ export function useThreads() {
     tokenRef.current = token;
   }, [token]);
 
+  const [threads, setThreads] = React.useState<ThreadSummary[]>([]);
   const [currentThreadId, setCurrentThreadId] = React.useState<string | null>(null);
   const [mode, setMode] = React.useState<ChatMode>('content');
+  const [loading, setLoading] = React.useState(false);
+  const [nextCursor, setNextCursor] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   // The transport's body callback reads this synchronously, so it must be a ref, not state.
@@ -108,6 +111,34 @@ export function useThreads() {
     modeRef.current = mode;
   }, [mode]);
 
+  const refresh = React.useCallback(async (cursor?: string | null) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ limit: '30' });
+      if (cursor) {
+        params.set('cursor', cursor);
+      }
+      const page = await adminFetch<{ threads: ThreadSummary[]; nextCursor: string | null }>(
+        `/threads?${params.toString()}`,
+        tokenRef.current
+      );
+      setThreads((current) => (cursor ? [...current, ...page.threads] : page.threads));
+      setNextCursor(page.nextCursor);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load your conversations.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // The list is what makes a reload feel like a return rather than a fresh start (FR-016).
+  React.useEffect(() => {
+    if (token) {
+      void refresh();
+    }
+  }, [token, refresh]);
+
   const createThread = React.useCallback(
     async (nextMode: ChatMode = 'content'): Promise<ThreadSummary> => {
       const thread = await adminFetch<ThreadSummary>('/threads', tokenRef.current, {
@@ -117,7 +148,78 @@ export function useThreads() {
       threadIdRef.current = thread.id;
       setCurrentThreadId(thread.id);
       setMode(thread.mode);
+      setThreads((current) => [thread, ...current.filter((t) => t.id !== thread.id)]);
       return thread;
+    },
+    []
+  );
+
+  /** Full history for a thread, in the shape `useChat` replays. */
+  const loadHistory = React.useCallback(async (threadId: string): Promise<ThreadHistory | null> => {
+    setError(null);
+    try {
+      const history = await adminFetch<ThreadHistory>(`/threads/${threadId}`, tokenRef.current);
+      threadIdRef.current = history.id;
+      setCurrentThreadId(history.id);
+      setMode(history.mode);
+      return history;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open that conversation.');
+      return null;
+    }
+  }, []);
+
+  const renameThread = React.useCallback(async (threadId: string, title: string) => {
+    // Optimistic: the rename is a local edit to a list the server already agrees with.
+    setThreads((current) => current.map((t) => (t.id === threadId ? { ...t, title } : t)));
+    try {
+      await adminFetch<ThreadSummary>(`/threads/${threadId}`, tokenRef.current, {
+        method: 'PATCH',
+        body: JSON.stringify({ title }),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not rename that conversation.');
+      await refresh();
+    }
+  }, [refresh]);
+
+  const deleteThread = React.useCallback(
+    async (threadId: string): Promise<boolean> => {
+      try {
+        await adminFetch<void>(`/threads/${threadId}`, tokenRef.current, { method: 'DELETE' });
+        setThreads((current) => current.filter((t) => t.id !== threadId));
+        if (threadIdRef.current === threadId) {
+          threadIdRef.current = null;
+          setCurrentThreadId(null);
+        }
+        return true;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not delete that conversation.');
+        return false;
+      }
+    },
+    []
+  );
+
+  /** Persist a mode change on the thread so it survives a reload (FR-028). */
+  const changeMode = React.useCallback(
+    async (nextMode: ChatMode) => {
+      setMode(nextMode);
+      modeRef.current = nextMode;
+      const id = threadIdRef.current;
+      if (!id) {
+        // No thread yet — the mode rides along when one is created on the first send.
+        return;
+      }
+      setThreads((current) => current.map((t) => (t.id === id ? { ...t, mode: nextMode } : t)));
+      try {
+        await adminFetch<ThreadSummary>(`/threads/${id}`, tokenRef.current, {
+          method: 'PATCH',
+          body: JSON.stringify({ mode: nextMode }),
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not change the mode.');
+      }
     },
     []
   );
@@ -137,16 +239,25 @@ export function useThreads() {
   return {
     token,
     tokenRef,
+    threads,
     currentThreadId,
     setCurrentThreadId,
     threadIdRef,
     mode,
     setMode,
     modeRef,
+    changeMode,
+    loading,
+    hasMore: nextCursor !== null,
+    loadMore: () => refresh(nextCursor),
     error,
     setError,
+    refresh,
     createThread,
     ensureThread,
+    loadHistory,
+    renameThread,
+    deleteThread,
   };
 }
 

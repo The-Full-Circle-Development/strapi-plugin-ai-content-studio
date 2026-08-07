@@ -148,16 +148,16 @@ the first user's threads are neither listed nor reachable.
 
 ### Implementation for User Story 3
 
-- [ ] T045 [US3] Add `listThreads` (most-recent-first, `limit` 1..100 default 30, `lastActivityAt` cursor), `renameThread`, and `deleteThread` cascading to messages, change sets, preview sessions, and staged files (FR-022), in server/src/services/threads.ts
-- [ ] T046 [US3] Add `loadHistory` returning ordered messages in the shape the chat UI replays, plus `contextCondensed` and `expiredAttachments`, in server/src/services/threads.ts
-- [ ] T047 [US3] Add context condensing â€” send recent turns verbatim up to a token budget, replace older turns with a running `contextSummary` produced by the active provider, track `summarizedThroughMessageId`, refresh on crossing the threshold (R9, FR-021) â€” in server/src/services/threads.ts
-- [ ] T048 [US3] Generate a short (â‰¤ 60 char) automatic title from the first exchange, user-overridable, in server/src/services/threads.ts
-- [ ] T049 [US3] Add `find`, `update`, and `delete` handlers in server/src/controllers/threads.ts and register `GET /threads`, `PATCH /threads/:id`, and `DELETE /threads/:id` in server/src/routes/index.ts
-- [ ] T050 [US3] Feed the thread's condensed context into the model request instead of trusting client-supplied history in server/src/controllers/chat.ts
-- [ ] T051 [P] [US3] Create the thread sidebar (list with title and last-activity time, new thread, select, rename, delete) in admin/src/components/ThreadSidebar.tsx
-- [ ] T052 [US3] Extend the hook with list, rename, delete, and history restore in admin/src/hooks/useThreads.ts
-- [ ] T053 [US3] Restore a thread's messages into `useChat` on open and surface the condensed-history notice in admin/src/pages/Chat.tsx
-- [ ] T054 [US3] Show held attachments from a restored thread as expired, explain they were never ingested, and invite re-attaching (FR-038) in admin/src/components/MessageList.tsx
+- [X] T045 [US3] Add `listThreads` (most-recent-first, `limit` 1..100 default 30, `lastActivityAt` cursor), `renameThread`, and `deleteThread` cascading to messages, change sets, preview sessions, and staged files (FR-022), in server/src/services/threads.ts
+- [X] T046 [US3] Add `loadHistory` returning ordered messages in the shape the chat UI replays, plus `contextCondensed` and `expiredAttachments`, in server/src/services/threads.ts
+- [X] T047 [US3] Add context condensing â€” send recent turns verbatim up to a token budget, replace older turns with a running `contextSummary` produced by the active provider, track `summarizedThroughMessageId`, refresh on crossing the threshold (R9, FR-021) â€” in server/src/services/threads.ts
+- [X] T048 [US3] Generate a short (â‰¤ 60 char) automatic title from the first exchange, user-overridable, in server/src/services/threads.ts
+- [X] T049 [US3] Add `find`, `update`, and `delete` handlers in server/src/controllers/threads.ts and register `GET /threads`, `PATCH /threads/:id`, and `DELETE /threads/:id` in server/src/routes/index.ts
+- [X] T050 [US3] Feed the thread's condensed context into the model request instead of trusting client-supplied history in server/src/controllers/chat.ts
+- [X] T051 [P] [US3] Create the thread sidebar (list with title and last-activity time, new thread, select, rename, delete) in admin/src/components/ThreadSidebar.tsx
+- [X] T052 [US3] Extend the hook with list, rename, delete, and history restore in admin/src/hooks/useThreads.ts
+- [X] T053 [US3] Restore a thread's messages into `useChat` on open and surface the condensed-history notice in admin/src/pages/Chat.tsx
+- [X] T054 [US3] Show held attachments from a restored thread as expired, explain they were never ingested, and invite re-attaching (FR-038) in admin/src/components/MessageList.tsx
 - [ ] T055 [US3] Verify US3 in a real admin panel â€” quickstart scenario 4, plus permission-denied path 3 from contracts/permissions.md
 
 **Checkpoint**: US1, US2, and US3 all work independently.

@@ -47,6 +47,31 @@ export interface AppendMessageInput {
 const DEFAULT_TITLE = 'New conversation';
 const MAX_TITLE_CHARS = 60;
 
+/**
+ * Condensing bounds (R9). Characters rather than tokens on purpose: a token count depends on the
+ * provider's tokenizer, and branching on provider identity is exactly what Constitution III
+ * forbids. ~4 chars per token makes this budget roughly 15k tokens of verbatim tail, which every
+ * model in the curated lists accepts.
+ */
+const VERBATIM_BUDGET_CHARS = 60_000;
+/** Always send at least this many recent turns, however long they are. */
+const MIN_VERBATIM_TURNS = 4;
+const CONDENSE_INPUT_CHARS = 24_000;
+
+/** Plain text of a stored message, for budgeting and summarizing. */
+const textOf = (message: StoredMessage): string =>
+  (message.parts ?? [])
+    .map((part) => {
+      const p = part as { type?: string; text?: string };
+      if (p?.type === 'text' && typeof p.text === 'string') {
+        return p.text;
+      }
+      // Tool calls and apply reports matter for context but are cheap to reduce to their shape.
+      return p?.type ? `[${p.type}]` : '';
+    })
+    .filter(Boolean)
+    .join('\n');
+
 const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
   const docs = (uid: string): any => strapi.documents(uid as never);
 
@@ -198,6 +223,85 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
           changeSetId: null,
         };
       });
+    },
+
+    /**
+     * The caller's own threads, most-recent-first (FR-018). Cursor is a `lastActivityAt` ISO
+     * string, so paging is stable while new activity lands at the front.
+     */
+    async listThreads({
+      ownerId,
+      limit = 30,
+      cursor,
+    }: {
+      ownerId: number;
+      limit?: number;
+      cursor?: string | null;
+    }): Promise<{ threads: ThreadSummary[]; nextCursor: string | null }> {
+      const clamped = Math.min(100, Math.max(1, Math.trunc(limit) || 30));
+      const rows = await docs(UID.thread).findMany({
+        filters: {
+          ownerId,
+          ...(cursor ? { lastActivityAt: { $lt: cursor } } : {}),
+        },
+        sort: 'lastActivityAt:desc',
+        // One extra row tells us whether another page exists without a second count query.
+        limit: clamped + 1,
+      });
+      const list = Array.isArray(rows) ? rows : [];
+      const page = list.slice(0, clamped);
+      const counts = await Promise.all(
+        page.map((thread: any) =>
+          docs(UID.message).count({ filters: { thread: { documentId: thread.documentId } } })
+        )
+      );
+      return {
+        threads: page.map((thread: any, i: number) => ({
+          ...service.summarize(thread),
+          messageCount: Number(counts[i] ?? 0),
+        })),
+        nextCursor: list.length > clamped ? page[page.length - 1]?.lastActivityAt ?? null : null,
+      };
+    },
+
+    /** Rename. The user's title wins over the automatic one from then on (FR-019). */
+    async renameThread(threadId: string, ownerId: number, title: string): Promise<ThreadSummary | null> {
+      const thread = await service.getOwnedThread(threadId, ownerId);
+      if (!thread) {
+        return null;
+      }
+      const trimmed = (title ?? '').trim().slice(0, MAX_TITLE_CHARS);
+      if (trimmed === '') {
+        return service.summarize(thread);
+      }
+      const updated = await docs(UID.thread).update({
+        documentId: threadId,
+        data: { title: trimmed },
+      });
+      return service.summarize(updated);
+    },
+
+    /**
+     * Delete a thread and everything belonging to it: messages, change sets, preview sessions and
+     * their staged bytes (FR-022). Content and Media Library entries an APPLIED plan already
+     * produced are deliberately left alone — deleting a conversation must not undo approved work.
+     */
+    async deleteThread(threadId: string, ownerId: number): Promise<boolean> {
+      const thread = await service.getOwnedThread(threadId, ownerId);
+      if (!thread) {
+        return false;
+      }
+      const messages = await docs(UID.message).findMany({
+        filters: { thread: { documentId: threadId } },
+        fields: ['documentId'],
+        limit: -1,
+      });
+      for (const message of Array.isArray(messages) ? messages : []) {
+        await docs(UID.message).delete({ documentId: message.documentId });
+      }
+      await strapi.plugin('ai-content-studio').service('change-sets').deleteForThread(threadId);
+      await docs(UID.thread).delete({ documentId: threadId });
+      return true;
     },
 
     /** Ordered messages for one thread. Owner-scoped; empty array is a valid history. */
@@ -376,6 +480,96 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
         return;
       }
       await docs(UID.thread).update({ documentId: threadId, data: { mode } });
+    },
+
+    /**
+     * Context for the next model request (R9, FR-021).
+     *
+     * Recent turns go verbatim up to a character budget; everything older is replaced by a running
+     * summary stored on the thread and refreshed when the tail grows past the budget. The request
+     * NEVER fails because a thread got long, and the UI is told detail was condensed.
+     *
+     * The summary is produced by the ACTIVE provider, so no second provider is introduced
+     * (Constitution III).
+     */
+    async buildContext(
+      threadId: string,
+      ownerId: number
+    ): Promise<{ summary: string | null; messages: StoredMessage[]; condensed: boolean } | null> {
+      const thread = await service.getOwnedThread(threadId, ownerId);
+      if (!thread) {
+        return null;
+      }
+      const all = await service.listMessages(threadId);
+
+      // Walk backwards accumulating verbatim turns until the budget is spent.
+      const verbatim: StoredMessage[] = [];
+      let used = 0;
+      for (let i = all.length - 1; i >= 0; i -= 1) {
+        const size = textOf(all[i]).length;
+        if (verbatim.length >= MIN_VERBATIM_TURNS && used + size > VERBATIM_BUDGET_CHARS) {
+          break;
+        }
+        verbatim.unshift(all[i]);
+        used += size;
+      }
+
+      const older = all.slice(0, all.length - verbatim.length);
+      if (older.length === 0) {
+        return { summary: thread.contextSummary ?? null, messages: verbatim, condensed: false };
+      }
+
+      // Reuse the stored summary when it already covers every condensed turn.
+      const lastOlderId = older[older.length - 1].id;
+      if (thread.contextSummary && thread.summarizedThroughMessageId === lastOlderId) {
+        return { summary: thread.contextSummary, messages: verbatim, condensed: true };
+      }
+
+      const summary = await service.summarizeTurns(older, thread.contextSummary ?? null);
+      if (summary) {
+        await docs(UID.thread).update({
+          documentId: threadId,
+          data: { contextSummary: summary, summarizedThroughMessageId: lastOlderId },
+        });
+        return { summary, messages: verbatim, condensed: true };
+      }
+
+      // Summarizing failed (provider hiccup). Fall back to the previous summary if there is one,
+      // and otherwise to the verbatim tail — degrade, never fail the request (FR-021, FR-052).
+      return { summary: thread.contextSummary ?? null, messages: verbatim, condensed: true };
+    },
+
+    /** Condense older turns into a running summary with the active provider. Null on failure. */
+    async summarizeTurns(older: StoredMessage[], previousSummary: string | null): Promise<string | null> {
+      const transcript = older
+        .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${textOf(m).slice(0, 2000)}`)
+        .join('\n')
+        .slice(0, CONDENSE_INPUT_CHARS);
+      if (transcript.trim() === '') {
+        return previousSummary;
+      }
+      try {
+        const { generateText } = await import('ai');
+        const { model } = await strapi.plugin('ai-content-studio').service('registry').getActiveModel();
+        const { text } = await generateText({
+          model,
+          system:
+            'You compress a Strapi content-editing conversation into durable notes. Keep every concrete referent a later turn might need: content-type uids, documentIds, entry titles, field paths, values that were changed, decisions the user made, and anything still outstanding. Drop pleasantries and narration. No preamble — notes only, under 250 words.',
+          prompt: previousSummary
+            ? `Existing notes:\n${previousSummary}\n\nFold these newly-condensed turns into the notes:\n${transcript}`
+            : `Condense these turns into notes:\n${transcript}`,
+        });
+        const summary = text.trim();
+        return summary === '' ? previousSummary : summary;
+      } catch (err) {
+        strapi.log.warn(
+          `[ai-content-studio] could not condense thread history: ${strapi
+            .plugin('ai-content-studio')
+            .service('redact')
+            .describeError(err)}`
+        );
+        return null;
+      }
     },
 
     summarize(thread: any): ThreadSummary {

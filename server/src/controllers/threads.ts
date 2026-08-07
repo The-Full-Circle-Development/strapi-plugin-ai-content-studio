@@ -16,6 +16,20 @@ const createSchema = z.object({
   mode: z.enum(CHAT_MODES).optional(),
 });
 
+const updateSchema = z
+  .object({
+    title: z.string().max(120).optional(),
+    mode: z.enum(CHAT_MODES).optional(),
+  })
+  .refine((body) => body.title !== undefined || body.mode !== undefined, {
+    message: 'Provide a title or a mode.',
+  });
+
+const listSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  cursor: z.string().optional(),
+});
+
 const NOT_FOUND = 'That conversation does not exist.';
 
 const threadsController = ({ strapi }: { strapi: Core.Strapi }) => {
@@ -42,6 +56,24 @@ const threadsController = ({ strapi }: { strapi: Core.Strapi }) => {
       return undefined;
     },
 
+    async find(ctx: any) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized('Not authenticated.');
+      }
+      const parsed = listSchema.safeParse(ctx.request.query ?? {});
+      if (!parsed.success) {
+        return ctx.badRequest('`limit` must be between 1 and 100.');
+      }
+      // Scoped to the caller. There is no way to ask for anyone else's list.
+      ctx.body = await threads().listThreads({
+        ownerId,
+        limit: parsed.data.limit ?? 30,
+        cursor: parsed.data.cursor ?? null,
+      });
+      return undefined;
+    },
+
     async findOne(ctx: any) {
       const ownerId = ownerOf(ctx);
       if (ownerId === null) {
@@ -52,6 +84,46 @@ const threadsController = ({ strapi }: { strapi: Core.Strapi }) => {
         return ctx.notFound(NOT_FOUND);
       }
       ctx.body = history;
+      return undefined;
+    },
+
+    async update(ctx: any) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized('Not authenticated.');
+      }
+      const parsed = updateSchema.safeParse(ctx.request.body ?? {});
+      if (!parsed.success) {
+        return ctx.badRequest('Provide a title, or a mode of content, layout or audit.');
+      }
+      const id = String(ctx.params.id);
+      if (parsed.data.mode) {
+        await threads().setMode(id, ownerId, parsed.data.mode);
+      }
+      const summary =
+        parsed.data.title !== undefined
+          ? await threads().renameThread(id, ownerId, parsed.data.title)
+          : await threads()
+              .getOwnedThread(id, ownerId)
+              .then((thread: any) => (thread ? threads().summarize(thread) : null));
+
+      if (!summary) {
+        return ctx.notFound(NOT_FOUND);
+      }
+      ctx.body = summary;
+      return undefined;
+    },
+
+    async delete(ctx: any) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized('Not authenticated.');
+      }
+      const deleted = await threads().deleteThread(String(ctx.params.id), ownerId);
+      if (!deleted) {
+        return ctx.notFound(NOT_FOUND);
+      }
+      ctx.status = 204;
       return undefined;
     },
   };

@@ -34,8 +34,11 @@ export default {
       chatRoute('POST', '/chat', 'chat.chat'),
 
       // Threads — the caller's own conversations only.
+      chatRoute('GET', '/threads', 'threads.find'),
       chatRoute('POST', '/threads', 'threads.create'),
       chatRoute('GET', '/threads/:id', 'threads.findOne'),
+      chatRoute('PATCH', '/threads/:id', 'threads.update'),
+      chatRoute('DELETE', '/threads/:id', 'threads.delete'),
 
       // Change plans. `apply` is the only route in this plugin that mutates content.
       chatRoute('GET', '/change-sets/:id', 'change-sets.findOne'),

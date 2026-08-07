@@ -164,10 +164,10 @@ var AISDKError = class _AISDKError extends (_b$2 = Error, _a$5 = symbol$3, _b$2)
   }
 };
 var name$3 = "AI_APICallError";
-var marker2$1 = `vercel.ai.error.${name$3}`;
-var symbol2$1 = Symbol.for(marker2$1);
-var _a2$1, _b2$1;
-var APICallError = class extends (_b2$1 = AISDKError, _a2$1 = symbol2$1, _b2$1) {
+var marker2$2 = `vercel.ai.error.${name$3}`;
+var symbol2$2 = Symbol.for(marker2$2);
+var _a2$2, _b2$1;
+var APICallError = class extends (_b2$1 = AISDKError, _a2$2 = symbol2$2, _b2$1) {
   constructor({
     message,
     url,
@@ -184,7 +184,7 @@ var APICallError = class extends (_b2$1 = AISDKError, _a2$1 = symbol2$1, _b2$1) 
     data
   }) {
     super({ name: name$3, message, cause });
-    this[_a2$1] = true;
+    this[_a2$2] = true;
     this.url = url;
     this.requestBodyValues = requestBodyValues;
     this.statusCode = statusCode;
@@ -194,17 +194,17 @@ var APICallError = class extends (_b2$1 = AISDKError, _a2$1 = symbol2$1, _b2$1) 
     this.data = data;
   }
   static isInstance(error) {
-    return AISDKError.hasMarker(error, marker2$1);
+    return AISDKError.hasMarker(error, marker2$2);
   }
 };
-var name2$1 = "AI_EmptyResponseBodyError";
-var marker3$2 = `vercel.ai.error.${name2$1}`;
+var name2$2 = "AI_EmptyResponseBodyError";
+var marker3$2 = `vercel.ai.error.${name2$2}`;
 var symbol3$2 = Symbol.for(marker3$2);
 var _a3$2, _b3$1;
 var EmptyResponseBodyError = class extends (_b3$1 = AISDKError, _a3$2 = symbol3$2, _b3$1) {
   // used in isInstance
   constructor({ message = "Empty response body" } = {}) {
-    super({ name: name2$1, message });
+    super({ name: name2$2, message });
     this[_a3$2] = true;
   }
   static isInstance(error) {
@@ -296,24 +296,54 @@ Error message: ${getErrorMessage$1(cause)}`,
   }
 };
 var name7$2 = "AI_LoadAPIKeyError";
-var marker8$1 = `vercel.ai.error.${name7$2}`;
-var symbol8$1 = Symbol.for(marker8$1);
-var _a8$1, _b8$1;
-var LoadAPIKeyError = class extends (_b8$1 = AISDKError, _a8$1 = symbol8$1, _b8$1) {
+var marker8$2 = `vercel.ai.error.${name7$2}`;
+var symbol8$2 = Symbol.for(marker8$2);
+var _a8$2, _b8$1;
+var LoadAPIKeyError = class extends (_b8$1 = AISDKError, _a8$2 = symbol8$2, _b8$1) {
   // used in isInstance
   constructor({ message }) {
     super({ name: name7$2, message });
-    this[_a8$1] = true;
+    this[_a8$2] = true;
   }
   static isInstance(error) {
-    return AISDKError.hasMarker(error, marker8$1);
+    return AISDKError.hasMarker(error, marker8$2);
+  }
+};
+var name8$2 = "AI_LoadSettingError";
+var marker9$2 = `vercel.ai.error.${name8$2}`;
+var symbol9$2 = Symbol.for(marker9$2);
+var _a9$2, _b9$1;
+var LoadSettingError = class extends (_b9$1 = AISDKError, _a9$2 = symbol9$2, _b9$1) {
+  // used in isInstance
+  constructor({ message }) {
+    super({ name: name8$2, message });
+    this[_a9$2] = true;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker9$2);
+  }
+};
+var name9$2 = "AI_NoContentGeneratedError";
+var marker10$2 = `vercel.ai.error.${name9$2}`;
+var symbol10$2 = Symbol.for(marker10$2);
+var _a10$2, _b10$1;
+var NoContentGeneratedError = class extends (_b10$1 = AISDKError, _a10$2 = symbol10$2, _b10$1) {
+  // used in isInstance
+  constructor({
+    message = "No content generated."
+  } = {}) {
+    super({ name: name9$2, message });
+    this[_a10$2] = true;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker10$2);
   }
 };
 var name10$1 = "AI_NoSuchModelError";
-var marker11 = `vercel.ai.error.${name10$1}`;
-var symbol11 = Symbol.for(marker11);
-var _a11, _b11;
-var NoSuchModelError = class extends (_b11 = AISDKError, _a11 = symbol11, _b11) {
+var marker11$1 = `vercel.ai.error.${name10$1}`;
+var symbol11$1 = Symbol.for(marker11$1);
+var _a11$1, _b11;
+var NoSuchModelError = class extends (_b11 = AISDKError, _a11$1 = symbol11$1, _b11) {
   constructor({
     errorName = name10$1,
     modelId,
@@ -321,39 +351,39 @@ var NoSuchModelError = class extends (_b11 = AISDKError, _a11 = symbol11, _b11) 
     message = `No such ${modelType}: ${modelId}`
   }) {
     super({ name: errorName, message });
-    this[_a11] = true;
+    this[_a11$1] = true;
     this.modelId = modelId;
     this.modelType = modelType;
   }
   static isInstance(error) {
-    return AISDKError.hasMarker(error, marker11);
+    return AISDKError.hasMarker(error, marker11$1);
   }
 };
-var name11 = "AI_TooManyEmbeddingValuesForCallError";
-var marker12 = `vercel.ai.error.${name11}`;
-var symbol12 = Symbol.for(marker12);
-var _a12, _b12;
-var TooManyEmbeddingValuesForCallError = class extends (_b12 = AISDKError, _a12 = symbol12, _b12) {
+var name11$1 = "AI_TooManyEmbeddingValuesForCallError";
+var marker12$1 = `vercel.ai.error.${name11$1}`;
+var symbol12$1 = Symbol.for(marker12$1);
+var _a12$1, _b12;
+var TooManyEmbeddingValuesForCallError = class extends (_b12 = AISDKError, _a12$1 = symbol12$1, _b12) {
   constructor(options2) {
     super({
-      name: name11,
+      name: name11$1,
       message: `Too many values for a single embedding call. The ${options2.provider} model "${options2.modelId}" can only embed up to ${options2.maxEmbeddingsPerCall} values per call, but ${options2.values.length} values were provided.`
     });
-    this[_a12] = true;
+    this[_a12$1] = true;
     this.provider = options2.provider;
     this.modelId = options2.modelId;
     this.maxEmbeddingsPerCall = options2.maxEmbeddingsPerCall;
     this.values = options2.values;
   }
   static isInstance(error) {
-    return AISDKError.hasMarker(error, marker12);
+    return AISDKError.hasMarker(error, marker12$1);
   }
 };
-var name12 = "AI_TypeValidationError";
-var marker13 = `vercel.ai.error.${name12}`;
-var symbol13 = Symbol.for(marker13);
-var _a13, _b13;
-var TypeValidationError = class _TypeValidationError extends (_b13 = AISDKError, _a13 = symbol13, _b13) {
+var name12$1 = "AI_TypeValidationError";
+var marker13$1 = `vercel.ai.error.${name12$1}`;
+var symbol13$1 = Symbol.for(marker13$1);
+var _a13$1, _b13;
+var TypeValidationError = class _TypeValidationError extends (_b13 = AISDKError, _a13$1 = symbol13$1, _b13) {
   constructor({
     value,
     cause,
@@ -376,17 +406,17 @@ var TypeValidationError = class _TypeValidationError extends (_b13 = AISDKError,
       contextPrefix += ")";
     }
     super({
-      name: name12,
+      name: name12$1,
       message: `${contextPrefix}: Value: ${JSON.stringify(value)}.
 Error message: ${getErrorMessage$1(cause)}`,
       cause
     });
-    this[_a13] = true;
+    this[_a13$1] = true;
     this.value = value;
     this.context = context2;
   }
   static isInstance(error) {
-    return AISDKError.hasMarker(error, marker13);
+    return AISDKError.hasMarker(error, marker13$1);
   }
   /**
    * Wraps an error into a TypeValidationError.
@@ -411,8 +441,8 @@ Error message: ${getErrorMessage$1(cause)}`,
     return new _TypeValidationError({ value, cause, context: context2 });
   }
 };
-var name13 = "AI_UnsupportedFunctionalityError";
-var marker14$1 = `vercel.ai.error.${name13}`;
+var name13$1 = "AI_UnsupportedFunctionalityError";
+var marker14$1 = `vercel.ai.error.${name13$1}`;
 var symbol14$1 = Symbol.for(marker14$1);
 var _a14$1, _b14;
 var UnsupportedFunctionalityError = class extends (_b14 = AISDKError, _a14$1 = symbol14$1, _b14) {
@@ -420,7 +450,7 @@ var UnsupportedFunctionalityError = class extends (_b14 = AISDKError, _a14$1 = s
     functionality,
     message = `'${functionality}' functionality not supported.`
   }) {
-    super({ name: name13, message });
+    super({ name: name13$1, message });
     this[_a14$1] = true;
     this.functionality = functionality;
   }
@@ -428,8 +458,30 @@ var UnsupportedFunctionalityError = class extends (_b14 = AISDKError, _a14$1 = s
     return AISDKError.hasMarker(error, marker14$1);
   }
 };
+function isJSONValue(value) {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.every(isJSONValue);
+  }
+  if (typeof value === "object") {
+    return Object.entries(value).every(
+      ([key, val]) => typeof key === "string" && (val === void 0 || isJSONValue(val))
+    );
+  }
+  return false;
+}
+function isJSONArray(value) {
+  return Array.isArray(value) && value.every(isJSONValue);
+}
+function isJSONObject(value) {
+  return value != null && typeof value === "object" && Object.entries(value).every(
+    ([key, val]) => typeof key === "string" && (val === void 0 || isJSONValue(val))
+  );
+}
 var _a$4;
-function $constructor(name17, initializer2, params) {
+function $constructor(name22, initializer2, params) {
   function init(inst, def) {
     if (!inst._zod) {
       Object.defineProperty(inst, "_zod", {
@@ -441,10 +493,10 @@ function $constructor(name17, initializer2, params) {
         enumerable: false
       });
     }
-    if (inst._zod.traits.has(name17)) {
+    if (inst._zod.traits.has(name22)) {
       return;
     }
-    inst._zod.traits.add(name17);
+    inst._zod.traits.add(name22);
     initializer2(inst, def);
     const proto = _.prototype;
     const keys = Object.keys(proto);
@@ -458,12 +510,12 @@ function $constructor(name17, initializer2, params) {
   const Parent = params?.Parent ?? Object;
   class Definition extends Parent {
   }
-  Object.defineProperty(Definition, "name", { value: name17 });
+  Object.defineProperty(Definition, "name", { value: name22 });
   function _(def) {
-    var _a17;
+    var _a22;
     const inst = params?.Parent ? new Definition() : this;
     init(inst, def);
-    (_a17 = inst._zod).deferred ?? (_a17.deferred = []);
+    (_a22 = inst._zod).deferred ?? (_a22.deferred = []);
     for (const fn of inst._zod.deferred) {
       fn();
     }
@@ -474,10 +526,10 @@ function $constructor(name17, initializer2, params) {
     value: (inst) => {
       if (params?.Parent && inst instanceof params.Parent)
         return true;
-      return inst?._zod?.traits?.has(name17);
+      return inst?._zod?.traits?.has(name22);
     }
   });
-  Object.defineProperty(_, "name", { value: name17 });
+  Object.defineProperty(_, "name", { value: name22 });
   return _;
 }
 class $ZodAsyncError extends Error {
@@ -486,8 +538,8 @@ class $ZodAsyncError extends Error {
   }
 }
 class $ZodEncodeError extends Error {
-  constructor(name17) {
-    super(`Encountered unidirectional transform during encode: ${name17}`);
+  constructor(name22) {
+    super(`Encountered unidirectional transform during encode: ${name22}`);
     this.name = "ZodEncodeError";
   }
 }
@@ -857,8 +909,8 @@ function explicitlyAborted(x, startIndex = 0) {
 }
 function prefixIssues(path, issues) {
   return issues.map((iss) => {
-    var _a17;
-    (_a17 = iss).path ?? (_a17.path = []);
+    var _a22;
+    (_a22 = iss).path ?? (_a22.path = []);
     iss.path.unshift(path);
     return iss;
   });
@@ -1095,10 +1147,10 @@ const _null$2 = /^null$/i;
 const lowercase = /^[^A-Z]*$/;
 const uppercase = /^[^a-z]*$/;
 const $ZodCheck = /* @__PURE__ */ $constructor("$ZodCheck", (inst, def) => {
-  var _a17;
+  var _a22;
   inst._zod ?? (inst._zod = {});
   inst._zod.def = def;
-  (_a17 = inst._zod).onattach ?? (_a17.onattach = []);
+  (_a22 = inst._zod).onattach ?? (_a22.onattach = []);
 });
 const numericOriginMap = {
   number: "number",
@@ -1164,8 +1216,8 @@ const $ZodCheckGreaterThan = /* @__PURE__ */ $constructor("$ZodCheckGreaterThan"
 const $ZodCheckMultipleOf = /* @__PURE__ */ $constructor("$ZodCheckMultipleOf", (inst, def) => {
   $ZodCheck.init(inst, def);
   inst._zod.onattach.push((inst2) => {
-    var _a17;
-    (_a17 = inst2._zod.bag).multipleOf ?? (_a17.multipleOf = def.value);
+    var _a22;
+    (_a22 = inst2._zod.bag).multipleOf ?? (_a22.multipleOf = def.value);
   });
   inst._zod.check = (payload) => {
     if (typeof payload.value !== typeof def.value)
@@ -1263,9 +1315,9 @@ const $ZodCheckNumberFormat = /* @__PURE__ */ $constructor("$ZodCheckNumberForma
   };
 });
 const $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (inst, def) => {
-  var _a17;
+  var _a22;
   $ZodCheck.init(inst, def);
-  (_a17 = inst._zod.def).when ?? (_a17.when = (payload) => {
+  (_a22 = inst._zod.def).when ?? (_a22.when = (payload) => {
     const val = payload.value;
     return !nullish(val) && val.length !== void 0;
   });
@@ -1292,9 +1344,9 @@ const $ZodCheckMaxLength = /* @__PURE__ */ $constructor("$ZodCheckMaxLength", (i
   };
 });
 const $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (inst, def) => {
-  var _a17;
+  var _a22;
   $ZodCheck.init(inst, def);
-  (_a17 = inst._zod.def).when ?? (_a17.when = (payload) => {
+  (_a22 = inst._zod.def).when ?? (_a22.when = (payload) => {
     const val = payload.value;
     return !nullish(val) && val.length !== void 0;
   });
@@ -1321,9 +1373,9 @@ const $ZodCheckMinLength = /* @__PURE__ */ $constructor("$ZodCheckMinLength", (i
   };
 });
 const $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEquals", (inst, def) => {
-  var _a17;
+  var _a22;
   $ZodCheck.init(inst, def);
-  (_a17 = inst._zod.def).when ?? (_a17.when = (payload) => {
+  (_a22 = inst._zod.def).when ?? (_a22.when = (payload) => {
     const val = payload.value;
     return !nullish(val) && val.length !== void 0;
   });
@@ -1352,7 +1404,7 @@ const $ZodCheckLengthEquals = /* @__PURE__ */ $constructor("$ZodCheckLengthEqual
   };
 });
 const $ZodCheckStringFormat = /* @__PURE__ */ $constructor("$ZodCheckStringFormat", (inst, def) => {
-  var _a17, _b15;
+  var _a22, _b15;
   $ZodCheck.init(inst, def);
   inst._zod.onattach.push((inst2) => {
     const bag = inst2._zod.bag;
@@ -1363,7 +1415,7 @@ const $ZodCheckStringFormat = /* @__PURE__ */ $constructor("$ZodCheckStringForma
     }
   });
   if (def.pattern)
-    (_a17 = inst._zod).check ?? (_a17.check = (payload) => {
+    (_a22 = inst._zod).check ?? (_a22.check = (payload) => {
       def.pattern.lastIndex = 0;
       if (def.pattern.test(payload.value))
         return;
@@ -1522,7 +1574,7 @@ const version = {
   patch: 3
 };
 const $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
-  var _a17;
+  var _a22;
   inst ?? (inst = {});
   inst._zod.def = def;
   inst._zod.bag = inst._zod.bag || {};
@@ -1537,7 +1589,7 @@ const $ZodType = /* @__PURE__ */ $constructor("$ZodType", (inst, def) => {
     }
   }
   if (checks.length === 0) {
-    (_a17 = inst._zod).deferred ?? (_a17.deferred = []);
+    (_a22 = inst._zod).deferred ?? (_a22.deferred = []);
     inst._zod.deferred?.push(() => {
       inst._zod.run = inst._zod.parse;
     });
@@ -3732,7 +3784,7 @@ function initializeContext(params) {
   };
 }
 function process$1(schema, ctx, _params = { path: [], schemaPath: [] }) {
-  var _a17;
+  var _a22;
   const def = schema._zod.def;
   const seen = ctx.seen.get(schema);
   if (seen) {
@@ -3780,7 +3832,7 @@ function process$1(schema, ctx, _params = { path: [], schemaPath: [] }) {
     delete result.schema.default;
   }
   if (ctx.io === "input" && "_prefault" in result.schema)
-    (_a17 = result.schema).default ?? (_a17.default = result.schema._prefault);
+    (_a22 = result.schema).default ?? (_a22.default = result.schema._prefault);
   delete result.schema._prefault;
   const _result = ctx.seen.get(schema);
   return _result.schema;
@@ -5211,6 +5263,14 @@ function object$1(shape, params) {
   };
   return new ZodObject(def);
 }
+function strictObject(shape, params) {
+  return new ZodObject({
+    type: "object",
+    shape,
+    catchall: never(),
+    ...normalizeParams(params)
+  });
+}
 function looseObject(shape, params) {
   return new ZodObject({
     type: "object",
@@ -6397,14 +6457,14 @@ function withUserAgentSuffix(headers, ...userAgentSuffixParts) {
   return Object.fromEntries(normalizedHeaders.entries());
 }
 var VERSION$6 = "4.0.30";
-var getOriginalFetch$1 = () => globalThis.fetch;
+var getOriginalFetch$2 = () => globalThis.fetch;
 var getFromApi = async ({
   url,
   headers = {},
   successfulResponseHandler,
   failedResponseHandler,
   abortSignal,
-  fetch: fetch2 = getOriginalFetch$1()
+  fetch: fetch2 = getOriginalFetch$2()
 }) => {
   try {
     const response = await fetch2(url, {
@@ -7774,7 +7834,7 @@ function standardSchema(standardSchema2) {
 }
 function zod3Schema(zodSchema2, options2) {
   var _a22;
-  const useReferences = (_a22 = void 0) != null ? _a22 : false;
+  const useReferences = (_a22 = options2 == null ? void 0 : options2.useReferences) != null ? _a22 : false;
   return jsonSchema(
     // defer json schema creation to avoid unnecessary computation when only validation is needed
     () => zod3ToJsonSchema(zodSchema2, {
@@ -7790,7 +7850,7 @@ function zod3Schema(zodSchema2, options2) {
 }
 function zod4Schema(zodSchema2, options2) {
   var _a22;
-  const useReferences = (_a22 = void 0) != null ? _a22 : false;
+  const useReferences = (_a22 = options2 == null ? void 0 : options2.useReferences) != null ? _a22 : false;
   return jsonSchema(
     // defer json schema creation to avoid unnecessary computation when only validation is needed
     () => addAdditionalPropertiesToJsonSchema(
@@ -7813,9 +7873,9 @@ function isZod4Schema(zodSchema2) {
 }
 function zodSchema(zodSchema2, options2) {
   if (isZod4Schema(zodSchema2)) {
-    return zod4Schema(zodSchema2);
+    return zod4Schema(zodSchema2, options2);
   } else {
-    return zod3Schema(zodSchema2);
+    return zod3Schema(zodSchema2, options2);
   }
 }
 async function validateTypes({
@@ -8051,6 +8111,9 @@ var postToApi = async ({
 function tool(tool2) {
   return tool2;
 }
+function dynamicTool(tool2) {
+  return { ...tool2, type: "dynamic" };
+}
 function createProviderToolFactory({
   id,
   inputSchema
@@ -8267,8 +8330,8 @@ function requireGetContext() {
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __export2 = (target, all) => {
-    for (var name17 in all)
-      __defProp2(target, name17, { get: all[name17], enumerable: true });
+    for (var name22 in all)
+      __defProp2(target, name22, { get: all[name22], enumerable: true });
   };
   var __copyProps = (to, from, except, desc) => {
     if (from && typeof from === "object" || typeof from === "function") {
@@ -8302,8 +8365,8 @@ function requireAuthErrors() {
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __export2 = (target, all) => {
-    for (var name17 in all)
-      __defProp2(target, name17, { get: all[name17], enumerable: true });
+    for (var name22 in all)
+      __defProp2(target, name22, { get: all[name22], enumerable: true });
   };
   var __copyProps = (to, from, except, desc) => {
     if (from && typeof from === "object" || typeof from === "function") {
@@ -8346,8 +8409,8 @@ function requireIndexBrowser() {
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __export2 = (target, all) => {
-    for (var name17 in all)
-      __defProp2(target, name17, { get: all[name17], enumerable: true });
+    for (var name22 in all)
+      __defProp2(target, name22, { get: all[name22], enumerable: true });
   };
   var __copyProps = (to, from, except, desc) => {
     if (from && typeof from === "object" || typeof from === "function") {
@@ -8417,10 +8480,10 @@ var GatewayError = class _GatewayError extends (_b = Error, _a$1 = symbol$1, _b)
   }
 };
 var name$1 = "GatewayAuthenticationError";
-var marker2 = `vercel.ai.gateway.error.${name$1}`;
-var symbol2 = Symbol.for(marker2);
-var _a2, _b2;
-var GatewayAuthenticationError = class _GatewayAuthenticationError extends (_b2 = GatewayError, _a2 = symbol2, _b2) {
+var marker2$1 = `vercel.ai.gateway.error.${name$1}`;
+var symbol2$1 = Symbol.for(marker2$1);
+var _a2$1, _b2;
+var GatewayAuthenticationError = class _GatewayAuthenticationError extends (_b2 = GatewayError, _a2$1 = symbol2$1, _b2) {
   constructor({
     message = "Authentication failed",
     statusCode = 401,
@@ -8428,12 +8491,12 @@ var GatewayAuthenticationError = class _GatewayAuthenticationError extends (_b2 
     generationId
   } = {}) {
     super({ message, statusCode, cause, generationId });
-    this[_a2] = true;
+    this[_a2$1] = true;
     this.name = name$1;
     this.type = "authentication_error";
   }
   static isInstance(error) {
-    return GatewayError.hasMarker(error) && symbol2 in error;
+    return GatewayError.hasMarker(error) && symbol2$1 in error;
   }
   /**
    * Creates a contextual error message when authentication fails
@@ -8477,8 +8540,8 @@ Run 'npx vercel link' to link your project, then 'vc env pull' to fetch the toke
     });
   }
 };
-var name2 = "GatewayInvalidRequestError";
-var marker3$1 = `vercel.ai.gateway.error.${name2}`;
+var name2$1 = "GatewayInvalidRequestError";
+var marker3$1 = `vercel.ai.gateway.error.${name2$1}`;
 var symbol3$1 = Symbol.for(marker3$1);
 var _a3$1, _b3;
 var GatewayInvalidRequestError = class extends (_b3 = GatewayError, _a3$1 = symbol3$1, _b3) {
@@ -8490,7 +8553,7 @@ var GatewayInvalidRequestError = class extends (_b3 = GatewayError, _a3$1 = symb
   } = {}) {
     super({ message, statusCode, cause, generationId });
     this[_a3$1] = true;
-    this.name = name2;
+    this.name = name2$1;
     this.type = "invalid_request_error";
   }
   static isInstance(error) {
@@ -8587,10 +8650,10 @@ var GatewayFailedDependencyError = class extends (_b7 = GatewayError, _a7$1 = sy
   }
 };
 var name7$1 = "GatewayForbiddenError";
-var marker8 = `vercel.ai.gateway.error.${name7$1}`;
-var symbol8 = Symbol.for(marker8);
-var _a8, _b8;
-var GatewayForbiddenError = class extends (_b8 = GatewayError, _a8 = symbol8, _b8) {
+var marker8$1 = `vercel.ai.gateway.error.${name7$1}`;
+var symbol8$1 = Symbol.for(marker8$1);
+var _a8$1, _b8;
+var GatewayForbiddenError = class extends (_b8 = GatewayError, _a8$1 = symbol8$1, _b8) {
   constructor({
     message = "Forbidden",
     statusCode = 403,
@@ -8598,16 +8661,16 @@ var GatewayForbiddenError = class extends (_b8 = GatewayError, _a8 = symbol8, _b
     generationId
   } = {}) {
     super({ message, statusCode, cause, generationId });
-    this[_a8] = true;
+    this[_a8$1] = true;
     this.name = name7$1;
     this.type = "forbidden";
   }
   static isInstance(error) {
-    return GatewayError.hasMarker(error) && symbol8 in error;
+    return GatewayError.hasMarker(error) && symbol8$1 in error;
   }
 };
-var name8 = "GatewayResponseError";
-var marker9$1 = `vercel.ai.gateway.error.${name8}`;
+var name8$1 = "GatewayResponseError";
+var marker9$1 = `vercel.ai.gateway.error.${name8$1}`;
 var symbol9$1 = Symbol.for(marker9$1);
 var _a9$1, _b9;
 var GatewayResponseError = class extends (_b9 = GatewayError, _a9$1 = symbol9$1, _b9) {
@@ -8621,7 +8684,7 @@ var GatewayResponseError = class extends (_b9 = GatewayError, _a9$1 = symbol9$1,
   } = {}) {
     super({ message, statusCode, cause, generationId });
     this[_a9$1] = true;
-    this.name = name8;
+    this.name = name8$1;
     this.type = "response_error";
     this.response = response;
     this.validationError = validationError;
@@ -10237,8 +10300,8 @@ const major = VERSION$4.split(".")[0];
 const GLOBAL_OPENTELEMETRY_API_KEY = Symbol.for(`opentelemetry.js.api.${major}`);
 const _global = typeof globalThis === "object" ? globalThis : typeof self === "object" ? self : typeof window === "object" ? window : typeof global === "object" ? global : {};
 function registerGlobal(type, instance, diag, allowOverride = false) {
-  var _a17;
-  const api = _global[GLOBAL_OPENTELEMETRY_API_KEY] = (_a17 = _global[GLOBAL_OPENTELEMETRY_API_KEY]) !== null && _a17 !== void 0 ? _a17 : {
+  var _a22;
+  const api = _global[GLOBAL_OPENTELEMETRY_API_KEY] = (_a22 = _global[GLOBAL_OPENTELEMETRY_API_KEY]) !== null && _a22 !== void 0 ? _a22 : {
     version: VERSION$4
   };
   if (!allowOverride && api[type]) {
@@ -10256,8 +10319,8 @@ function registerGlobal(type, instance, diag, allowOverride = false) {
   return true;
 }
 function getGlobal(type) {
-  var _a17, _b15;
-  const globalVersion = (_a17 = _global[GLOBAL_OPENTELEMETRY_API_KEY]) === null || _a17 === void 0 ? void 0 : _a17.version;
+  var _a22, _b15;
+  const globalVersion = (_a22 = _global[GLOBAL_OPENTELEMETRY_API_KEY]) === null || _a22 === void 0 ? void 0 : _a22.version;
   if (!globalVersion || !isCompatible(globalVersion)) {
     return;
   }
@@ -10354,10 +10417,10 @@ class DiagAPI {
     }
     const self2 = this;
     const setLogger = (logger, optionsOrLogLevel = { logLevel: DiagLogLevel.INFO }) => {
-      var _a17, _b15, _c;
+      var _a22, _b15, _c;
       if (logger === self2) {
         const err = new Error("Cannot use diag as the logger for itself. Please use a DiagLogger implementation like ConsoleDiagLogger or a custom implementation");
-        self2.error((_a17 = err.stack) !== null && _a17 !== void 0 ? _a17 : err.message);
+        self2.error((_a22 = err.stack) !== null && _a22 !== void 0 ? _a22 : err.message);
         return false;
       }
       if (typeof optionsOrLogLevel === "number") {
@@ -10561,8 +10624,8 @@ function setSpanContext(context2, spanContext) {
   return setSpan(context2, new NonRecordingSpan(spanContext));
 }
 function getSpanContext(context2) {
-  var _a17;
-  return (_a17 = getSpan(context2)) === null || _a17 === void 0 ? void 0 : _a17.spanContext();
+  var _a22;
+  return (_a22 = getSpan(context2)) === null || _a22 === void 0 ? void 0 : _a22.spanContext();
 }
 const isHex = new Uint8Array([
   0,
@@ -10693,7 +10756,7 @@ function wrapSpanContext(spanContext) {
 const contextApi = ContextAPI.getInstance();
 class NoopTracer {
   // startSpan starts a noop span.
-  startSpan(name17, options2, context2 = contextApi.active()) {
+  startSpan(name22, options2, context2 = contextApi.active()) {
     const root = Boolean(options2 === null || options2 === void 0 ? void 0 : options2.root);
     if (root) {
       return new NonRecordingSpan();
@@ -10705,7 +10768,7 @@ class NoopTracer {
       return new NonRecordingSpan();
     }
   }
-  startActiveSpan(name17, arg2, arg3, arg4) {
+  startActiveSpan(name22, arg2, arg3, arg4) {
     let opts;
     let ctx;
     let fn;
@@ -10722,7 +10785,7 @@ class NoopTracer {
       fn = arg4;
     }
     const parentContext = ctx !== null && ctx !== void 0 ? ctx : contextApi.active();
-    const span = this.startSpan(name17, opts, parentContext);
+    const span = this.startSpan(name22, opts, parentContext);
     const contextWithSpanSet = setSpan(parentContext, span);
     return contextApi.with(contextWithSpanSet, fn, void 0, span);
   }
@@ -10732,14 +10795,14 @@ function isSpanContext(spanContext) {
 }
 const NOOP_TRACER = new NoopTracer();
 class ProxyTracer {
-  constructor(provider, name17, version2, options2) {
+  constructor(provider, name22, version2, options2) {
     this._provider = provider;
-    this.name = name17;
+    this.name = name22;
     this.version = version2;
     this.options = options2;
   }
-  startSpan(name17, options2, context2) {
-    return this._getTracer().startSpan(name17, options2, context2);
+  startSpan(name22, options2, context2) {
+    return this._getTracer().startSpan(name22, options2, context2);
   }
   startActiveSpan(_name, _options, _context, _fn) {
     const tracer = this._getTracer();
@@ -10771,13 +10834,13 @@ class ProxyTracerProvider {
   /**
    * Get a {@link ProxyTracer}
    */
-  getTracer(name17, version2, options2) {
-    var _a17;
-    return (_a17 = this.getDelegateTracer(name17, version2, options2)) !== null && _a17 !== void 0 ? _a17 : new ProxyTracer(this, name17, version2, options2);
+  getTracer(name22, version2, options2) {
+    var _a22;
+    return (_a22 = this.getDelegateTracer(name22, version2, options2)) !== null && _a22 !== void 0 ? _a22 : new ProxyTracer(this, name22, version2, options2);
   }
   getDelegate() {
-    var _a17;
-    return (_a17 = this._delegate) !== null && _a17 !== void 0 ? _a17 : NOOP_TRACER_PROVIDER;
+    var _a22;
+    return (_a22 = this._delegate) !== null && _a22 !== void 0 ? _a22 : NOOP_TRACER_PROVIDER;
   }
   /**
    * Set the delegate tracer provider
@@ -10785,9 +10848,9 @@ class ProxyTracerProvider {
   setDelegate(delegate) {
     this._delegate = delegate;
   }
-  getDelegateTracer(name17, version2, options2) {
-    var _a17;
-    return (_a17 = this._delegate) === null || _a17 === void 0 ? void 0 : _a17.getTracer(name17, version2, options2);
+  getDelegateTracer(name22, version2, options2) {
+    var _a22;
+    return (_a22 = this._delegate) === null || _a22 === void 0 ? void 0 : _a22.getTracer(name22, version2, options2);
   }
 }
 var SpanStatusCode;
@@ -10839,8 +10902,8 @@ class TraceAPI {
   /**
    * Returns a tracer from the global tracer provider.
    */
-  getTracer(name17, version2) {
-    return this.getTracerProvider().getTracer(name17, version2);
+  getTracer(name22, version2) {
+    return this.getTracerProvider().getTracer(name22, version2);
   }
   /** Remove the global tracer provider */
   disable() {
@@ -10877,6 +10940,24 @@ var InvalidArgumentError2 = class extends AISDKError {
   }
 };
 _a = symbol;
+var name2 = "AI_InvalidStreamPartError";
+var marker2 = `vercel.ai.error.${name2}`;
+var symbol2 = Symbol.for(marker2);
+var _a2;
+var InvalidStreamPartError = class extends AISDKError {
+  constructor({
+    chunk,
+    message
+  }) {
+    super({ name: name2, message });
+    this[_a2] = true;
+    this.chunk = chunk;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker2);
+  }
+};
+_a2 = symbol2;
 var name3 = "AI_InvalidToolApprovalError";
 var marker3 = `vercel.ai.error.${name3}`;
 var symbol3 = Symbol.for(marker3);
@@ -10981,6 +11062,25 @@ var MissingToolResultsError = class extends AISDKError {
   }
 };
 _a7 = symbol7;
+var name8 = "AI_NoImageGeneratedError";
+var marker8 = `vercel.ai.error.${name8}`;
+var symbol8 = Symbol.for(marker8);
+var _a8;
+var NoImageGeneratedError = class extends AISDKError {
+  constructor({
+    message = "No image generated.",
+    cause,
+    responses
+  }) {
+    super({ name: name8, message, cause });
+    this[_a8] = true;
+    this.responses = responses;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker8);
+  }
+};
+_a8 = symbol8;
 var name9 = "AI_NoObjectGeneratedError";
 var marker9 = `vercel.ai.error.${name9}`;
 var symbol9 = Symbol.for(marker9);
@@ -11024,6 +11124,79 @@ var NoOutputGeneratedError = class extends AISDKError {
   }
 };
 _a10 = symbol10;
+var name11 = "AI_NoSpeechGeneratedError";
+var marker11 = `vercel.ai.error.${name11}`;
+var symbol11 = Symbol.for(marker11);
+var _a11;
+var NoSpeechGeneratedError = class extends AISDKError {
+  constructor(options2) {
+    super({
+      name: name11,
+      message: "No speech audio generated."
+    });
+    this[_a11] = true;
+    this.responses = options2.responses;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker11);
+  }
+};
+_a11 = symbol11;
+var name12 = "AI_NoTranscriptGeneratedError";
+var marker12 = `vercel.ai.error.${name12}`;
+var symbol12 = Symbol.for(marker12);
+var _a12;
+var NoTranscriptGeneratedError = class extends AISDKError {
+  constructor(options2) {
+    super({
+      name: name12,
+      message: "No transcript generated."
+    });
+    this[_a12] = true;
+    this.responses = options2.responses;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker12);
+  }
+};
+_a12 = symbol12;
+var name13 = "AI_NoVideoGeneratedError";
+var marker13 = `vercel.ai.error.${name13}`;
+var symbol13 = Symbol.for(marker13);
+var _a13;
+var NoVideoGeneratedError = class extends AISDKError {
+  constructor({
+    message = "No video generated.",
+    cause,
+    responses
+  }) {
+    super({ name: name13, message, cause });
+    this[_a13] = true;
+    this.responses = responses;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker13);
+  }
+  /**
+   * @deprecated use `isInstance` instead
+   */
+  static isNoVideoGeneratedError(error) {
+    return error instanceof Error && error.name === name13 && typeof error.responses !== "undefined" ? true : false;
+  }
+  /**
+   * @deprecated Do not use this method. It will be removed in the next major version.
+   */
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      stack: this.stack,
+      cause: this.cause,
+      responses: this.responses
+    };
+  }
+};
+_a13 = symbol13;
 var name14 = "AI_NoSuchToolError";
 var marker14 = `vercel.ai.error.${name14}`;
 var symbol14 = Symbol.for(marker14);
@@ -11094,6 +11267,25 @@ var UIMessageStreamError = class extends AISDKError {
   }
 };
 _a16 = symbol16;
+var name17 = "AI_InvalidDataContentError";
+var marker17 = `vercel.ai.error.${name17}`;
+var symbol17 = Symbol.for(marker17);
+var _a17;
+var InvalidDataContentError = class extends AISDKError {
+  constructor({
+    content,
+    cause,
+    message = `Invalid data content. Expected a base64 string, Uint8Array, ArrayBuffer, or Buffer, but got ${typeof content}.`
+  }) {
+    super({ name: name17, message, cause });
+    this[_a17] = true;
+    this.content = content;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker17);
+  }
+};
+_a17 = symbol17;
 var name18 = "AI_InvalidMessageRoleError";
 var marker18 = `vercel.ai.error.${name18}`;
 var symbol18 = Symbol.for(marker18);
@@ -11237,6 +11429,38 @@ function logV2CompatibilityWarning({
     model: modelId
   });
 }
+function asEmbeddingModelV3(model) {
+  if (model.specificationVersion === "v3") {
+    return model;
+  }
+  logV2CompatibilityWarning({
+    provider: model.provider,
+    modelId: model.modelId
+  });
+  return new Proxy(model, {
+    get(target, prop) {
+      if (prop === "specificationVersion")
+        return "v3";
+      return target[prop];
+    }
+  });
+}
+function asImageModelV3(model) {
+  if (model.specificationVersion === "v3") {
+    return model;
+  }
+  logV2CompatibilityWarning({
+    provider: model.provider,
+    modelId: model.modelId
+  });
+  return new Proxy(model, {
+    get(target, prop) {
+      if (prop === "specificationVersion")
+        return "v3";
+      return target[prop];
+    }
+  });
+}
 function asLanguageModelV3(model) {
   if (model.specificationVersion === "v3") {
     return model;
@@ -11314,6 +11538,38 @@ function convertV2UsageToV3(usage) {
     }
   };
 }
+function asSpeechModelV3(model) {
+  if (model.specificationVersion === "v3") {
+    return model;
+  }
+  logV2CompatibilityWarning({
+    provider: model.provider,
+    modelId: model.modelId
+  });
+  return new Proxy(model, {
+    get(target, prop) {
+      if (prop === "specificationVersion")
+        return "v3";
+      return target[prop];
+    }
+  });
+}
+function asTranscriptionModelV3(model) {
+  if (model.specificationVersion === "v3") {
+    return model;
+  }
+  logV2CompatibilityWarning({
+    provider: model.provider,
+    modelId: model.modelId
+  });
+  return new Proxy(model, {
+    get(target, prop) {
+      if (prop === "specificationVersion")
+        return "v3";
+      return target[prop];
+    }
+  });
+}
 function resolveLanguageModel(model) {
   if (typeof model !== "string") {
     if (model.specificationVersion !== "v3" && model.specificationVersion !== "v2") {
@@ -11327,6 +11583,106 @@ function resolveLanguageModel(model) {
     return asLanguageModelV3(model);
   }
   return getGlobalProvider().languageModel(model);
+}
+function resolveEmbeddingModel(model) {
+  if (typeof model !== "string") {
+    if (model.specificationVersion !== "v3" && model.specificationVersion !== "v2") {
+      const unsupportedModel = model;
+      throw new UnsupportedModelVersionError({
+        version: unsupportedModel.specificationVersion,
+        provider: unsupportedModel.provider,
+        modelId: unsupportedModel.modelId
+      });
+    }
+    return asEmbeddingModelV3(model);
+  }
+  return getGlobalProvider().embeddingModel(model);
+}
+function resolveTranscriptionModel(model) {
+  var _a22, _b15;
+  if (typeof model !== "string") {
+    if (model.specificationVersion !== "v3" && model.specificationVersion !== "v2") {
+      const unsupportedModel = model;
+      throw new UnsupportedModelVersionError({
+        version: unsupportedModel.specificationVersion,
+        provider: unsupportedModel.provider,
+        modelId: unsupportedModel.modelId
+      });
+    }
+    return asTranscriptionModelV3(model);
+  }
+  return (_b15 = (_a22 = getGlobalProvider()).transcriptionModel) == null ? void 0 : _b15.call(_a22, model);
+}
+function resolveSpeechModel(model) {
+  var _a22, _b15;
+  if (typeof model !== "string") {
+    if (model.specificationVersion !== "v3" && model.specificationVersion !== "v2") {
+      const unsupportedModel = model;
+      throw new UnsupportedModelVersionError({
+        version: unsupportedModel.specificationVersion,
+        provider: unsupportedModel.provider,
+        modelId: unsupportedModel.modelId
+      });
+    }
+    return asSpeechModelV3(model);
+  }
+  return (_b15 = (_a22 = getGlobalProvider()).speechModel) == null ? void 0 : _b15.call(_a22, model);
+}
+function resolveImageModel(model) {
+  if (typeof model !== "string") {
+    if (model.specificationVersion !== "v3" && model.specificationVersion !== "v2") {
+      const unsupportedModel = model;
+      throw new UnsupportedModelVersionError({
+        version: unsupportedModel.specificationVersion,
+        provider: unsupportedModel.provider,
+        modelId: unsupportedModel.modelId
+      });
+    }
+    return asImageModelV3(model);
+  }
+  return getGlobalProvider().imageModel(model);
+}
+function resolveVideoModel(model) {
+  if (typeof model === "string") {
+    const provider = getGlobalProvider();
+    const videoModel = provider.videoModel;
+    if (!videoModel) {
+      throw new Error(
+        'The default provider does not support video models. Please use a Experimental_VideoModelV3 object from a provider (e.g., vertex.video("model-id")).'
+      );
+    }
+    return videoModel(model);
+  }
+  if (model.specificationVersion !== "v3") {
+    const unsupportedModel = model;
+    throw new UnsupportedModelVersionError({
+      version: unsupportedModel.specificationVersion,
+      provider: unsupportedModel.provider,
+      modelId: unsupportedModel.modelId
+    });
+  }
+  return model;
+}
+function resolveRerankingModel(model) {
+  if (typeof model === "string") {
+    const provider = getGlobalProvider();
+    const rerankingModel = provider.rerankingModel;
+    if (!rerankingModel) {
+      throw new Error(
+        'The default provider does not support reranking models. Please use a RerankingModel object from a provider (e.g., gateway.rerankingModel("model-id")).'
+      );
+    }
+    return rerankingModel(model);
+  }
+  if (model.specificationVersion !== "v3") {
+    const unsupportedModel = model;
+    throw new UnsupportedModelVersionError({
+      version: unsupportedModel.specificationVersion,
+      provider: unsupportedModel.provider,
+      modelId: unsupportedModel.modelId
+    });
+  }
+  return model;
 }
 function getGlobalProvider() {
   var _a22;
@@ -11434,6 +11790,119 @@ var imageMediaTypeSignatures = [
       105,
       99
     ]
+  }
+];
+var audioMediaTypeSignatures = [
+  {
+    mediaType: "audio/mpeg",
+    bytesPrefix: [255, 251]
+  },
+  {
+    mediaType: "audio/mpeg",
+    bytesPrefix: [255, 250]
+  },
+  {
+    mediaType: "audio/mpeg",
+    bytesPrefix: [255, 243]
+  },
+  {
+    mediaType: "audio/mpeg",
+    bytesPrefix: [255, 242]
+  },
+  {
+    mediaType: "audio/mpeg",
+    bytesPrefix: [255, 227]
+  },
+  {
+    mediaType: "audio/mpeg",
+    bytesPrefix: [255, 226]
+  },
+  {
+    mediaType: "audio/wav",
+    bytesPrefix: [
+      82,
+      // R
+      73,
+      // I
+      70,
+      // F
+      70,
+      // F
+      null,
+      null,
+      null,
+      null,
+      87,
+      // W
+      65,
+      // A
+      86,
+      // V
+      69
+      // E
+    ]
+  },
+  {
+    mediaType: "audio/ogg",
+    bytesPrefix: [79, 103, 103, 83]
+  },
+  {
+    mediaType: "audio/flac",
+    bytesPrefix: [102, 76, 97, 67]
+  },
+  {
+    mediaType: "audio/aac",
+    bytesPrefix: [64, 21, 0, 0]
+  },
+  {
+    mediaType: "audio/mp4",
+    bytesPrefix: [102, 116, 121, 112]
+  },
+  {
+    mediaType: "audio/webm",
+    bytesPrefix: [26, 69, 223, 163]
+  }
+];
+var videoMediaTypeSignatures = [
+  {
+    mediaType: "video/mp4",
+    bytesPrefix: [
+      0,
+      0,
+      0,
+      null,
+      102,
+      116,
+      121,
+      112
+      // ftyp
+    ]
+  },
+  {
+    mediaType: "video/webm",
+    bytesPrefix: [26, 69, 223, 163]
+    // EBML
+  },
+  {
+    mediaType: "video/quicktime",
+    bytesPrefix: [
+      0,
+      0,
+      0,
+      20,
+      102,
+      116,
+      121,
+      112,
+      113,
+      116
+      // ftypqt
+    ]
+  },
+  {
+    mediaType: "video/x-msvideo",
+    bytesPrefix: [82, 73, 70, 70]
+    // RIFF (AVI)
   }
 ];
 var stripID3 = (data) => {
@@ -11574,6 +12043,26 @@ function convertDataContentToBase64String(content) {
     return convertUint8ArrayToBase64(new Uint8Array(content));
   }
   return convertUint8ArrayToBase64(content);
+}
+function convertDataContentToUint8Array(content) {
+  if (content instanceof Uint8Array) {
+    return content;
+  }
+  if (typeof content === "string") {
+    try {
+      return convertBase64ToUint8Array(content);
+    } catch (error) {
+      throw new InvalidDataContentError({
+        message: "Invalid data content. Content string is not a base64-encoded media.",
+        content,
+        cause: error
+      });
+    }
+  }
+  if (content instanceof ArrayBuffer) {
+    return new Uint8Array(content);
+  }
+  throw new InvalidDataContentError({ content });
 }
 async function convertToLanguageModelPrompt({
   prompt,
@@ -12648,9 +13137,26 @@ function stringifyForTelemetry(prompt) {
     }))
   );
 }
+function registerTelemetryIntegration(integration) {
+  if (!globalThis.AI_SDK_TELEMETRY_INTEGRATIONS) {
+    globalThis.AI_SDK_TELEMETRY_INTEGRATIONS = [];
+  }
+  globalThis.AI_SDK_TELEMETRY_INTEGRATIONS.push(integration);
+}
 function getGlobalTelemetryIntegrations() {
   var _a22;
   return (_a22 = globalThis.AI_SDK_TELEMETRY_INTEGRATIONS) != null ? _a22 : [];
+}
+function bindTelemetryIntegration(integration) {
+  var _a22, _b15, _c, _d, _e, _f;
+  return {
+    onStart: (_a22 = integration.onStart) == null ? void 0 : _a22.bind(integration),
+    onStepStart: (_b15 = integration.onStepStart) == null ? void 0 : _b15.bind(integration),
+    onToolCallStart: (_c = integration.onToolCallStart) == null ? void 0 : _c.bind(integration),
+    onToolCallFinish: (_d = integration.onToolCallFinish) == null ? void 0 : _d.bind(integration),
+    onStepFinish: (_e = integration.onStepFinish) == null ? void 0 : _e.bind(integration),
+    onFinish: (_f = integration.onFinish) == null ? void 0 : _f.bind(integration)
+  };
 }
 function getGlobalTelemetryIntegration() {
   const globalIntegrations = getGlobalTelemetryIntegrations();
@@ -12767,6 +13273,13 @@ function addLanguageModelUsage(usage1, usage2) {
 }
 function addTokenCounts(tokenCount1, tokenCount2) {
   return tokenCount1 == null && tokenCount2 == null ? void 0 : (tokenCount1 != null ? tokenCount1 : 0) + (tokenCount2 != null ? tokenCount2 : 0);
+}
+function addImageModelUsage(usage1, usage2) {
+  return {
+    inputTokens: addTokenCounts(usage1.inputTokens, usage2.inputTokens),
+    outputTokens: addTokenCounts(usage1.outputTokens, usage2.outputTokens),
+    totalTokens: addTokenCounts(usage1.totalTokens, usage2.totalTokens)
+  };
 }
 function mergeObjects(base, overrides) {
   if (base === void 0 && overrides === void 0) {
@@ -13133,6 +13646,21 @@ async function executeToolCall({
       };
     }
   });
+}
+function extractReasoningContent(content) {
+  const parts = content.filter(
+    (content2) => content2.type === "reasoning"
+  );
+  return parts.length === 0 ? void 0 : parts.map((content2) => content2.text).join("\n");
+}
+function extractTextContent(content) {
+  const parts = content.filter(
+    (content2) => content2.type === "text"
+  );
+  if (parts.length === 0) {
+    return void 0;
+  }
+  return parts.map((content2) => content2.text).join("");
 }
 var DefaultGeneratedFile = class {
   constructor({
@@ -14210,6 +14738,17 @@ var DefaultStepResult = class {
 function stepCountIs(stepCount) {
   return ({ steps }) => steps.length === stepCount;
 }
+function isLoopFinished() {
+  return () => false;
+}
+function hasToolCall(toolName) {
+  return ({ steps }) => {
+    var _a22, _b15, _c;
+    return (_c = (_b15 = (_a22 = steps[steps.length - 1]) == null ? void 0 : _a22.toolCalls) == null ? void 0 : _b15.some(
+      (toolCall) => toolCall.toolName === toolName
+    )) != null ? _c : false;
+  };
+}
 async function isStopConditionMet({
   stopConditions,
   steps
@@ -14369,10 +14908,922 @@ function mergeAbortSignals(...signals) {
   }
   return controller.signal;
 }
-createIdGenerator({
+var originalGenerateId = createIdGenerator({
   prefix: "aitxt",
   size: 24
 });
+async function generateText({
+  model: modelArg,
+  tools,
+  toolChoice,
+  system,
+  prompt,
+  messages,
+  allowSystemInMessages,
+  maxRetries: maxRetriesArg,
+  abortSignal,
+  timeout,
+  headers,
+  stopWhen = stepCountIs(1),
+  experimental_output,
+  output = experimental_output,
+  experimental_telemetry: telemetry,
+  providerOptions,
+  experimental_activeTools,
+  activeTools = experimental_activeTools,
+  experimental_prepareStep,
+  prepareStep = experimental_prepareStep,
+  experimental_repairToolCall: repairToolCall,
+  experimental_download: download2,
+  experimental_context,
+  experimental_toolApprovalSecret,
+  experimental_include: include,
+  _internal: { generateId: generateId2 = originalGenerateId } = {},
+  experimental_onStart: onStart,
+  experimental_onStepStart: onStepStart,
+  experimental_onToolCallStart: onToolCallStart,
+  experimental_onToolCallFinish: onToolCallFinish,
+  onStepFinish,
+  onFinish,
+  ...settings
+}) {
+  const model = resolveLanguageModel(modelArg);
+  const createGlobalTelemetry = getGlobalTelemetryIntegration();
+  const stopConditions = asArray(stopWhen);
+  const totalTimeoutMs = getTotalTimeoutMs(timeout);
+  const stepTimeoutMs = getStepTimeoutMs(timeout);
+  const stepAbortController = stepTimeoutMs != null ? new AbortController() : void 0;
+  const mergedAbortSignal = mergeAbortSignals(
+    abortSignal,
+    totalTimeoutMs != null ? AbortSignal.timeout(totalTimeoutMs) : void 0,
+    stepAbortController == null ? void 0 : stepAbortController.signal
+  );
+  const { maxRetries, retry } = prepareRetries({
+    maxRetries: maxRetriesArg,
+    abortSignal: mergedAbortSignal
+  });
+  const callSettings = prepareCallSettings(settings);
+  const headersWithUserAgent = withUserAgentSuffix(
+    headers != null ? headers : {},
+    `ai/${VERSION$3}`
+  );
+  const baseTelemetryAttributes = getBaseTelemetryAttributes({
+    model,
+    telemetry,
+    headers: headersWithUserAgent,
+    settings: { ...callSettings, maxRetries }
+  });
+  const modelInfo = { provider: model.provider, modelId: model.modelId };
+  const initialPrompt = await standardizePrompt({
+    system,
+    prompt,
+    messages,
+    allowSystemInMessages
+  });
+  const globalTelemetry = createGlobalTelemetry(telemetry == null ? void 0 : telemetry.integrations);
+  await notify({
+    event: {
+      model: modelInfo,
+      system,
+      prompt,
+      messages,
+      tools,
+      toolChoice,
+      activeTools,
+      maxOutputTokens: callSettings.maxOutputTokens,
+      temperature: callSettings.temperature,
+      topP: callSettings.topP,
+      topK: callSettings.topK,
+      presencePenalty: callSettings.presencePenalty,
+      frequencyPenalty: callSettings.frequencyPenalty,
+      stopSequences: callSettings.stopSequences,
+      seed: callSettings.seed,
+      maxRetries,
+      timeout,
+      headers,
+      providerOptions,
+      stopWhen,
+      output,
+      abortSignal,
+      include,
+      functionId: telemetry == null ? void 0 : telemetry.functionId,
+      metadata: telemetry == null ? void 0 : telemetry.metadata,
+      experimental_context
+    },
+    callbacks: [
+      onStart,
+      globalTelemetry.onStart
+    ]
+  });
+  const tracer = getTracer(telemetry);
+  try {
+    return await recordSpan({
+      name: "ai.generateText",
+      attributes: selectTelemetryAttributes({
+        telemetry,
+        attributes: {
+          ...assembleOperationName({
+            operationId: "ai.generateText",
+            telemetry
+          }),
+          ...baseTelemetryAttributes,
+          // model:
+          "ai.model.provider": model.provider,
+          "ai.model.id": model.modelId,
+          // specific settings that only make sense on the outer level:
+          "ai.prompt": {
+            input: () => JSON.stringify({ system, prompt, messages })
+          }
+        }
+      }),
+      tracer,
+      fn: async (span) => {
+        var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
+        const initialMessages = initialPrompt.messages;
+        const responseMessages = [];
+        const {
+          approvedToolApprovals,
+          deniedToolApprovals: collectedDeniedToolApprovals
+        } = collectToolApprovals({ messages: initialMessages });
+        const {
+          approvedToolApprovals: localApprovedToolApprovals,
+          deniedToolApprovals: revalidationDeniedToolApprovals
+        } = await validateApprovedToolApprovals({
+          approvedToolApprovals: approvedToolApprovals.filter(
+            (toolApproval) => !toolApproval.toolCall.providerExecuted
+          ),
+          tools,
+          messages: initialMessages,
+          experimental_context,
+          toolApprovalSecret: experimental_toolApprovalSecret
+        });
+        const deniedToolApprovals = [
+          ...collectedDeniedToolApprovals,
+          ...revalidationDeniedToolApprovals
+        ];
+        if (deniedToolApprovals.length > 0 || localApprovedToolApprovals.length > 0) {
+          const toolOutputs = await executeTools({
+            toolCalls: localApprovedToolApprovals.map(
+              (toolApproval) => toolApproval.toolCall
+            ),
+            tools,
+            tracer,
+            telemetry,
+            messages: initialMessages,
+            abortSignal: mergedAbortSignal,
+            experimental_context,
+            stepNumber: 0,
+            model: modelInfo,
+            onToolCallStart: [
+              onToolCallStart,
+              globalTelemetry.onToolCallStart
+            ],
+            onToolCallFinish: [
+              onToolCallFinish,
+              globalTelemetry.onToolCallFinish
+            ]
+          });
+          const toolContent = [];
+          for (const output2 of toolOutputs) {
+            const modelOutput = await createToolModelOutput({
+              toolCallId: output2.toolCallId,
+              input: output2.input,
+              tool: tools == null ? void 0 : tools[output2.toolName],
+              output: output2.type === "tool-result" ? output2.output : output2.error,
+              errorMode: output2.type === "tool-error" ? "text" : "none"
+            });
+            toolContent.push({
+              type: "tool-result",
+              toolCallId: output2.toolCallId,
+              toolName: output2.toolName,
+              output: modelOutput
+            });
+          }
+          for (const toolApproval of deniedToolApprovals) {
+            toolContent.push({
+              type: "tool-result",
+              toolCallId: toolApproval.toolCall.toolCallId,
+              toolName: toolApproval.toolCall.toolName,
+              output: {
+                type: "execution-denied",
+                reason: toolApproval.approvalResponse.reason,
+                // For provider-executed tools, include approvalId so provider can correlate
+                ...toolApproval.toolCall.providerExecuted && {
+                  providerOptions: {
+                    openai: {
+                      approvalId: toolApproval.approvalResponse.approvalId
+                    }
+                  }
+                }
+              }
+            });
+          }
+          responseMessages.push({
+            role: "tool",
+            content: toolContent
+          });
+        }
+        const callSettings2 = prepareCallSettings(settings);
+        let currentModelResponse;
+        let clientToolCalls = [];
+        let clientToolOutputs = [];
+        const steps = [];
+        const pendingDeferredToolCalls = /* @__PURE__ */ new Map();
+        do {
+          const stepTimeoutId = stepTimeoutMs != null ? setTimeout(() => stepAbortController.abort(), stepTimeoutMs) : void 0;
+          try {
+            const stepInputMessages = [...initialMessages, ...responseMessages];
+            const prepareStepResult = await (prepareStep == null ? void 0 : prepareStep({
+              model,
+              steps,
+              stepNumber: steps.length,
+              messages: stepInputMessages,
+              experimental_context
+            }));
+            const stepModel = resolveLanguageModel(
+              (_a22 = prepareStepResult == null ? void 0 : prepareStepResult.model) != null ? _a22 : model
+            );
+            const stepModelInfo = {
+              provider: stepModel.provider,
+              modelId: stepModel.modelId
+            };
+            const promptMessages = await convertToLanguageModelPrompt({
+              prompt: {
+                system: (_b15 = prepareStepResult == null ? void 0 : prepareStepResult.system) != null ? _b15 : initialPrompt.system,
+                messages: (_c = prepareStepResult == null ? void 0 : prepareStepResult.messages) != null ? _c : stepInputMessages
+              },
+              supportedUrls: await stepModel.supportedUrls,
+              download: download2
+            });
+            experimental_context = (_d = prepareStepResult == null ? void 0 : prepareStepResult.experimental_context) != null ? _d : experimental_context;
+            const stepActiveTools = (_e = prepareStepResult == null ? void 0 : prepareStepResult.activeTools) != null ? _e : activeTools;
+            const { toolChoice: stepToolChoice, tools: stepTools } = await prepareToolsAndToolChoice({
+              tools,
+              toolChoice: (_f = prepareStepResult == null ? void 0 : prepareStepResult.toolChoice) != null ? _f : toolChoice,
+              activeTools: stepActiveTools
+            });
+            const stepMessages = (_g = prepareStepResult == null ? void 0 : prepareStepResult.messages) != null ? _g : stepInputMessages;
+            const stepSystem = (_h = prepareStepResult == null ? void 0 : prepareStepResult.system) != null ? _h : initialPrompt.system;
+            const stepProviderOptions = mergeObjects(
+              providerOptions,
+              prepareStepResult == null ? void 0 : prepareStepResult.providerOptions
+            );
+            await notify({
+              event: {
+                stepNumber: steps.length,
+                model: stepModelInfo,
+                system: stepSystem,
+                messages: stepMessages,
+                tools,
+                toolChoice: stepToolChoice,
+                activeTools: stepActiveTools,
+                steps: [...steps],
+                providerOptions: stepProviderOptions,
+                timeout,
+                headers,
+                stopWhen,
+                output,
+                abortSignal,
+                include,
+                functionId: telemetry == null ? void 0 : telemetry.functionId,
+                metadata: telemetry == null ? void 0 : telemetry.metadata,
+                experimental_context
+              },
+              callbacks: [
+                onStepStart,
+                globalTelemetry.onStepStart
+              ]
+            });
+            currentModelResponse = await retry(
+              () => {
+                var _a23;
+                return recordSpan({
+                  name: "ai.generateText.doGenerate",
+                  attributes: selectTelemetryAttributes({
+                    telemetry,
+                    attributes: {
+                      ...assembleOperationName({
+                        operationId: "ai.generateText.doGenerate",
+                        telemetry
+                      }),
+                      ...baseTelemetryAttributes,
+                      // model:
+                      "ai.model.provider": stepModel.provider,
+                      "ai.model.id": stepModel.modelId,
+                      // prompt:
+                      "ai.prompt.messages": {
+                        input: () => stringifyForTelemetry(promptMessages)
+                      },
+                      "ai.prompt.tools": {
+                        // convert the language model level tools:
+                        input: () => stepTools == null ? void 0 : stepTools.map((tool2) => JSON.stringify(tool2))
+                      },
+                      "ai.prompt.toolChoice": {
+                        input: () => stepToolChoice != null ? JSON.stringify(stepToolChoice) : void 0
+                      },
+                      // standardized gen-ai llm span attributes:
+                      "gen_ai.system": stepModel.provider,
+                      "gen_ai.request.model": stepModel.modelId,
+                      "gen_ai.request.frequency_penalty": settings.frequencyPenalty,
+                      "gen_ai.request.max_tokens": settings.maxOutputTokens,
+                      "gen_ai.request.presence_penalty": settings.presencePenalty,
+                      "gen_ai.request.stop_sequences": settings.stopSequences,
+                      "gen_ai.request.temperature": (_a23 = settings.temperature) != null ? _a23 : void 0,
+                      "gen_ai.request.top_k": settings.topK,
+                      "gen_ai.request.top_p": settings.topP
+                    }
+                  }),
+                  tracer,
+                  fn: async (span2) => {
+                    var _a24, _b22, _c2, _d2, _e2, _f2, _g2, _h2;
+                    const result = await stepModel.doGenerate({
+                      ...callSettings2,
+                      tools: stepTools,
+                      toolChoice: stepToolChoice,
+                      responseFormat: await (output == null ? void 0 : output.responseFormat),
+                      prompt: promptMessages,
+                      providerOptions: stepProviderOptions,
+                      abortSignal: mergedAbortSignal,
+                      headers: headersWithUserAgent
+                    });
+                    const responseData = {
+                      id: (_b22 = (_a24 = result.response) == null ? void 0 : _a24.id) != null ? _b22 : generateId2(),
+                      timestamp: (_d2 = (_c2 = result.response) == null ? void 0 : _c2.timestamp) != null ? _d2 : /* @__PURE__ */ new Date(),
+                      modelId: (_f2 = (_e2 = result.response) == null ? void 0 : _e2.modelId) != null ? _f2 : stepModel.modelId,
+                      headers: (_g2 = result.response) == null ? void 0 : _g2.headers,
+                      body: (_h2 = result.response) == null ? void 0 : _h2.body
+                    };
+                    const usage = asLanguageModelUsage(result.usage);
+                    span2.setAttributes(
+                      await selectTelemetryAttributes({
+                        telemetry,
+                        attributes: {
+                          "ai.response.finishReason": result.finishReason.unified,
+                          "ai.response.text": {
+                            output: () => extractTextContent(result.content)
+                          },
+                          "ai.response.reasoning": {
+                            output: () => extractReasoningContent(result.content)
+                          },
+                          "ai.response.toolCalls": {
+                            output: () => {
+                              const toolCalls = asToolCalls(result.content);
+                              return toolCalls == null ? void 0 : JSON.stringify(toolCalls);
+                            }
+                          },
+                          "ai.response.id": responseData.id,
+                          "ai.response.model": responseData.modelId,
+                          "ai.response.timestamp": responseData.timestamp.toISOString(),
+                          "ai.response.providerMetadata": JSON.stringify(
+                            result.providerMetadata
+                          ),
+                          "ai.usage.inputTokens": result.usage.inputTokens.total,
+                          "ai.usage.inputTokenDetails.noCacheTokens": result.usage.inputTokens.noCache,
+                          "ai.usage.inputTokenDetails.cacheReadTokens": result.usage.inputTokens.cacheRead,
+                          "ai.usage.inputTokenDetails.cacheWriteTokens": result.usage.inputTokens.cacheWrite,
+                          "ai.usage.outputTokens": result.usage.outputTokens.total,
+                          "ai.usage.outputTokenDetails.textTokens": result.usage.outputTokens.text,
+                          "ai.usage.outputTokenDetails.reasoningTokens": result.usage.outputTokens.reasoning,
+                          "ai.usage.totalTokens": usage.totalTokens,
+                          "ai.usage.reasoningTokens": result.usage.outputTokens.reasoning,
+                          "ai.usage.cachedInputTokens": result.usage.inputTokens.cacheRead,
+                          // standardized gen-ai llm span attributes:
+                          "gen_ai.response.finish_reasons": [
+                            result.finishReason.unified
+                          ],
+                          "gen_ai.response.id": responseData.id,
+                          "gen_ai.response.model": responseData.modelId,
+                          "gen_ai.usage.input_tokens": result.usage.inputTokens.total,
+                          "gen_ai.usage.output_tokens": result.usage.outputTokens.total
+                        }
+                      })
+                    );
+                    return { ...result, response: responseData };
+                  }
+                });
+              }
+            );
+            const stepToolCalls = await Promise.all(
+              currentModelResponse.content.filter(
+                (part) => part.type === "tool-call"
+              ).map(
+                (toolCall) => parseToolCall({
+                  toolCall,
+                  tools,
+                  repairToolCall,
+                  system,
+                  messages: stepInputMessages
+                })
+              )
+            );
+            const toolApprovalRequests = {};
+            for (const toolCall of stepToolCalls) {
+              if (toolCall.invalid) {
+                continue;
+              }
+              const tool2 = tools == null ? void 0 : tools[toolCall.toolName];
+              if (tool2 == null) {
+                continue;
+              }
+              if ((tool2 == null ? void 0 : tool2.onInputAvailable) != null) {
+                await tool2.onInputAvailable({
+                  input: toolCall.input,
+                  toolCallId: toolCall.toolCallId,
+                  messages: stepInputMessages,
+                  abortSignal: mergedAbortSignal,
+                  experimental_context
+                });
+              }
+              if (await isApprovalNeeded({
+                tool: tool2,
+                toolCall,
+                messages: stepInputMessages,
+                experimental_context
+              })) {
+                const approvalId = generateId2();
+                const signature = await maybeSignApproval({
+                  secret: experimental_toolApprovalSecret,
+                  approvalId,
+                  toolCallId: toolCall.toolCallId,
+                  toolName: toolCall.toolName,
+                  input: toolCall.input
+                });
+                toolApprovalRequests[toolCall.toolCallId] = {
+                  type: "tool-approval-request",
+                  approvalId,
+                  toolCall,
+                  ...signature != null ? { signature } : {}
+                };
+              }
+            }
+            const invalidToolCalls = stepToolCalls.filter(
+              (toolCall) => toolCall.invalid && toolCall.dynamic
+            );
+            clientToolOutputs = [];
+            for (const toolCall of invalidToolCalls) {
+              clientToolOutputs.push({
+                type: "tool-error",
+                toolCallId: toolCall.toolCallId,
+                toolName: toolCall.toolName,
+                input: toolCall.input,
+                error: getErrorMessage(toolCall.error),
+                dynamic: true
+              });
+            }
+            clientToolCalls = stepToolCalls.filter(
+              (toolCall) => !toolCall.providerExecuted
+            );
+            if (tools != null) {
+              clientToolOutputs.push(
+                ...await executeTools({
+                  toolCalls: clientToolCalls.filter(
+                    (toolCall) => !toolCall.invalid && toolApprovalRequests[toolCall.toolCallId] == null
+                  ),
+                  tools,
+                  tracer,
+                  telemetry,
+                  messages: stepInputMessages,
+                  abortSignal: mergedAbortSignal,
+                  experimental_context,
+                  stepNumber: steps.length,
+                  model: stepModelInfo,
+                  onToolCallStart: [
+                    onToolCallStart,
+                    globalTelemetry.onToolCallStart
+                  ],
+                  onToolCallFinish: [
+                    onToolCallFinish,
+                    globalTelemetry.onToolCallFinish
+                  ]
+                })
+              );
+            }
+            for (const toolCall of stepToolCalls) {
+              if (!toolCall.providerExecuted)
+                continue;
+              const tool2 = tools == null ? void 0 : tools[toolCall.toolName];
+              if ((tool2 == null ? void 0 : tool2.type) === "provider" && tool2.supportsDeferredResults) {
+                const hasResultInResponse = currentModelResponse.content.some(
+                  (part) => part.type === "tool-result" && part.toolCallId === toolCall.toolCallId
+                );
+                if (!hasResultInResponse) {
+                  pendingDeferredToolCalls.set(toolCall.toolCallId, {
+                    toolName: toolCall.toolName
+                  });
+                }
+              }
+            }
+            for (const part of currentModelResponse.content) {
+              if (part.type === "tool-result") {
+                pendingDeferredToolCalls.delete(part.toolCallId);
+              }
+            }
+            const stepContent = asContent({
+              content: currentModelResponse.content,
+              toolCalls: stepToolCalls,
+              toolOutputs: clientToolOutputs,
+              toolApprovalRequests: Object.values(toolApprovalRequests),
+              tools
+            });
+            responseMessages.push(
+              ...await toResponseMessages({
+                content: stepContent,
+                tools
+              })
+            );
+            const stepRequest = ((_i = include == null ? void 0 : include.requestBody) != null ? _i : true) ? (_j = currentModelResponse.request) != null ? _j : {} : { ...currentModelResponse.request, body: void 0 };
+            const stepResponse = {
+              ...currentModelResponse.response,
+              // deep clone msgs to avoid mutating past messages in multi-step:
+              messages: structuredClone(responseMessages),
+              // Conditionally include response body:
+              body: ((_k = include == null ? void 0 : include.responseBody) != null ? _k : true) ? (_l = currentModelResponse.response) == null ? void 0 : _l.body : void 0
+            };
+            const stepNumber = steps.length;
+            const currentStepResult = new DefaultStepResult({
+              stepNumber,
+              model: stepModelInfo,
+              functionId: telemetry == null ? void 0 : telemetry.functionId,
+              metadata: telemetry == null ? void 0 : telemetry.metadata,
+              experimental_context,
+              content: stepContent,
+              finishReason: currentModelResponse.finishReason.unified,
+              rawFinishReason: currentModelResponse.finishReason.raw,
+              usage: asLanguageModelUsage(currentModelResponse.usage),
+              warnings: currentModelResponse.warnings,
+              providerMetadata: currentModelResponse.providerMetadata,
+              request: stepRequest,
+              response: stepResponse
+            });
+            logWarnings({
+              warnings: (_m = currentModelResponse.warnings) != null ? _m : [],
+              provider: stepModelInfo.provider,
+              model: stepModelInfo.modelId
+            });
+            steps.push(currentStepResult);
+            await notify({
+              event: currentStepResult,
+              callbacks: [onStepFinish, globalTelemetry.onStepFinish]
+            });
+          } finally {
+            if (stepTimeoutId != null) {
+              clearTimeout(stepTimeoutId);
+            }
+          }
+        } while (
+          // Continue if:
+          // 1. There are client tool calls that have all been executed, OR
+          // 2. There are pending deferred results from provider-executed tools
+          (clientToolCalls.length > 0 && clientToolOutputs.length === clientToolCalls.length || pendingDeferredToolCalls.size > 0) && // continue until a stop condition is met:
+          !await isStopConditionMet({ stopConditions, steps })
+        );
+        span.setAttributes(
+          await selectTelemetryAttributes({
+            telemetry,
+            attributes: {
+              "ai.response.finishReason": currentModelResponse.finishReason.unified,
+              "ai.response.text": {
+                output: () => extractTextContent(currentModelResponse.content)
+              },
+              "ai.response.reasoning": {
+                output: () => extractReasoningContent(currentModelResponse.content)
+              },
+              "ai.response.toolCalls": {
+                output: () => {
+                  const toolCalls = asToolCalls(currentModelResponse.content);
+                  return toolCalls == null ? void 0 : JSON.stringify(toolCalls);
+                }
+              },
+              "ai.response.providerMetadata": JSON.stringify(
+                currentModelResponse.providerMetadata
+              )
+            }
+          })
+        );
+        const lastStep = steps[steps.length - 1];
+        const totalUsage = steps.reduce(
+          (totalUsage2, step) => {
+            return addLanguageModelUsage(totalUsage2, step.usage);
+          },
+          {
+            inputTokens: void 0,
+            outputTokens: void 0,
+            totalTokens: void 0,
+            reasoningTokens: void 0,
+            cachedInputTokens: void 0
+          }
+        );
+        span.setAttributes(
+          await selectTelemetryAttributes({
+            telemetry,
+            attributes: {
+              "ai.usage.inputTokens": totalUsage.inputTokens,
+              "ai.usage.inputTokenDetails.noCacheTokens": (_n = totalUsage.inputTokenDetails) == null ? void 0 : _n.noCacheTokens,
+              "ai.usage.inputTokenDetails.cacheReadTokens": (_o = totalUsage.inputTokenDetails) == null ? void 0 : _o.cacheReadTokens,
+              "ai.usage.inputTokenDetails.cacheWriteTokens": (_p = totalUsage.inputTokenDetails) == null ? void 0 : _p.cacheWriteTokens,
+              "ai.usage.outputTokens": totalUsage.outputTokens,
+              "ai.usage.outputTokenDetails.textTokens": (_q = totalUsage.outputTokenDetails) == null ? void 0 : _q.textTokens,
+              "ai.usage.outputTokenDetails.reasoningTokens": (_r = totalUsage.outputTokenDetails) == null ? void 0 : _r.reasoningTokens,
+              "ai.usage.totalTokens": totalUsage.totalTokens,
+              "ai.usage.reasoningTokens": (_s = totalUsage.outputTokenDetails) == null ? void 0 : _s.reasoningTokens,
+              "ai.usage.cachedInputTokens": (_t = totalUsage.inputTokenDetails) == null ? void 0 : _t.cacheReadTokens
+            }
+          })
+        );
+        await notify({
+          event: {
+            stepNumber: lastStep.stepNumber,
+            model: lastStep.model,
+            functionId: lastStep.functionId,
+            metadata: lastStep.metadata,
+            experimental_context: lastStep.experimental_context,
+            finishReason: lastStep.finishReason,
+            rawFinishReason: lastStep.rawFinishReason,
+            usage: lastStep.usage,
+            content: lastStep.content,
+            text: lastStep.text,
+            reasoningText: lastStep.reasoningText,
+            reasoning: lastStep.reasoning,
+            files: lastStep.files,
+            sources: lastStep.sources,
+            toolCalls: lastStep.toolCalls,
+            staticToolCalls: lastStep.staticToolCalls,
+            dynamicToolCalls: lastStep.dynamicToolCalls,
+            toolResults: lastStep.toolResults,
+            staticToolResults: lastStep.staticToolResults,
+            dynamicToolResults: lastStep.dynamicToolResults,
+            request: lastStep.request,
+            response: lastStep.response,
+            warnings: lastStep.warnings,
+            providerMetadata: lastStep.providerMetadata,
+            steps,
+            totalUsage
+          },
+          callbacks: [
+            onFinish,
+            globalTelemetry.onFinish
+          ]
+        });
+        let resolvedOutput;
+        if (lastStep.finishReason === "stop") {
+          const outputSpecification = output != null ? output : text();
+          resolvedOutput = await outputSpecification.parseCompleteOutput(
+            { text: lastStep.text },
+            {
+              response: lastStep.response,
+              usage: lastStep.usage,
+              finishReason: lastStep.finishReason
+            }
+          );
+        }
+        return new DefaultGenerateTextResult({
+          steps,
+          totalUsage,
+          output: resolvedOutput
+        });
+      }
+    });
+  } catch (error) {
+    throw wrapGatewayError(error);
+  }
+}
+async function executeTools({
+  toolCalls,
+  tools,
+  tracer,
+  telemetry,
+  messages,
+  abortSignal,
+  experimental_context,
+  stepNumber,
+  model,
+  onToolCallStart,
+  onToolCallFinish
+}) {
+  const toolOutputs = await Promise.all(
+    toolCalls.map(
+      async (toolCall) => executeToolCall({
+        toolCall,
+        tools,
+        tracer,
+        telemetry,
+        messages,
+        abortSignal,
+        experimental_context,
+        stepNumber,
+        model,
+        onToolCallStart,
+        onToolCallFinish
+      })
+    )
+  );
+  return toolOutputs.filter(
+    (output) => output != null
+  );
+}
+var DefaultGenerateTextResult = class {
+  constructor(options2) {
+    this.steps = options2.steps;
+    this._output = options2.output;
+    this.totalUsage = options2.totalUsage;
+  }
+  get finalStep() {
+    return this.steps[this.steps.length - 1];
+  }
+  get content() {
+    return this.finalStep.content;
+  }
+  get text() {
+    return this.finalStep.text;
+  }
+  get files() {
+    return this.finalStep.files;
+  }
+  get reasoningText() {
+    return this.finalStep.reasoningText;
+  }
+  get reasoning() {
+    return this.finalStep.reasoning;
+  }
+  get toolCalls() {
+    return this.finalStep.toolCalls;
+  }
+  get staticToolCalls() {
+    return this.finalStep.staticToolCalls;
+  }
+  get dynamicToolCalls() {
+    return this.finalStep.dynamicToolCalls;
+  }
+  get toolResults() {
+    return this.finalStep.toolResults;
+  }
+  get staticToolResults() {
+    return this.finalStep.staticToolResults;
+  }
+  get dynamicToolResults() {
+    return this.finalStep.dynamicToolResults;
+  }
+  get sources() {
+    return this.finalStep.sources;
+  }
+  get finishReason() {
+    return this.finalStep.finishReason;
+  }
+  get rawFinishReason() {
+    return this.finalStep.rawFinishReason;
+  }
+  get warnings() {
+    return this.finalStep.warnings;
+  }
+  get providerMetadata() {
+    return this.finalStep.providerMetadata;
+  }
+  get response() {
+    return this.finalStep.response;
+  }
+  get request() {
+    return this.finalStep.request;
+  }
+  get usage() {
+    return this.finalStep.usage;
+  }
+  get experimental_output() {
+    return this.output;
+  }
+  get output() {
+    if (this._output == null) {
+      throw new NoOutputGeneratedError();
+    }
+    return this._output;
+  }
+};
+function asToolCalls(content) {
+  const parts = content.filter(
+    (part) => part.type === "tool-call"
+  );
+  if (parts.length === 0) {
+    return void 0;
+  }
+  return parts.map((toolCall) => ({
+    toolCallId: toolCall.toolCallId,
+    toolName: toolCall.toolName,
+    input: toolCall.input
+  }));
+}
+function asContent({
+  content,
+  toolCalls,
+  toolOutputs,
+  toolApprovalRequests,
+  tools
+}) {
+  const contentParts = [];
+  for (const part of content) {
+    switch (part.type) {
+      case "text":
+      case "reasoning":
+      case "source":
+        contentParts.push(part);
+        break;
+      case "file": {
+        contentParts.push({
+          type: "file",
+          file: new DefaultGeneratedFile(part),
+          ...part.providerMetadata != null ? { providerMetadata: part.providerMetadata } : {}
+        });
+        break;
+      }
+      case "tool-call": {
+        contentParts.push(
+          toolCalls.find((toolCall) => toolCall.toolCallId === part.toolCallId)
+        );
+        break;
+      }
+      case "tool-result": {
+        const toolCall = toolCalls.find(
+          (toolCall2) => toolCall2.toolCallId === part.toolCallId
+        );
+        if (toolCall == null) {
+          const tool2 = tools == null ? void 0 : tools[part.toolName];
+          const supportsDeferredResults = (tool2 == null ? void 0 : tool2.type) === "provider" && tool2.supportsDeferredResults;
+          if (!supportsDeferredResults) {
+            throw new Error(`Tool call ${part.toolCallId} not found.`);
+          }
+          if (part.isError) {
+            contentParts.push({
+              type: "tool-error",
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              input: void 0,
+              error: part.result,
+              providerExecuted: true,
+              dynamic: part.dynamic,
+              ...part.providerMetadata != null ? { providerMetadata: part.providerMetadata } : {},
+              ...(tool2 == null ? void 0 : tool2.metadata) != null ? { toolMetadata: tool2.metadata } : {}
+            });
+          } else {
+            contentParts.push({
+              type: "tool-result",
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              input: void 0,
+              output: part.result,
+              providerExecuted: true,
+              dynamic: part.dynamic,
+              ...part.providerMetadata != null ? { providerMetadata: part.providerMetadata } : {},
+              ...(tool2 == null ? void 0 : tool2.metadata) != null ? { toolMetadata: tool2.metadata } : {}
+            });
+          }
+          break;
+        }
+        if (part.isError) {
+          contentParts.push({
+            type: "tool-error",
+            toolCallId: part.toolCallId,
+            toolName: part.toolName,
+            input: toolCall.input,
+            error: part.result,
+            providerExecuted: true,
+            dynamic: toolCall.dynamic,
+            ...part.providerMetadata != null ? { providerMetadata: part.providerMetadata } : {},
+            ...toolCall.toolMetadata != null ? { toolMetadata: toolCall.toolMetadata } : {}
+          });
+        } else {
+          contentParts.push({
+            type: "tool-result",
+            toolCallId: part.toolCallId,
+            toolName: part.toolName,
+            input: toolCall.input,
+            output: part.result,
+            providerExecuted: true,
+            dynamic: toolCall.dynamic,
+            ...part.providerMetadata != null ? { providerMetadata: part.providerMetadata } : {},
+            ...toolCall.toolMetadata != null ? { toolMetadata: toolCall.toolMetadata } : {}
+          });
+        }
+        break;
+      }
+      case "tool-approval-request": {
+        const toolCall = toolCalls.find(
+          (toolCall2) => toolCall2.toolCallId === part.toolCallId
+        );
+        if (toolCall == null) {
+          throw new ToolCallNotFoundForApprovalError({
+            toolCallId: part.toolCallId,
+            approvalId: part.approvalId
+          });
+        }
+        contentParts.push({
+          type: "tool-approval-request",
+          approvalId: part.approvalId,
+          toolCall
+        });
+        break;
+      }
+    }
+  }
+  return [...contentParts, ...toolOutputs, ...toolApprovalRequests];
+}
 function prepareHeaders(headers, defaultHeaders) {
   const responseHeaders = new Headers(headers != null ? headers : {});
   for (const [key, value] of Object.entries(defaultHeaders)) {
@@ -14501,9 +15952,179 @@ function getResponseUIMessageId({
   const lastMessage = originalMessages[originalMessages.length - 1];
   return (lastMessage == null ? void 0 : lastMessage.role) === "assistant" ? lastMessage.id : typeof responseMessageId === "function" ? responseMessageId() : responseMessageId;
 }
-record(
+var toolMetadataSchema = record(
   string(),
   jsonValueSchema$1.optional()
+);
+var uiMessageChunkSchema = lazySchema(
+  () => zodSchema(
+    union([
+      strictObject({
+        type: literal("text-start"),
+        id: string(),
+        providerMetadata: providerMetadataSchema.optional()
+      }),
+      strictObject({
+        type: literal("text-delta"),
+        id: string(),
+        delta: string(),
+        providerMetadata: providerMetadataSchema.optional()
+      }),
+      strictObject({
+        type: literal("text-end"),
+        id: string(),
+        providerMetadata: providerMetadataSchema.optional()
+      }),
+      strictObject({
+        type: literal("error"),
+        errorText: string()
+      }),
+      strictObject({
+        type: literal("tool-input-start"),
+        toolCallId: string(),
+        toolName: string(),
+        providerExecuted: boolean().optional(),
+        providerMetadata: providerMetadataSchema.optional(),
+        toolMetadata: toolMetadataSchema.optional(),
+        dynamic: boolean().optional(),
+        title: string().optional()
+      }),
+      strictObject({
+        type: literal("tool-input-delta"),
+        toolCallId: string(),
+        inputTextDelta: string()
+      }),
+      strictObject({
+        type: literal("tool-input-available"),
+        toolCallId: string(),
+        toolName: string(),
+        input: unknown(),
+        providerExecuted: boolean().optional(),
+        providerMetadata: providerMetadataSchema.optional(),
+        toolMetadata: toolMetadataSchema.optional(),
+        dynamic: boolean().optional(),
+        title: string().optional()
+      }),
+      strictObject({
+        type: literal("tool-input-error"),
+        toolCallId: string(),
+        toolName: string(),
+        input: unknown(),
+        providerExecuted: boolean().optional(),
+        providerMetadata: providerMetadataSchema.optional(),
+        toolMetadata: toolMetadataSchema.optional(),
+        dynamic: boolean().optional(),
+        errorText: string(),
+        title: string().optional()
+      }),
+      strictObject({
+        type: literal("tool-approval-request"),
+        approvalId: string(),
+        toolCallId: string(),
+        signature: string().optional()
+      }),
+      strictObject({
+        type: literal("tool-output-available"),
+        toolCallId: string(),
+        output: unknown(),
+        providerExecuted: boolean().optional(),
+        providerMetadata: providerMetadataSchema.optional(),
+        toolMetadata: toolMetadataSchema.optional(),
+        dynamic: boolean().optional(),
+        preliminary: boolean().optional()
+      }),
+      strictObject({
+        type: literal("tool-output-error"),
+        toolCallId: string(),
+        errorText: string(),
+        providerExecuted: boolean().optional(),
+        providerMetadata: providerMetadataSchema.optional(),
+        toolMetadata: toolMetadataSchema.optional(),
+        dynamic: boolean().optional()
+      }),
+      strictObject({
+        type: literal("tool-output-denied"),
+        toolCallId: string()
+      }),
+      strictObject({
+        type: literal("reasoning-start"),
+        id: string(),
+        providerMetadata: providerMetadataSchema.optional()
+      }),
+      strictObject({
+        type: literal("reasoning-delta"),
+        id: string(),
+        delta: string(),
+        providerMetadata: providerMetadataSchema.optional()
+      }),
+      strictObject({
+        type: literal("reasoning-end"),
+        id: string(),
+        providerMetadata: providerMetadataSchema.optional()
+      }),
+      strictObject({
+        type: literal("source-url"),
+        sourceId: string(),
+        url: string(),
+        title: string().optional(),
+        providerMetadata: providerMetadataSchema.optional()
+      }),
+      strictObject({
+        type: literal("source-document"),
+        sourceId: string(),
+        mediaType: string(),
+        title: string(),
+        filename: string().optional(),
+        providerMetadata: providerMetadataSchema.optional()
+      }),
+      strictObject({
+        type: literal("file"),
+        url: string(),
+        mediaType: string(),
+        providerMetadata: providerMetadataSchema.optional()
+      }),
+      strictObject({
+        type: custom(
+          (value) => typeof value === "string" && value.startsWith("data-"),
+          { message: 'Type must start with "data-"' }
+        ),
+        id: string().optional(),
+        data: unknown(),
+        transient: boolean().optional()
+      }),
+      strictObject({
+        type: literal("start-step")
+      }),
+      strictObject({
+        type: literal("finish-step")
+      }),
+      strictObject({
+        type: literal("start"),
+        messageId: string().optional(),
+        messageMetadata: unknown().optional()
+      }),
+      strictObject({
+        type: literal("finish"),
+        finishReason: _enum([
+          "stop",
+          "length",
+          "content-filter",
+          "tool-calls",
+          "error",
+          "other"
+        ]).optional(),
+        messageMetadata: unknown().optional()
+      }),
+      strictObject({
+        type: literal("abort"),
+        reason: string().optional()
+      }),
+      strictObject({
+        type: literal("message-metadata"),
+        messageMetadata: unknown()
+      })
+    ])
+  )
 );
 function isDataUIMessageChunk(chunk) {
   return chunk.type.startsWith("data-");
@@ -14532,12 +16153,14 @@ function isDynamicToolUIPart(part) {
 function isToolUIPart(part) {
   return isStaticToolUIPart(part) || isDynamicToolUIPart(part);
 }
+var isToolOrDynamicToolUIPart = isToolUIPart;
 function getStaticToolName(part) {
   return part.type.split("-").slice(1).join("-");
 }
 function getToolName(part) {
   return isDynamicToolUIPart(part) ? part.toolName : getStaticToolName(part);
 }
+var getToolOrDynamicToolName = getToolName;
 function createStreamingUIMessageState({
   lastMessage,
   messageId
@@ -17466,8 +19089,248 @@ var DefaultStreamTextResult = class {
     });
   }
 };
+var ToolLoopAgent = class {
+  constructor(settings) {
+    this.version = "agent-v1";
+    this.settings = settings;
+  }
+  /**
+   * The id of the agent.
+   */
+  get id() {
+    return this.settings.id;
+  }
+  /**
+   * The tools that the agent can use.
+   */
+  get tools() {
+    return this.settings.tools;
+  }
+  async prepareCall(options2) {
+    var _a22, _b15, _c, _d;
+    if (this.settings.callOptionsSchema != null && options2.options !== void 0) {
+      const validatedOptions = await validateTypes({
+        value: options2.options,
+        schema: this.settings.callOptionsSchema,
+        context: { field: "options" }
+      });
+      options2 = { ...options2, options: validatedOptions };
+    }
+    const { onStepFinish: _settingsOnStepFinish, ...settingsWithoutCallback } = this.settings;
+    const baseCallArgs = {
+      ...settingsWithoutCallback,
+      stopWhen: (_a22 = this.settings.stopWhen) != null ? _a22 : stepCountIs(20),
+      ...options2
+    };
+    const preparedCallArgs = (_d = await ((_c = (_b15 = this.settings).prepareCall) == null ? void 0 : _c.call(
+      _b15,
+      baseCallArgs
+    ))) != null ? _d : baseCallArgs;
+    const {
+      instructions,
+      allowSystemInMessages,
+      messages,
+      prompt,
+      ...callArgs
+    } = preparedCallArgs;
+    return {
+      ...callArgs,
+      // restore prompt types
+      ...{
+        system: instructions,
+        allowSystemInMessages,
+        messages,
+        prompt
+      }
+    };
+  }
+  mergeOnStepFinishCallbacks(methodCallback) {
+    const constructorCallback = this.settings.onStepFinish;
+    if (methodCallback && constructorCallback) {
+      return async (stepResult) => {
+        await constructorCallback(stepResult);
+        await methodCallback(stepResult);
+      };
+    }
+    return methodCallback != null ? methodCallback : constructorCallback;
+  }
+  /**
+   * Generates an output from the agent (non-streaming).
+   */
+  async generate({
+    abortSignal,
+    timeout,
+    onStepFinish,
+    ...options2
+  }) {
+    return generateText({
+      ...await this.prepareCall(options2),
+      abortSignal,
+      timeout,
+      onStepFinish: this.mergeOnStepFinishCallbacks(onStepFinish)
+    });
+  }
+  /**
+   * Streams an output from the agent (streaming).
+   */
+  async stream({
+    abortSignal,
+    timeout,
+    experimental_transform,
+    onStepFinish,
+    ...options2
+  }) {
+    return streamText({
+      ...await this.prepareCall(options2),
+      abortSignal,
+      timeout,
+      experimental_transform,
+      onStepFinish: this.mergeOnStepFinishCallbacks(onStepFinish)
+    });
+  }
+};
+function createUIMessageStream({
+  execute,
+  onError = () => "An error occurred.",
+  // prevent leaking server error details to the client by default
+  originalMessages,
+  onStepFinish,
+  onFinish,
+  generateId: generateId2 = generateId
+}) {
+  let controller;
+  const ongoingStreamPromises = [];
+  const stream = new ReadableStream({
+    start(controllerArg) {
+      controller = controllerArg;
+    }
+  });
+  function safeEnqueue(data) {
+    try {
+      controller.enqueue(data);
+    } catch (error) {
+    }
+  }
+  try {
+    const result = execute({
+      writer: {
+        write(part) {
+          safeEnqueue(part);
+        },
+        merge(streamArg) {
+          ongoingStreamPromises.push(
+            (async () => {
+              const reader = streamArg.getReader();
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done)
+                  break;
+                safeEnqueue(value);
+              }
+            })().catch((error) => {
+              safeEnqueue({
+                type: "error",
+                errorText: onError(error)
+              });
+            })
+          );
+        },
+        onError
+      }
+    });
+    if (result) {
+      ongoingStreamPromises.push(
+        result.catch((error) => {
+          safeEnqueue({
+            type: "error",
+            errorText: onError(error)
+          });
+        })
+      );
+    }
+  } catch (error) {
+    safeEnqueue({
+      type: "error",
+      errorText: onError(error)
+    });
+  }
+  const waitForStreams = new Promise(async (resolve3) => {
+    while (ongoingStreamPromises.length > 0) {
+      await ongoingStreamPromises.shift();
+    }
+    resolve3();
+  });
+  waitForStreams.finally(() => {
+    try {
+      controller.close();
+    } catch (error) {
+    }
+  });
+  return handleUIMessageStreamFinish({
+    stream,
+    messageId: generateId2(),
+    originalMessages,
+    onStepFinish,
+    onFinish,
+    onError
+  });
+}
+function readUIMessageStream({
+  message,
+  stream,
+  onError,
+  terminateOnError = false
+}) {
+  var _a22;
+  let controller;
+  let hasErrored = false;
+  const outputStream = new ReadableStream({
+    start(controllerParam) {
+      controller = controllerParam;
+    }
+  });
+  const state = createStreamingUIMessageState({
+    messageId: (_a22 = message == null ? void 0 : message.id) != null ? _a22 : "",
+    lastMessage: message
+  });
+  const handleError = (error) => {
+    onError == null ? void 0 : onError(error);
+    if (!hasErrored && terminateOnError) {
+      hasErrored = true;
+      controller == null ? void 0 : controller.error(error);
+    }
+  };
+  consumeStream({
+    stream: processUIMessageStream({
+      stream,
+      runUpdateMessageJob(job) {
+        return job({
+          state,
+          write: () => {
+            controller == null ? void 0 : controller.enqueue(structuredClone(state.message));
+          }
+        });
+      },
+      onError: handleError
+    }),
+    onError: handleError
+  }).finally(() => {
+    if (!hasErrored) {
+      controller == null ? void 0 : controller.close();
+    }
+  });
+  return createAsyncIterableStream(outputStream);
+}
 async function convertToModelMessages(messages, options2) {
   const modelMessages = [];
+  if (options2 == null ? void 0 : options2.ignoreIncompleteToolCalls) {
+    messages = messages.map((message) => ({
+      ...message,
+      parts: message.parts.filter(
+        (part) => !isToolUIPart(part) || part.state !== "input-streaming" && part.state !== "input-available"
+      )
+    }));
+  }
   for (const message of messages) {
     switch (message.role) {
       case "system": {
@@ -17509,7 +19372,7 @@ async function convertToModelMessages(messages, options2) {
               };
             }
             if (isDataUIPart(part)) {
-              return (_a22 = void 0) == null ? void 0 : _a22.call(
+              return (_a22 = options2 == null ? void 0 : options2.convertDataPart) == null ? void 0 : _a22.call(
                 options2,
                 part
               );
@@ -17577,7 +19440,7 @@ async function convertToModelMessages(messages, options2) {
                         toolCallId: part.toolCallId,
                         input: part.input,
                         output: part.state === "output-error" ? part.errorText : part.output,
-                        tool: (_c = void 0) == null ? void 0 : _c[toolName],
+                        tool: (_c = options2 == null ? void 0 : options2.tools) == null ? void 0 : _c[toolName],
                         errorMode: part.state === "output-error" ? "json" : "none"
                       }),
                       ...resultProviderMetadata != null ? { providerOptions: resultProviderMetadata } : {}
@@ -17585,7 +19448,7 @@ async function convertToModelMessages(messages, options2) {
                   }
                 }
               } else if (isDataUIPart(part)) {
-                const dataPart = (_d = void 0) == null ? void 0 : _d.call(
+                const dataPart = (_d = options2 == null ? void 0 : options2.convertDataPart) == null ? void 0 : _d.call(
                   options2,
                   part
                 );
@@ -17648,7 +19511,7 @@ async function convertToModelMessages(messages, options2) {
                           toolCallId: toolPart.toolCallId,
                           input: toolPart.input,
                           output: toolPart.state === "output-error" ? toolPart.errorText : toolPart.output,
-                          tool: (_h = void 0) == null ? void 0 : _h[toolName],
+                          tool: (_h = options2 == null ? void 0 : options2.tools) == null ? void 0 : _h[toolName],
                           errorMode: toolPart.state === "output-error" ? "text" : "none"
                         }),
                         ...toolPart.callProviderMetadata != null ? { providerOptions: toolPart.callProviderMetadata } : {}
@@ -17690,12 +19553,3296 @@ async function convertToModelMessages(messages, options2) {
   }
   return modelMessages;
 }
-record(
+var toolMetadataSchema2 = record(
   string(),
   jsonValueSchema$1.optional()
 );
-createIdGenerator({ prefix: "aiobj", size: 24 });
-createIdGenerator({ prefix: "aiobj", size: 24 });
+var uiMessagesSchema = lazySchema(
+  () => zodSchema(
+    array$1(
+      object$1({
+        id: string(),
+        role: _enum(["system", "user", "assistant"]),
+        metadata: unknown().optional(),
+        parts: array$1(
+          union([
+            object$1({
+              type: literal("text"),
+              text: string(),
+              state: _enum(["streaming", "done"]).optional(),
+              providerMetadata: providerMetadataSchema.optional()
+            }),
+            object$1({
+              type: literal("reasoning"),
+              text: string(),
+              state: _enum(["streaming", "done"]).optional(),
+              providerMetadata: providerMetadataSchema.optional()
+            }),
+            object$1({
+              type: literal("source-url"),
+              sourceId: string(),
+              url: string(),
+              title: string().optional(),
+              providerMetadata: providerMetadataSchema.optional()
+            }),
+            object$1({
+              type: literal("source-document"),
+              sourceId: string(),
+              mediaType: string(),
+              title: string(),
+              filename: string().optional(),
+              providerMetadata: providerMetadataSchema.optional()
+            }),
+            object$1({
+              type: literal("file"),
+              mediaType: string(),
+              filename: string().optional(),
+              url: string(),
+              providerMetadata: providerMetadataSchema.optional()
+            }),
+            object$1({
+              type: literal("step-start")
+            }),
+            object$1({
+              type: string().startsWith("data-"),
+              id: string().optional(),
+              data: unknown()
+            }),
+            object$1({
+              type: literal("dynamic-tool"),
+              toolName: string(),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("input-streaming"),
+              input: unknown().optional(),
+              providerExecuted: boolean().optional(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              output: never().optional(),
+              errorText: never().optional(),
+              approval: never().optional()
+            }),
+            object$1({
+              type: literal("dynamic-tool"),
+              toolName: string(),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("input-available"),
+              input: unknown(),
+              providerExecuted: boolean().optional(),
+              output: never().optional(),
+              errorText: never().optional(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              approval: never().optional()
+            }),
+            object$1({
+              type: literal("dynamic-tool"),
+              toolName: string(),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("approval-requested"),
+              input: unknown(),
+              providerExecuted: boolean().optional(),
+              output: never().optional(),
+              errorText: never().optional(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              approval: object$1({
+                id: string(),
+                approved: never().optional(),
+                reason: never().optional(),
+                signature: string().optional()
+              })
+            }),
+            object$1({
+              type: literal("dynamic-tool"),
+              toolName: string(),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("approval-responded"),
+              input: unknown(),
+              providerExecuted: boolean().optional(),
+              output: never().optional(),
+              errorText: never().optional(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              approval: object$1({
+                id: string(),
+                approved: boolean(),
+                reason: string().optional(),
+                signature: string().optional()
+              })
+            }),
+            object$1({
+              type: literal("dynamic-tool"),
+              toolName: string(),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("output-available"),
+              input: unknown(),
+              providerExecuted: boolean().optional(),
+              output: unknown(),
+              errorText: never().optional(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              resultProviderMetadata: providerMetadataSchema.optional(),
+              preliminary: boolean().optional(),
+              approval: object$1({
+                id: string(),
+                approved: literal(true),
+                reason: string().optional(),
+                signature: string().optional()
+              }).optional()
+            }),
+            object$1({
+              type: literal("dynamic-tool"),
+              toolName: string(),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("output-error"),
+              input: unknown().optional(),
+              rawInput: unknown().optional(),
+              providerExecuted: boolean().optional(),
+              output: never().optional(),
+              errorText: string(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              resultProviderMetadata: providerMetadataSchema.optional(),
+              approval: object$1({
+                id: string(),
+                approved: literal(true),
+                reason: string().optional(),
+                signature: string().optional()
+              }).optional()
+            }),
+            object$1({
+              type: literal("dynamic-tool"),
+              toolName: string(),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("output-denied"),
+              input: unknown(),
+              providerExecuted: boolean().optional(),
+              output: never().optional(),
+              errorText: never().optional(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              approval: object$1({
+                id: string(),
+                approved: literal(false),
+                reason: string().optional(),
+                signature: string().optional()
+              })
+            }),
+            object$1({
+              type: string().startsWith("tool-"),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("input-streaming"),
+              providerExecuted: boolean().optional(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              input: unknown().optional(),
+              output: never().optional(),
+              errorText: never().optional(),
+              approval: never().optional()
+            }),
+            object$1({
+              type: string().startsWith("tool-"),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("input-available"),
+              providerExecuted: boolean().optional(),
+              input: unknown(),
+              output: never().optional(),
+              errorText: never().optional(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              approval: never().optional()
+            }),
+            object$1({
+              type: string().startsWith("tool-"),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("approval-requested"),
+              input: unknown(),
+              providerExecuted: boolean().optional(),
+              output: never().optional(),
+              errorText: never().optional(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              approval: object$1({
+                id: string(),
+                approved: never().optional(),
+                reason: never().optional(),
+                signature: string().optional()
+              })
+            }),
+            object$1({
+              type: string().startsWith("tool-"),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("approval-responded"),
+              input: unknown(),
+              providerExecuted: boolean().optional(),
+              output: never().optional(),
+              errorText: never().optional(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              approval: object$1({
+                id: string(),
+                approved: boolean(),
+                reason: string().optional(),
+                signature: string().optional()
+              })
+            }),
+            object$1({
+              type: string().startsWith("tool-"),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("output-available"),
+              providerExecuted: boolean().optional(),
+              input: unknown(),
+              output: unknown(),
+              errorText: never().optional(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              resultProviderMetadata: providerMetadataSchema.optional(),
+              preliminary: boolean().optional(),
+              approval: object$1({
+                id: string(),
+                approved: literal(true),
+                reason: string().optional(),
+                signature: string().optional()
+              }).optional()
+            }),
+            object$1({
+              type: string().startsWith("tool-"),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("output-error"),
+              providerExecuted: boolean().optional(),
+              input: unknown().optional(),
+              rawInput: unknown().optional(),
+              output: never().optional(),
+              errorText: string(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              resultProviderMetadata: providerMetadataSchema.optional(),
+              approval: object$1({
+                id: string(),
+                approved: literal(true),
+                reason: string().optional(),
+                signature: string().optional()
+              }).optional()
+            }),
+            object$1({
+              type: string().startsWith("tool-"),
+              toolCallId: string(),
+              toolMetadata: toolMetadataSchema2.optional(),
+              state: literal("output-denied"),
+              providerExecuted: boolean().optional(),
+              input: unknown(),
+              output: never().optional(),
+              errorText: never().optional(),
+              callProviderMetadata: providerMetadataSchema.optional(),
+              approval: object$1({
+                id: string(),
+                approved: literal(false),
+                reason: string().optional(),
+                signature: string().optional()
+              })
+            })
+          ])
+        ).nonempty("Message must contain at least one part")
+      })
+    ).nonempty("Messages array must not be empty")
+  )
+);
+async function safeValidateUIMessages({
+  messages,
+  metadataSchema,
+  dataSchemas,
+  tools
+}) {
+  try {
+    if (messages == null) {
+      return {
+        success: false,
+        error: new InvalidArgumentError2({
+          parameter: "messages",
+          value: messages,
+          message: "messages parameter must be provided"
+        })
+      };
+    }
+    const validatedMessages = await validateTypes({
+      value: messages,
+      schema: uiMessagesSchema
+    });
+    if (metadataSchema) {
+      for (const [msgIdx, message] of validatedMessages.entries()) {
+        await validateTypes({
+          value: message.metadata,
+          schema: metadataSchema,
+          context: {
+            field: `messages[${msgIdx}].metadata`,
+            entityId: message.id
+          }
+        });
+      }
+    }
+    if (dataSchemas || tools) {
+      for (const [msgIdx, message] of validatedMessages.entries()) {
+        for (const [partIdx, part] of message.parts.entries()) {
+          if (dataSchemas && part.type.startsWith("data-")) {
+            const dataPart = part;
+            const dataName = dataPart.type.slice(5);
+            const dataSchema = dataSchemas[dataName];
+            if (!dataSchema) {
+              return {
+                success: false,
+                error: new TypeValidationError({
+                  value: dataPart.data,
+                  cause: `No data schema found for data part ${dataName}`,
+                  context: {
+                    field: `messages[${msgIdx}].parts[${partIdx}].data`,
+                    entityName: dataName,
+                    entityId: dataPart.id
+                  }
+                })
+              };
+            }
+            await validateTypes({
+              value: dataPart.data,
+              schema: dataSchema,
+              context: {
+                field: `messages[${msgIdx}].parts[${partIdx}].data`,
+                entityName: dataName,
+                entityId: dataPart.id
+              }
+            });
+          }
+          if (tools && part.type.startsWith("tool-")) {
+            const toolPart = part;
+            const toolName = toolPart.type.slice(5);
+            const tool2 = tools[toolName];
+            if (!tool2 && (toolPart.state === "output-available" || toolPart.state === "output-error" || toolPart.state === "output-denied")) {
+              continue;
+            }
+            if (!tool2) {
+              return {
+                success: false,
+                error: new TypeValidationError({
+                  value: toolPart.input,
+                  cause: `No tool schema found for tool part ${toolName}`,
+                  context: {
+                    field: `messages[${msgIdx}].parts[${partIdx}].input`,
+                    entityName: toolName,
+                    entityId: toolPart.toolCallId
+                  }
+                })
+              };
+            }
+            if (toolPart.state === "input-available" || toolPart.state === "output-available") {
+              await validateTypes({
+                value: toolPart.input,
+                schema: tool2.inputSchema,
+                context: {
+                  field: `messages[${msgIdx}].parts[${partIdx}].input`,
+                  entityName: toolName,
+                  entityId: toolPart.toolCallId
+                }
+              });
+            }
+            if (toolPart.state === "output-available" && tool2.outputSchema) {
+              await validateTypes({
+                value: toolPart.output,
+                schema: tool2.outputSchema,
+                context: {
+                  field: `messages[${msgIdx}].parts[${partIdx}].output`,
+                  entityName: toolName,
+                  entityId: toolPart.toolCallId
+                }
+              });
+            }
+          }
+        }
+      }
+    }
+    return {
+      success: true,
+      data: validatedMessages
+    };
+  } catch (error) {
+    const err = error;
+    return {
+      success: false,
+      error: err
+    };
+  }
+}
+async function validateUIMessages({
+  messages,
+  metadataSchema,
+  dataSchemas,
+  tools
+}) {
+  const response = await safeValidateUIMessages({
+    messages,
+    metadataSchema,
+    dataSchemas,
+    tools
+  });
+  if (!response.success)
+    throw response.error;
+  return response.data;
+}
+async function createAgentUIStream({
+  agent,
+  uiMessages,
+  options: options2,
+  abortSignal,
+  timeout,
+  experimental_transform,
+  onStepFinish,
+  ...uiMessageStreamOptions
+}) {
+  var _a22;
+  const validatedMessages = await validateUIMessages({
+    messages: uiMessages,
+    tools: agent.tools
+  });
+  const modelMessages = await convertToModelMessages(validatedMessages, {
+    tools: agent.tools
+  });
+  const result = await agent.stream({
+    prompt: modelMessages,
+    options: options2,
+    abortSignal,
+    timeout,
+    experimental_transform,
+    onStepFinish
+  });
+  return result.toUIMessageStream({
+    ...uiMessageStreamOptions,
+    // TODO reading `originalMessages` is here for bc, always use `validatedMessages` in v7
+    originalMessages: (_a22 = uiMessageStreamOptions.originalMessages) != null ? _a22 : validatedMessages
+  });
+}
+async function createAgentUIStreamResponse({
+  headers,
+  status,
+  statusText,
+  consumeSseStream,
+  ...options2
+}) {
+  return createUIMessageStreamResponse({
+    headers,
+    status,
+    statusText,
+    consumeSseStream,
+    stream: await createAgentUIStream(options2)
+  });
+}
+async function pipeAgentUIStreamToResponse({
+  response,
+  headers,
+  status,
+  statusText,
+  consumeSseStream,
+  ...options2
+}) {
+  pipeUIMessageStreamToResponse({
+    response,
+    headers,
+    status,
+    statusText,
+    consumeSseStream,
+    stream: await createAgentUIStream(options2)
+  });
+}
+async function embed({
+  model: modelArg,
+  value,
+  providerOptions,
+  maxRetries: maxRetriesArg,
+  abortSignal,
+  headers,
+  experimental_telemetry: telemetry
+}) {
+  const model = resolveEmbeddingModel(modelArg);
+  const { maxRetries, retry } = prepareRetries({
+    maxRetries: maxRetriesArg,
+    abortSignal
+  });
+  const headersWithUserAgent = withUserAgentSuffix(
+    headers != null ? headers : {},
+    `ai/${VERSION$3}`
+  );
+  const baseTelemetryAttributes = getBaseTelemetryAttributes({
+    model,
+    telemetry,
+    headers: headersWithUserAgent,
+    settings: { maxRetries }
+  });
+  const tracer = getTracer(telemetry);
+  return recordSpan({
+    name: "ai.embed",
+    attributes: selectTelemetryAttributes({
+      telemetry,
+      attributes: {
+        ...assembleOperationName({ operationId: "ai.embed", telemetry }),
+        ...baseTelemetryAttributes,
+        "ai.value": { input: () => JSON.stringify(value) }
+      }
+    }),
+    tracer,
+    fn: async (span) => {
+      const { embedding, usage, warnings, response, providerMetadata } = await retry(
+        () => (
+          // nested spans to align with the embedMany telemetry data:
+          recordSpan({
+            name: "ai.embed.doEmbed",
+            attributes: selectTelemetryAttributes({
+              telemetry,
+              attributes: {
+                ...assembleOperationName({
+                  operationId: "ai.embed.doEmbed",
+                  telemetry
+                }),
+                ...baseTelemetryAttributes,
+                // specific settings that only make sense on the outer level:
+                "ai.values": { input: () => [JSON.stringify(value)] }
+              }
+            }),
+            tracer,
+            fn: async (doEmbedSpan) => {
+              var _a22, _b15;
+              const modelResponse = await model.doEmbed({
+                values: [value],
+                abortSignal,
+                headers: headersWithUserAgent,
+                providerOptions
+              });
+              const embedding2 = modelResponse.embeddings[0];
+              const usage2 = (_a22 = modelResponse.usage) != null ? _a22 : { tokens: NaN };
+              doEmbedSpan.setAttributes(
+                await selectTelemetryAttributes({
+                  telemetry,
+                  attributes: {
+                    "ai.embeddings": {
+                      output: () => modelResponse.embeddings.map(
+                        (embedding3) => JSON.stringify(embedding3)
+                      )
+                    },
+                    "ai.usage.tokens": usage2.tokens
+                  }
+                })
+              );
+              return {
+                embedding: embedding2,
+                usage: usage2,
+                warnings: (_b15 = modelResponse.warnings) != null ? _b15 : [],
+                providerMetadata: modelResponse.providerMetadata,
+                response: modelResponse.response
+              };
+            }
+          })
+        )
+      );
+      span.setAttributes(
+        await selectTelemetryAttributes({
+          telemetry,
+          attributes: {
+            "ai.embedding": { output: () => JSON.stringify(embedding) },
+            "ai.usage.tokens": usage.tokens
+          }
+        })
+      );
+      logWarnings({ warnings, provider: model.provider, model: model.modelId });
+      return new DefaultEmbedResult({
+        value,
+        embedding,
+        usage,
+        warnings,
+        providerMetadata,
+        response
+      });
+    }
+  });
+}
+var DefaultEmbedResult = class {
+  constructor(options2) {
+    this.value = options2.value;
+    this.embedding = options2.embedding;
+    this.usage = options2.usage;
+    this.warnings = options2.warnings;
+    this.providerMetadata = options2.providerMetadata;
+    this.response = options2.response;
+  }
+};
+function splitArray(array2, chunkSize) {
+  if (chunkSize <= 0) {
+    throw new Error("chunkSize must be greater than 0");
+  }
+  const result = [];
+  for (let i = 0; i < array2.length; i += chunkSize) {
+    result.push(array2.slice(i, i + chunkSize));
+  }
+  return result;
+}
+async function embedMany({
+  model: modelArg,
+  values,
+  maxParallelCalls = Infinity,
+  maxRetries: maxRetriesArg,
+  abortSignal,
+  headers,
+  providerOptions,
+  experimental_telemetry: telemetry
+}) {
+  const model = resolveEmbeddingModel(modelArg);
+  const { maxRetries, retry } = prepareRetries({
+    maxRetries: maxRetriesArg,
+    abortSignal
+  });
+  const headersWithUserAgent = withUserAgentSuffix(
+    headers != null ? headers : {},
+    `ai/${VERSION$3}`
+  );
+  const baseTelemetryAttributes = getBaseTelemetryAttributes({
+    model,
+    telemetry,
+    headers: headersWithUserAgent,
+    settings: { maxRetries }
+  });
+  const tracer = getTracer(telemetry);
+  return recordSpan({
+    name: "ai.embedMany",
+    attributes: selectTelemetryAttributes({
+      telemetry,
+      attributes: {
+        ...assembleOperationName({ operationId: "ai.embedMany", telemetry }),
+        ...baseTelemetryAttributes,
+        // specific settings that only make sense on the outer level:
+        "ai.values": {
+          input: () => values.map((value) => JSON.stringify(value))
+        }
+      }
+    }),
+    tracer,
+    fn: async (span) => {
+      var _a22;
+      const [maxEmbeddingsPerCall, supportsParallelCalls] = await Promise.all([
+        model.maxEmbeddingsPerCall,
+        model.supportsParallelCalls
+      ]);
+      if (maxEmbeddingsPerCall == null || maxEmbeddingsPerCall === Infinity) {
+        const { embeddings: embeddings2, usage, warnings: warnings2, response, providerMetadata: providerMetadata2 } = await retry(() => {
+          return recordSpan({
+            name: "ai.embedMany.doEmbed",
+            attributes: selectTelemetryAttributes({
+              telemetry,
+              attributes: {
+                ...assembleOperationName({
+                  operationId: "ai.embedMany.doEmbed",
+                  telemetry
+                }),
+                ...baseTelemetryAttributes,
+                // specific settings that only make sense on the outer level:
+                "ai.values": {
+                  input: () => values.map((value) => JSON.stringify(value))
+                }
+              }
+            }),
+            tracer,
+            fn: async (doEmbedSpan) => {
+              var _a23, _b15;
+              const modelResponse = await model.doEmbed({
+                values,
+                abortSignal,
+                headers: headersWithUserAgent,
+                providerOptions
+              });
+              const embeddings3 = modelResponse.embeddings;
+              const usage2 = (_a23 = modelResponse.usage) != null ? _a23 : { tokens: NaN };
+              doEmbedSpan.setAttributes(
+                await selectTelemetryAttributes({
+                  telemetry,
+                  attributes: {
+                    "ai.embeddings": {
+                      output: () => embeddings3.map(
+                        (embedding) => JSON.stringify(embedding)
+                      )
+                    },
+                    "ai.usage.tokens": usage2.tokens
+                  }
+                })
+              );
+              return {
+                embeddings: embeddings3,
+                usage: usage2,
+                warnings: (_b15 = modelResponse.warnings) != null ? _b15 : [],
+                providerMetadata: modelResponse.providerMetadata,
+                response: modelResponse.response
+              };
+            }
+          });
+        });
+        span.setAttributes(
+          await selectTelemetryAttributes({
+            telemetry,
+            attributes: {
+              "ai.embeddings": {
+                output: () => embeddings2.map((embedding) => JSON.stringify(embedding))
+              },
+              "ai.usage.tokens": usage.tokens
+            }
+          })
+        );
+        logWarnings({
+          warnings: warnings2,
+          provider: model.provider,
+          model: model.modelId
+        });
+        return new DefaultEmbedManyResult({
+          values,
+          embeddings: embeddings2,
+          usage,
+          warnings: warnings2,
+          providerMetadata: providerMetadata2,
+          responses: [response]
+        });
+      }
+      const valueChunks = splitArray(values, maxEmbeddingsPerCall);
+      const embeddings = [];
+      const warnings = [];
+      const responses = [];
+      let tokens = 0;
+      let providerMetadata;
+      const parallelChunks = splitArray(
+        valueChunks,
+        supportsParallelCalls ? maxParallelCalls : 1
+      );
+      for (const parallelChunk of parallelChunks) {
+        const results = await Promise.all(
+          parallelChunk.map((chunk) => {
+            return retry(() => {
+              return recordSpan({
+                name: "ai.embedMany.doEmbed",
+                attributes: selectTelemetryAttributes({
+                  telemetry,
+                  attributes: {
+                    ...assembleOperationName({
+                      operationId: "ai.embedMany.doEmbed",
+                      telemetry
+                    }),
+                    ...baseTelemetryAttributes,
+                    // specific settings that only make sense on the outer level:
+                    "ai.values": {
+                      input: () => chunk.map((value) => JSON.stringify(value))
+                    }
+                  }
+                }),
+                tracer,
+                fn: async (doEmbedSpan) => {
+                  var _a23, _b15;
+                  const modelResponse = await model.doEmbed({
+                    values: chunk,
+                    abortSignal,
+                    headers: headersWithUserAgent,
+                    providerOptions
+                  });
+                  const embeddings2 = modelResponse.embeddings;
+                  const usage = (_a23 = modelResponse.usage) != null ? _a23 : { tokens: NaN };
+                  doEmbedSpan.setAttributes(
+                    await selectTelemetryAttributes({
+                      telemetry,
+                      attributes: {
+                        "ai.embeddings": {
+                          output: () => embeddings2.map(
+                            (embedding) => JSON.stringify(embedding)
+                          )
+                        },
+                        "ai.usage.tokens": usage.tokens
+                      }
+                    })
+                  );
+                  return {
+                    embeddings: embeddings2,
+                    usage,
+                    warnings: (_b15 = modelResponse.warnings) != null ? _b15 : [],
+                    providerMetadata: modelResponse.providerMetadata,
+                    response: modelResponse.response
+                  };
+                }
+              });
+            });
+          })
+        );
+        for (const result of results) {
+          embeddings.push(...result.embeddings);
+          warnings.push(...result.warnings);
+          responses.push(result.response);
+          tokens += result.usage.tokens;
+          if (result.providerMetadata) {
+            if (!providerMetadata) {
+              providerMetadata = { ...result.providerMetadata };
+            } else {
+              for (const [providerName, metadata] of Object.entries(
+                result.providerMetadata
+              )) {
+                providerMetadata[providerName] = {
+                  ...(_a22 = providerMetadata[providerName]) != null ? _a22 : {},
+                  ...metadata
+                };
+              }
+            }
+          }
+        }
+      }
+      span.setAttributes(
+        await selectTelemetryAttributes({
+          telemetry,
+          attributes: {
+            "ai.embeddings": {
+              output: () => embeddings.map((embedding) => JSON.stringify(embedding))
+            },
+            "ai.usage.tokens": tokens
+          }
+        })
+      );
+      logWarnings({
+        warnings,
+        provider: model.provider,
+        model: model.modelId
+      });
+      return new DefaultEmbedManyResult({
+        values,
+        embeddings,
+        usage: { tokens },
+        warnings,
+        providerMetadata,
+        responses
+      });
+    }
+  });
+}
+var DefaultEmbedManyResult = class {
+  constructor(options2) {
+    this.values = options2.values;
+    this.embeddings = options2.embeddings;
+    this.usage = options2.usage;
+    this.warnings = options2.warnings;
+    this.providerMetadata = options2.providerMetadata;
+    this.responses = options2.responses;
+  }
+};
+async function generateImage({
+  model: modelArg,
+  prompt: promptArg,
+  n = 1,
+  maxImagesPerCall,
+  size,
+  aspectRatio,
+  seed,
+  providerOptions,
+  maxRetries: maxRetriesArg,
+  abortSignal,
+  headers
+}) {
+  var _a22, _b15;
+  const model = resolveImageModel(modelArg);
+  const headersWithUserAgent = withUserAgentSuffix(
+    headers != null ? headers : {},
+    `ai/${VERSION$3}`
+  );
+  const { retry } = prepareRetries({
+    maxRetries: maxRetriesArg,
+    abortSignal
+  });
+  const maxImagesPerCallWithDefault = (_a22 = maxImagesPerCall != null ? maxImagesPerCall : await invokeModelMaxImagesPerCall(model)) != null ? _a22 : 1;
+  const callCount = Math.ceil(n / maxImagesPerCallWithDefault);
+  const callImageCounts = Array.from({ length: callCount }, (_, i) => {
+    if (i < callCount - 1) {
+      return maxImagesPerCallWithDefault;
+    }
+    const remainder = n % maxImagesPerCallWithDefault;
+    return remainder === 0 ? maxImagesPerCallWithDefault : remainder;
+  });
+  const results = await Promise.all(
+    callImageCounts.map(
+      async (callImageCount) => retry(() => {
+        const { prompt, files, mask } = normalizePrompt(promptArg);
+        return model.doGenerate({
+          prompt,
+          files,
+          mask,
+          n: callImageCount,
+          abortSignal,
+          headers: headersWithUserAgent,
+          size,
+          aspectRatio,
+          seed,
+          providerOptions: providerOptions != null ? providerOptions : {}
+        });
+      })
+    )
+  );
+  const images = [];
+  const warnings = [];
+  const responses = [];
+  const providerMetadata = {};
+  let totalUsage = {
+    inputTokens: void 0,
+    outputTokens: void 0,
+    totalTokens: void 0
+  };
+  for (const result of results) {
+    images.push(
+      ...result.images.map(
+        (image) => {
+          var _a23;
+          return new DefaultGeneratedFile({
+            data: image,
+            mediaType: (_a23 = detectMediaType({
+              data: image,
+              signatures: imageMediaTypeSignatures
+            })) != null ? _a23 : "image/png"
+          });
+        }
+      )
+    );
+    warnings.push(...result.warnings);
+    if (result.usage != null) {
+      totalUsage = addImageModelUsage(totalUsage, result.usage);
+    }
+    if (result.providerMetadata) {
+      for (const [providerName, metadata] of Object.entries(result.providerMetadata)) {
+        if (providerName === "gateway") {
+          const currentEntry = providerMetadata[providerName];
+          if (currentEntry != null && typeof currentEntry === "object") {
+            providerMetadata[providerName] = {
+              ...currentEntry,
+              ...metadata
+            };
+          } else {
+            providerMetadata[providerName] = metadata;
+          }
+          const imagesValue = providerMetadata[providerName].images;
+          if (Array.isArray(imagesValue) && imagesValue.length === 0) {
+            delete providerMetadata[providerName].images;
+          }
+        } else {
+          (_b15 = providerMetadata[providerName]) != null ? _b15 : providerMetadata[providerName] = { images: [] };
+          providerMetadata[providerName].images.push(
+            ...result.providerMetadata[providerName].images
+          );
+        }
+      }
+    }
+    responses.push(result.response);
+  }
+  logWarnings({ warnings, provider: model.provider, model: model.modelId });
+  if (!images.length) {
+    throw new NoImageGeneratedError({ responses });
+  }
+  return new DefaultGenerateImageResult({
+    images,
+    warnings,
+    responses,
+    providerMetadata,
+    usage: totalUsage
+  });
+}
+var DefaultGenerateImageResult = class {
+  constructor(options2) {
+    this.images = options2.images;
+    this.warnings = options2.warnings;
+    this.responses = options2.responses;
+    this.providerMetadata = options2.providerMetadata;
+    this.usage = options2.usage;
+  }
+  get image() {
+    return this.images[0];
+  }
+};
+async function invokeModelMaxImagesPerCall(model) {
+  const isFunction = model.maxImagesPerCall instanceof Function;
+  if (!isFunction) {
+    return model.maxImagesPerCall;
+  }
+  return model.maxImagesPerCall({
+    modelId: model.modelId
+  });
+}
+function normalizePrompt(prompt) {
+  if (typeof prompt === "string") {
+    return { prompt, files: void 0, mask: void 0 };
+  }
+  return {
+    prompt: prompt.text,
+    files: prompt.images.map(toImageModelV3File),
+    mask: prompt.mask ? toImageModelV3File(prompt.mask) : void 0
+  };
+}
+function toImageModelV3File(dataContent) {
+  if (typeof dataContent === "string" && dataContent.startsWith("http")) {
+    return {
+      type: "url",
+      url: dataContent
+    };
+  }
+  if (typeof dataContent === "string" && dataContent.startsWith("data:")) {
+    const { mediaType: dataUrlMediaType, base64Content } = splitDataUrl(dataContent);
+    if (base64Content != null) {
+      const uint8Data2 = convertBase64ToUint8Array(base64Content);
+      return {
+        type: "file",
+        data: uint8Data2,
+        mediaType: dataUrlMediaType || detectMediaType({
+          data: uint8Data2,
+          signatures: imageMediaTypeSignatures
+        }) || "image/png"
+      };
+    }
+  }
+  const uint8Data = convertDataContentToUint8Array(dataContent);
+  return {
+    type: "file",
+    data: uint8Data,
+    mediaType: detectMediaType({
+      data: uint8Data,
+      signatures: imageMediaTypeSignatures
+    }) || "image/png"
+  };
+}
+var experimental_generateImage = generateImage;
+var noSchemaOutputStrategy = {
+  type: "no-schema",
+  jsonSchema: async () => void 0,
+  async validatePartialResult({ value, textDelta }) {
+    return { success: true, value: { partial: value, textDelta } };
+  },
+  async validateFinalResult(value, context2) {
+    return value === void 0 ? {
+      success: false,
+      error: new NoObjectGeneratedError({
+        message: "No object generated: response did not match schema.",
+        text: context2.text,
+        response: context2.response,
+        usage: context2.usage,
+        finishReason: context2.finishReason
+      })
+    } : { success: true, value };
+  },
+  createElementStream() {
+    throw new UnsupportedFunctionalityError({
+      functionality: "element streams in no-schema mode"
+    });
+  }
+};
+var objectOutputStrategy = (schema) => ({
+  type: "object",
+  jsonSchema: async () => await schema.jsonSchema,
+  async validatePartialResult({ value, textDelta }) {
+    return {
+      success: true,
+      value: {
+        // Note: currently no validation of partial results:
+        partial: value,
+        textDelta
+      }
+    };
+  },
+  async validateFinalResult(value) {
+    return safeValidateTypes({ value, schema });
+  },
+  createElementStream() {
+    throw new UnsupportedFunctionalityError({
+      functionality: "element streams in object mode"
+    });
+  }
+});
+var arrayOutputStrategy = (schema) => {
+  return {
+    type: "array",
+    // wrap in object that contains array of elements, since most LLMs will not
+    // be able to generate an array directly:
+    // possible future optimization: use arrays directly when model supports grammar-guided generation
+    jsonSchema: async () => {
+      const { $schema, ...itemSchema } = await schema.jsonSchema;
+      return {
+        $schema: "http://json-schema.org/draft-07/schema#",
+        type: "object",
+        properties: {
+          elements: { type: "array", items: itemSchema }
+        },
+        required: ["elements"],
+        additionalProperties: false
+      };
+    },
+    async validatePartialResult({
+      value,
+      latestObject,
+      isFirstDelta,
+      isFinalDelta
+    }) {
+      var _a22;
+      if (!isJSONObject(value) || !isJSONArray(value.elements)) {
+        return {
+          success: false,
+          error: new TypeValidationError({
+            value,
+            cause: "value must be an object that contains an array of elements"
+          })
+        };
+      }
+      const inputArray = value.elements;
+      const resultArray = [];
+      for (let i = 0; i < inputArray.length; i++) {
+        const element = inputArray[i];
+        const result = await safeValidateTypes({ value: element, schema });
+        if (i === inputArray.length - 1 && !isFinalDelta) {
+          continue;
+        }
+        if (!result.success) {
+          return result;
+        }
+        resultArray.push(result.value);
+      }
+      const publishedElementCount = (_a22 = latestObject == null ? void 0 : latestObject.length) != null ? _a22 : 0;
+      let textDelta = "";
+      if (isFirstDelta) {
+        textDelta += "[";
+      }
+      if (publishedElementCount > 0) {
+        textDelta += ",";
+      }
+      textDelta += resultArray.slice(publishedElementCount).map((element) => JSON.stringify(element)).join(",");
+      if (isFinalDelta) {
+        textDelta += "]";
+      }
+      return {
+        success: true,
+        value: {
+          partial: resultArray,
+          textDelta
+        }
+      };
+    },
+    async validateFinalResult(value) {
+      if (!isJSONObject(value) || !isJSONArray(value.elements)) {
+        return {
+          success: false,
+          error: new TypeValidationError({
+            value,
+            cause: "value must be an object that contains an array of elements"
+          })
+        };
+      }
+      const inputArray = value.elements;
+      const resultArray = [];
+      for (const element of inputArray) {
+        const result = await safeValidateTypes({ value: element, schema });
+        if (!result.success) {
+          return result;
+        }
+        resultArray.push(result.value);
+      }
+      return { success: true, value: resultArray };
+    },
+    createElementStream(originalStream) {
+      let publishedElements = 0;
+      return createAsyncIterableStream(
+        originalStream.pipeThrough(
+          new TransformStream({
+            transform(chunk, controller) {
+              switch (chunk.type) {
+                case "object": {
+                  const array2 = chunk.object;
+                  for (; publishedElements < array2.length; publishedElements++) {
+                    controller.enqueue(array2[publishedElements]);
+                  }
+                  break;
+                }
+                case "text-delta":
+                case "finish":
+                case "error":
+                  break;
+                default: {
+                  const _exhaustiveCheck = chunk;
+                  throw new Error(
+                    `Unsupported chunk type: ${_exhaustiveCheck}`
+                  );
+                }
+              }
+            }
+          })
+        )
+      );
+    }
+  };
+};
+var enumOutputStrategy = (enumValues) => {
+  return {
+    type: "enum",
+    // wrap in object that contains result, since most LLMs will not
+    // be able to generate an enum value directly:
+    // possible future optimization: use enums directly when model supports top-level enums
+    jsonSchema: async () => ({
+      $schema: "http://json-schema.org/draft-07/schema#",
+      type: "object",
+      properties: {
+        result: { type: "string", enum: enumValues }
+      },
+      required: ["result"],
+      additionalProperties: false
+    }),
+    async validateFinalResult(value) {
+      if (!isJSONObject(value) || typeof value.result !== "string") {
+        return {
+          success: false,
+          error: new TypeValidationError({
+            value,
+            cause: 'value must be an object that contains a string in the "result" property.'
+          })
+        };
+      }
+      const result = value.result;
+      return enumValues.includes(result) ? { success: true, value: result } : {
+        success: false,
+        error: new TypeValidationError({
+          value,
+          cause: "value must be a string in the enum"
+        })
+      };
+    },
+    async validatePartialResult({ value, textDelta }) {
+      if (!isJSONObject(value) || typeof value.result !== "string") {
+        return {
+          success: false,
+          error: new TypeValidationError({
+            value,
+            cause: 'value must be an object that contains a string in the "result" property.'
+          })
+        };
+      }
+      const result = value.result;
+      const possibleEnumValues = enumValues.filter(
+        (enumValue) => enumValue.startsWith(result)
+      );
+      if (value.result.length === 0 || possibleEnumValues.length === 0) {
+        return {
+          success: false,
+          error: new TypeValidationError({
+            value,
+            cause: "value must be a string in the enum"
+          })
+        };
+      }
+      return {
+        success: true,
+        value: {
+          partial: possibleEnumValues.length > 1 ? result : possibleEnumValues[0],
+          textDelta
+        }
+      };
+    },
+    createElementStream() {
+      throw new UnsupportedFunctionalityError({
+        functionality: "element streams in enum mode"
+      });
+    }
+  };
+};
+function getOutputStrategy({
+  output,
+  schema,
+  enumValues
+}) {
+  switch (output) {
+    case "object":
+      return objectOutputStrategy(asSchema(schema));
+    case "array":
+      return arrayOutputStrategy(asSchema(schema));
+    case "enum":
+      return enumOutputStrategy(enumValues);
+    case "no-schema":
+      return noSchemaOutputStrategy;
+    default: {
+      const _exhaustiveCheck = output;
+      throw new Error(`Unsupported output: ${_exhaustiveCheck}`);
+    }
+  }
+}
+async function parseAndValidateObjectResult(result, outputStrategy, context2) {
+  const parseResult = await safeParseJSON({ text: result });
+  if (!parseResult.success) {
+    throw new NoObjectGeneratedError({
+      message: "No object generated: could not parse the response.",
+      cause: parseResult.error,
+      text: result,
+      response: context2.response,
+      usage: context2.usage,
+      finishReason: context2.finishReason
+    });
+  }
+  const validationResult = await outputStrategy.validateFinalResult(
+    parseResult.value,
+    {
+      text: result,
+      response: context2.response,
+      usage: context2.usage
+    }
+  );
+  if (!validationResult.success) {
+    throw new NoObjectGeneratedError({
+      message: "No object generated: response did not match schema.",
+      cause: validationResult.error,
+      text: result,
+      response: context2.response,
+      usage: context2.usage,
+      finishReason: context2.finishReason
+    });
+  }
+  return validationResult.value;
+}
+async function parseAndValidateObjectResultWithRepair(result, outputStrategy, repairText, context2) {
+  try {
+    return await parseAndValidateObjectResult(result, outputStrategy, context2);
+  } catch (error) {
+    if (repairText != null && NoObjectGeneratedError.isInstance(error) && (JSONParseError.isInstance(error.cause) || TypeValidationError.isInstance(error.cause))) {
+      const repairedText = await repairText({
+        text: result,
+        error: error.cause
+      });
+      if (repairedText === null) {
+        throw error;
+      }
+      return await parseAndValidateObjectResult(
+        repairedText,
+        outputStrategy,
+        context2
+      );
+    }
+    throw error;
+  }
+}
+function validateObjectGenerationInput({
+  output,
+  schema,
+  schemaName,
+  schemaDescription,
+  enumValues
+}) {
+  if (output != null && output !== "object" && output !== "array" && output !== "enum" && output !== "no-schema") {
+    throw new InvalidArgumentError2({
+      parameter: "output",
+      value: output,
+      message: "Invalid output type."
+    });
+  }
+  if (output === "no-schema") {
+    if (schema != null) {
+      throw new InvalidArgumentError2({
+        parameter: "schema",
+        value: schema,
+        message: "Schema is not supported for no-schema output."
+      });
+    }
+    if (schemaDescription != null) {
+      throw new InvalidArgumentError2({
+        parameter: "schemaDescription",
+        value: schemaDescription,
+        message: "Schema description is not supported for no-schema output."
+      });
+    }
+    if (schemaName != null) {
+      throw new InvalidArgumentError2({
+        parameter: "schemaName",
+        value: schemaName,
+        message: "Schema name is not supported for no-schema output."
+      });
+    }
+    if (enumValues != null) {
+      throw new InvalidArgumentError2({
+        parameter: "enumValues",
+        value: enumValues,
+        message: "Enum values are not supported for no-schema output."
+      });
+    }
+  }
+  if (output === "object") {
+    if (schema == null) {
+      throw new InvalidArgumentError2({
+        parameter: "schema",
+        value: schema,
+        message: "Schema is required for object output."
+      });
+    }
+    if (enumValues != null) {
+      throw new InvalidArgumentError2({
+        parameter: "enumValues",
+        value: enumValues,
+        message: "Enum values are not supported for object output."
+      });
+    }
+  }
+  if (output === "array") {
+    if (schema == null) {
+      throw new InvalidArgumentError2({
+        parameter: "schema",
+        value: schema,
+        message: "Element schema is required for array output."
+      });
+    }
+    if (enumValues != null) {
+      throw new InvalidArgumentError2({
+        parameter: "enumValues",
+        value: enumValues,
+        message: "Enum values are not supported for array output."
+      });
+    }
+  }
+  if (output === "enum") {
+    if (schema != null) {
+      throw new InvalidArgumentError2({
+        parameter: "schema",
+        value: schema,
+        message: "Schema is not supported for enum output."
+      });
+    }
+    if (schemaDescription != null) {
+      throw new InvalidArgumentError2({
+        parameter: "schemaDescription",
+        value: schemaDescription,
+        message: "Schema description is not supported for enum output."
+      });
+    }
+    if (schemaName != null) {
+      throw new InvalidArgumentError2({
+        parameter: "schemaName",
+        value: schemaName,
+        message: "Schema name is not supported for enum output."
+      });
+    }
+    if (enumValues == null) {
+      throw new InvalidArgumentError2({
+        parameter: "enumValues",
+        value: enumValues,
+        message: "Enum values are required for enum output."
+      });
+    }
+    for (const value of enumValues) {
+      if (typeof value !== "string") {
+        throw new InvalidArgumentError2({
+          parameter: "enumValues",
+          value,
+          message: "Enum values must be strings."
+        });
+      }
+    }
+  }
+}
+var originalGenerateId3 = createIdGenerator({ prefix: "aiobj", size: 24 });
+async function generateObject(options2) {
+  const {
+    model: modelArg,
+    output = "object",
+    system,
+    prompt,
+    messages,
+    allowSystemInMessages,
+    maxRetries: maxRetriesArg,
+    abortSignal,
+    headers,
+    experimental_repairText: repairText,
+    experimental_telemetry: telemetry,
+    experimental_download: download2,
+    providerOptions,
+    _internal: {
+      generateId: generateId2 = originalGenerateId3,
+      currentDate = () => /* @__PURE__ */ new Date()
+    } = {},
+    ...settings
+  } = options2;
+  const model = resolveLanguageModel(modelArg);
+  const enumValues = "enum" in options2 ? options2.enum : void 0;
+  const {
+    schema: inputSchema,
+    schemaDescription,
+    schemaName
+  } = "schema" in options2 ? options2 : {};
+  validateObjectGenerationInput({
+    output,
+    schema: inputSchema,
+    schemaName,
+    schemaDescription,
+    enumValues
+  });
+  const { maxRetries, retry } = prepareRetries({
+    maxRetries: maxRetriesArg,
+    abortSignal
+  });
+  const outputStrategy = getOutputStrategy({
+    output,
+    schema: inputSchema,
+    enumValues
+  });
+  const callSettings = prepareCallSettings(settings);
+  const headersWithUserAgent = withUserAgentSuffix(
+    headers != null ? headers : {},
+    `ai/${VERSION$3}`
+  );
+  const baseTelemetryAttributes = getBaseTelemetryAttributes({
+    model,
+    telemetry,
+    headers: headersWithUserAgent,
+    settings: { ...callSettings, maxRetries }
+  });
+  const tracer = getTracer(telemetry);
+  const jsonSchema2 = await outputStrategy.jsonSchema();
+  try {
+    return await recordSpan({
+      name: "ai.generateObject",
+      attributes: selectTelemetryAttributes({
+        telemetry,
+        attributes: {
+          ...assembleOperationName({
+            operationId: "ai.generateObject",
+            telemetry
+          }),
+          ...baseTelemetryAttributes,
+          // specific settings that only make sense on the outer level:
+          "ai.prompt": {
+            input: () => JSON.stringify({ system, prompt, messages })
+          },
+          "ai.schema": jsonSchema2 != null ? { input: () => JSON.stringify(jsonSchema2) } : void 0,
+          "ai.schema.name": schemaName,
+          "ai.schema.description": schemaDescription,
+          "ai.settings.output": outputStrategy.type
+        }
+      }),
+      tracer,
+      fn: async (span) => {
+        var _a22;
+        let result;
+        let finishReason;
+        let usage;
+        let warnings;
+        let response;
+        let request;
+        let resultProviderMetadata;
+        let reasoning;
+        const standardizedPrompt = await standardizePrompt({
+          system,
+          prompt,
+          messages,
+          allowSystemInMessages
+        });
+        const promptMessages = await convertToLanguageModelPrompt({
+          prompt: standardizedPrompt,
+          supportedUrls: await model.supportedUrls,
+          download: download2
+        });
+        const generateResult = await retry(
+          () => recordSpan({
+            name: "ai.generateObject.doGenerate",
+            attributes: selectTelemetryAttributes({
+              telemetry,
+              attributes: {
+                ...assembleOperationName({
+                  operationId: "ai.generateObject.doGenerate",
+                  telemetry
+                }),
+                ...baseTelemetryAttributes,
+                "ai.prompt.messages": {
+                  input: () => stringifyForTelemetry(promptMessages)
+                },
+                // standardized gen-ai llm span attributes:
+                "gen_ai.system": model.provider,
+                "gen_ai.request.model": model.modelId,
+                "gen_ai.request.frequency_penalty": callSettings.frequencyPenalty,
+                "gen_ai.request.max_tokens": callSettings.maxOutputTokens,
+                "gen_ai.request.presence_penalty": callSettings.presencePenalty,
+                "gen_ai.request.temperature": callSettings.temperature,
+                "gen_ai.request.top_k": callSettings.topK,
+                "gen_ai.request.top_p": callSettings.topP
+              }
+            }),
+            tracer,
+            fn: async (span2) => {
+              var _a23, _b15, _c, _d, _e, _f, _g, _h;
+              const result2 = await model.doGenerate({
+                responseFormat: {
+                  type: "json",
+                  schema: jsonSchema2,
+                  name: schemaName,
+                  description: schemaDescription
+                },
+                ...prepareCallSettings(settings),
+                prompt: promptMessages,
+                providerOptions,
+                abortSignal,
+                headers: headersWithUserAgent
+              });
+              const responseData = {
+                id: (_b15 = (_a23 = result2.response) == null ? void 0 : _a23.id) != null ? _b15 : generateId2(),
+                timestamp: (_d = (_c = result2.response) == null ? void 0 : _c.timestamp) != null ? _d : currentDate(),
+                modelId: (_f = (_e = result2.response) == null ? void 0 : _e.modelId) != null ? _f : model.modelId,
+                headers: (_g = result2.response) == null ? void 0 : _g.headers,
+                body: (_h = result2.response) == null ? void 0 : _h.body
+              };
+              const text2 = extractTextContent(result2.content);
+              const reasoning2 = extractReasoningContent(result2.content);
+              if (text2 === void 0) {
+                throw new NoObjectGeneratedError({
+                  message: "No object generated: the model did not return a response.",
+                  response: responseData,
+                  usage: asLanguageModelUsage(result2.usage),
+                  finishReason: result2.finishReason.unified
+                });
+              }
+              span2.setAttributes(
+                await selectTelemetryAttributes({
+                  telemetry,
+                  attributes: {
+                    "ai.response.finishReason": result2.finishReason.unified,
+                    "ai.response.object": { output: () => text2 },
+                    "ai.response.id": responseData.id,
+                    "ai.response.model": responseData.modelId,
+                    "ai.response.timestamp": responseData.timestamp.toISOString(),
+                    "ai.response.providerMetadata": JSON.stringify(
+                      result2.providerMetadata
+                    ),
+                    // TODO rename telemetry attributes to inputTokens and outputTokens
+                    "ai.usage.promptTokens": result2.usage.inputTokens.total,
+                    "ai.usage.completionTokens": result2.usage.outputTokens.total,
+                    // standardized gen-ai llm span attributes:
+                    "gen_ai.response.finish_reasons": [
+                      result2.finishReason.unified
+                    ],
+                    "gen_ai.response.id": responseData.id,
+                    "gen_ai.response.model": responseData.modelId,
+                    "gen_ai.usage.input_tokens": result2.usage.inputTokens.total,
+                    "gen_ai.usage.output_tokens": result2.usage.outputTokens.total
+                  }
+                })
+              );
+              return {
+                ...result2,
+                objectText: text2,
+                reasoning: reasoning2,
+                responseData
+              };
+            }
+          })
+        );
+        result = generateResult.objectText;
+        finishReason = generateResult.finishReason.unified;
+        usage = asLanguageModelUsage(generateResult.usage);
+        warnings = generateResult.warnings;
+        resultProviderMetadata = generateResult.providerMetadata;
+        request = (_a22 = generateResult.request) != null ? _a22 : {};
+        response = generateResult.responseData;
+        reasoning = generateResult.reasoning;
+        logWarnings({
+          warnings,
+          provider: model.provider,
+          model: model.modelId
+        });
+        const object2 = await parseAndValidateObjectResultWithRepair(
+          result,
+          outputStrategy,
+          repairText,
+          {
+            response,
+            usage,
+            finishReason
+          }
+        );
+        span.setAttributes(
+          await selectTelemetryAttributes({
+            telemetry,
+            attributes: {
+              "ai.response.finishReason": finishReason,
+              "ai.response.object": {
+                output: () => JSON.stringify(object2)
+              },
+              "ai.response.providerMetadata": JSON.stringify(
+                resultProviderMetadata
+              ),
+              // TODO rename telemetry attributes to inputTokens and outputTokens
+              "ai.usage.promptTokens": usage.inputTokens,
+              "ai.usage.completionTokens": usage.outputTokens
+            }
+          })
+        );
+        return new DefaultGenerateObjectResult({
+          object: object2,
+          reasoning,
+          finishReason,
+          usage,
+          warnings,
+          request,
+          response,
+          providerMetadata: resultProviderMetadata
+        });
+      }
+    });
+  } catch (error) {
+    throw wrapGatewayError(error);
+  }
+}
+var DefaultGenerateObjectResult = class {
+  constructor(options2) {
+    this.object = options2.object;
+    this.finishReason = options2.finishReason;
+    this.usage = options2.usage;
+    this.warnings = options2.warnings;
+    this.providerMetadata = options2.providerMetadata;
+    this.response = options2.response;
+    this.request = options2.request;
+    this.reasoning = options2.reasoning;
+  }
+  toJsonResponse(init) {
+    var _a22;
+    return new Response(JSON.stringify(this.object), {
+      status: (_a22 = init == null ? void 0 : init.status) != null ? _a22 : 200,
+      headers: prepareHeaders(init == null ? void 0 : init.headers, {
+        "content-type": "application/json; charset=utf-8"
+      })
+    });
+  }
+};
+function cosineSimilarity(vector1, vector2) {
+  if (vector1.length !== vector2.length) {
+    throw new InvalidArgumentError2({
+      parameter: "vector1,vector2",
+      value: { vector1Length: vector1.length, vector2Length: vector2.length },
+      message: `Vectors must have the same length`
+    });
+  }
+  const n = vector1.length;
+  if (n === 0) {
+    return 0;
+  }
+  let magnitudeSquared1 = 0;
+  let magnitudeSquared2 = 0;
+  let dotProduct = 0;
+  for (let i = 0; i < n; i++) {
+    const value1 = vector1[i];
+    const value2 = vector2[i];
+    magnitudeSquared1 += value1 * value1;
+    magnitudeSquared2 += value2 * value2;
+    dotProduct += value1 * value2;
+  }
+  return magnitudeSquared1 === 0 || magnitudeSquared2 === 0 ? 0 : dotProduct / (Math.sqrt(magnitudeSquared1) * Math.sqrt(magnitudeSquared2));
+}
+function createDownload(options2) {
+  return ({ url, abortSignal }) => download({ url, maxBytes: options2 == null ? void 0 : options2.maxBytes, abortSignal });
+}
+function getTextFromDataUrl(dataUrl) {
+  const [header, base64Content] = dataUrl.split(",");
+  const mediaType = header.split(";")[0].split(":")[1];
+  if (mediaType == null || base64Content == null) {
+    throw new Error("Invalid data URL format");
+  }
+  try {
+    return window.atob(base64Content);
+  } catch (error) {
+    throw new Error(`Error decoding data URL`);
+  }
+}
+function isDeepEqualData(obj1, obj2) {
+  if (obj1 === obj2)
+    return true;
+  if (obj1 == null || obj2 == null)
+    return false;
+  if (typeof obj1 !== "object" && typeof obj2 !== "object")
+    return obj1 === obj2;
+  if (obj1.constructor !== obj2.constructor)
+    return false;
+  if (obj1 instanceof Date && obj2 instanceof Date) {
+    return obj1.getTime() === obj2.getTime();
+  }
+  if (Array.isArray(obj1)) {
+    if (obj1.length !== obj2.length)
+      return false;
+    for (let i = 0; i < obj1.length; i++) {
+      if (!isDeepEqualData(obj1[i], obj2[i]))
+        return false;
+    }
+    return true;
+  }
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+  if (keys1.length !== keys2.length)
+    return false;
+  for (const key of keys1) {
+    if (!keys2.includes(key))
+      return false;
+    if (!isDeepEqualData(obj1[key], obj2[key]))
+      return false;
+  }
+  return true;
+}
+var SerialJobExecutor = class {
+  constructor() {
+    this.queue = [];
+    this.isProcessing = false;
+  }
+  async processQueue() {
+    if (this.isProcessing) {
+      return;
+    }
+    this.isProcessing = true;
+    while (this.queue.length > 0) {
+      await this.queue[0]();
+      this.queue.shift();
+    }
+    this.isProcessing = false;
+  }
+  async run(job) {
+    return new Promise((resolve3, reject) => {
+      this.queue.push(async () => {
+        try {
+          await job();
+          resolve3();
+        } catch (error) {
+          reject(error);
+        }
+      });
+      void this.processQueue();
+    });
+  }
+};
+function simulateReadableStream({
+  chunks,
+  initialDelayInMs = 0,
+  chunkDelayInMs = 0,
+  _internal
+}) {
+  var _a22;
+  const delay2 = (_a22 = _internal == null ? void 0 : _internal.delay) != null ? _a22 : delay;
+  let index2 = 0;
+  return new ReadableStream({
+    async pull(controller) {
+      if (index2 < chunks.length) {
+        await delay2(index2 === 0 ? initialDelayInMs : chunkDelayInMs);
+        controller.enqueue(chunks[index2++]);
+      } else {
+        controller.close();
+      }
+    }
+  });
+}
+var originalGenerateId4 = createIdGenerator({ prefix: "aiobj", size: 24 });
+function streamObject(options2) {
+  const {
+    model,
+    output = "object",
+    system,
+    prompt,
+    messages,
+    allowSystemInMessages,
+    maxRetries,
+    abortSignal,
+    headers,
+    experimental_repairText: repairText,
+    experimental_telemetry: telemetry,
+    experimental_download: download2,
+    providerOptions,
+    onError = ({ error }) => {
+      console.error(error);
+    },
+    onFinish,
+    _internal: {
+      generateId: generateId2 = originalGenerateId4,
+      currentDate = () => /* @__PURE__ */ new Date(),
+      now: now2 = now
+    } = {},
+    ...settings
+  } = options2;
+  const enumValues = "enum" in options2 && options2.enum ? options2.enum : void 0;
+  const {
+    schema: inputSchema,
+    schemaDescription,
+    schemaName
+  } = "schema" in options2 ? options2 : {};
+  validateObjectGenerationInput({
+    output,
+    schema: inputSchema,
+    schemaName,
+    schemaDescription,
+    enumValues
+  });
+  const outputStrategy = getOutputStrategy({
+    output,
+    schema: inputSchema,
+    enumValues
+  });
+  return new DefaultStreamObjectResult({
+    model,
+    telemetry,
+    headers,
+    settings,
+    maxRetries,
+    abortSignal,
+    outputStrategy,
+    system,
+    prompt,
+    messages,
+    allowSystemInMessages,
+    schemaName,
+    schemaDescription,
+    providerOptions,
+    repairText,
+    onError,
+    onFinish,
+    download: download2,
+    generateId: generateId2,
+    currentDate,
+    now: now2
+  });
+}
+var DefaultStreamObjectResult = class {
+  constructor({
+    model: modelArg,
+    headers,
+    telemetry,
+    settings,
+    maxRetries: maxRetriesArg,
+    abortSignal,
+    outputStrategy,
+    system,
+    prompt,
+    messages,
+    allowSystemInMessages,
+    schemaName,
+    schemaDescription,
+    providerOptions,
+    repairText,
+    onError,
+    onFinish,
+    download: download2,
+    generateId: generateId2,
+    currentDate,
+    now: now2
+  }) {
+    this._object = new DelayedPromise();
+    this._usage = new DelayedPromise();
+    this._providerMetadata = new DelayedPromise();
+    this._warnings = new DelayedPromise();
+    this._request = new DelayedPromise();
+    this._response = new DelayedPromise();
+    this._finishReason = new DelayedPromise();
+    const model = resolveLanguageModel(modelArg);
+    const { maxRetries, retry } = prepareRetries({
+      maxRetries: maxRetriesArg,
+      abortSignal
+    });
+    const callSettings = prepareCallSettings(settings);
+    const baseTelemetryAttributes = getBaseTelemetryAttributes({
+      model,
+      telemetry,
+      headers,
+      settings: { ...callSettings, maxRetries }
+    });
+    const tracer = getTracer(telemetry);
+    const self2 = this;
+    const stitchableStream = createStitchableStream();
+    const eventProcessor = new TransformStream({
+      transform(chunk, controller) {
+        controller.enqueue(chunk);
+        if (chunk.type === "error") {
+          onError({ error: wrapGatewayError(chunk.error) });
+        }
+      }
+    });
+    this.baseStream = stitchableStream.stream.pipeThrough(eventProcessor);
+    recordSpan({
+      name: "ai.streamObject",
+      attributes: selectTelemetryAttributes({
+        telemetry,
+        attributes: {
+          ...assembleOperationName({
+            operationId: "ai.streamObject",
+            telemetry
+          }),
+          ...baseTelemetryAttributes,
+          // specific settings that only make sense on the outer level:
+          "ai.prompt": {
+            input: () => JSON.stringify({ system, prompt, messages })
+          },
+          "ai.schema": {
+            input: async () => JSON.stringify(await outputStrategy.jsonSchema())
+          },
+          "ai.schema.name": schemaName,
+          "ai.schema.description": schemaDescription,
+          "ai.settings.output": outputStrategy.type
+        }
+      }),
+      tracer,
+      endWhenDone: false,
+      fn: async (rootSpan) => {
+        const standardizedPrompt = await standardizePrompt({
+          system,
+          prompt,
+          messages,
+          allowSystemInMessages
+        });
+        const callOptions = {
+          responseFormat: {
+            type: "json",
+            schema: await outputStrategy.jsonSchema(),
+            name: schemaName,
+            description: schemaDescription
+          },
+          ...prepareCallSettings(settings),
+          prompt: await convertToLanguageModelPrompt({
+            prompt: standardizedPrompt,
+            supportedUrls: await model.supportedUrls,
+            download: download2
+          }),
+          providerOptions,
+          abortSignal,
+          headers,
+          includeRawChunks: false
+        };
+        const transformer = {
+          transform: (chunk, controller) => {
+            switch (chunk.type) {
+              case "text-delta":
+                controller.enqueue(chunk.delta);
+                break;
+              case "response-metadata":
+              case "finish":
+              case "error":
+              case "stream-start":
+                controller.enqueue(chunk);
+                break;
+            }
+          }
+        };
+        const {
+          result: { stream, response, request },
+          doStreamSpan,
+          startTimestampMs
+        } = await retry(
+          () => recordSpan({
+            name: "ai.streamObject.doStream",
+            attributes: selectTelemetryAttributes({
+              telemetry,
+              attributes: {
+                ...assembleOperationName({
+                  operationId: "ai.streamObject.doStream",
+                  telemetry
+                }),
+                ...baseTelemetryAttributes,
+                "ai.prompt.messages": {
+                  input: () => stringifyForTelemetry(callOptions.prompt)
+                },
+                // standardized gen-ai llm span attributes:
+                "gen_ai.system": model.provider,
+                "gen_ai.request.model": model.modelId,
+                "gen_ai.request.frequency_penalty": callSettings.frequencyPenalty,
+                "gen_ai.request.max_tokens": callSettings.maxOutputTokens,
+                "gen_ai.request.presence_penalty": callSettings.presencePenalty,
+                "gen_ai.request.temperature": callSettings.temperature,
+                "gen_ai.request.top_k": callSettings.topK,
+                "gen_ai.request.top_p": callSettings.topP
+              }
+            }),
+            tracer,
+            endWhenDone: false,
+            fn: async (doStreamSpan2) => ({
+              startTimestampMs: now2(),
+              doStreamSpan: doStreamSpan2,
+              result: await model.doStream(callOptions)
+            })
+          })
+        );
+        self2._request.resolve(request != null ? request : {});
+        let warnings;
+        let usage = createNullLanguageModelUsage();
+        let finishReason;
+        let providerMetadata;
+        let object2;
+        let error;
+        let accumulatedText = "";
+        let textDelta = "";
+        let fullResponse = {
+          id: generateId2(),
+          timestamp: currentDate(),
+          modelId: model.modelId
+        };
+        let latestObjectJson = void 0;
+        let latestObject = void 0;
+        let isFirstChunk = true;
+        let isFirstDelta = true;
+        const transformedStream = stream.pipeThrough(new TransformStream(transformer)).pipeThrough(
+          new TransformStream({
+            async transform(chunk, controller) {
+              var _a22, _b15, _c;
+              if (typeof chunk === "object" && chunk.type === "stream-start") {
+                warnings = chunk.warnings;
+                return;
+              }
+              if (isFirstChunk) {
+                const msToFirstChunk = now2() - startTimestampMs;
+                isFirstChunk = false;
+                doStreamSpan.addEvent("ai.stream.firstChunk", {
+                  "ai.stream.msToFirstChunk": msToFirstChunk
+                });
+                doStreamSpan.setAttributes({
+                  "ai.stream.msToFirstChunk": msToFirstChunk
+                });
+              }
+              if (typeof chunk === "string") {
+                accumulatedText += chunk;
+                textDelta += chunk;
+                const { value: currentObjectJson, state: parseState } = await parsePartialJson(accumulatedText);
+                if (currentObjectJson !== void 0 && !isDeepEqualData(latestObjectJson, currentObjectJson)) {
+                  const validationResult = await outputStrategy.validatePartialResult({
+                    value: currentObjectJson,
+                    textDelta,
+                    latestObject,
+                    isFirstDelta,
+                    isFinalDelta: parseState === "successful-parse"
+                  });
+                  if (validationResult.success && !isDeepEqualData(
+                    latestObject,
+                    validationResult.value.partial
+                  )) {
+                    latestObjectJson = currentObjectJson;
+                    latestObject = validationResult.value.partial;
+                    controller.enqueue({
+                      type: "object",
+                      object: latestObject
+                    });
+                    controller.enqueue({
+                      type: "text-delta",
+                      textDelta: validationResult.value.textDelta
+                    });
+                    textDelta = "";
+                    isFirstDelta = false;
+                  }
+                }
+                return;
+              }
+              switch (chunk.type) {
+                case "response-metadata": {
+                  fullResponse = {
+                    id: (_a22 = chunk.id) != null ? _a22 : fullResponse.id,
+                    timestamp: (_b15 = chunk.timestamp) != null ? _b15 : fullResponse.timestamp,
+                    modelId: (_c = chunk.modelId) != null ? _c : fullResponse.modelId
+                  };
+                  break;
+                }
+                case "finish": {
+                  if (textDelta !== "") {
+                    controller.enqueue({ type: "text-delta", textDelta });
+                  }
+                  finishReason = chunk.finishReason.unified;
+                  usage = asLanguageModelUsage(chunk.usage);
+                  providerMetadata = chunk.providerMetadata;
+                  controller.enqueue({
+                    ...chunk,
+                    finishReason: chunk.finishReason.unified,
+                    usage,
+                    response: fullResponse
+                  });
+                  logWarnings({
+                    warnings: warnings != null ? warnings : [],
+                    provider: model.provider,
+                    model: model.modelId
+                  });
+                  self2._usage.resolve(usage);
+                  self2._providerMetadata.resolve(providerMetadata);
+                  self2._warnings.resolve(warnings);
+                  self2._response.resolve({
+                    ...fullResponse,
+                    headers: response == null ? void 0 : response.headers
+                  });
+                  self2._finishReason.resolve(finishReason != null ? finishReason : "other");
+                  try {
+                    object2 = await parseAndValidateObjectResultWithRepair(
+                      accumulatedText,
+                      outputStrategy,
+                      repairText,
+                      {
+                        response: fullResponse,
+                        usage,
+                        finishReason
+                      }
+                    );
+                    self2._object.resolve(object2);
+                  } catch (e) {
+                    error = e;
+                    self2._object.reject(e);
+                  }
+                  break;
+                }
+                default: {
+                  controller.enqueue(chunk);
+                  break;
+                }
+              }
+            },
+            // invoke onFinish callback and resolve toolResults promise when the stream is about to close:
+            async flush(controller) {
+              try {
+                const finalUsage = usage != null ? usage : {
+                  promptTokens: NaN,
+                  completionTokens: NaN,
+                  totalTokens: NaN
+                };
+                doStreamSpan.setAttributes(
+                  await selectTelemetryAttributes({
+                    telemetry,
+                    attributes: {
+                      "ai.response.finishReason": finishReason,
+                      "ai.response.object": {
+                        output: () => JSON.stringify(object2)
+                      },
+                      "ai.response.id": fullResponse.id,
+                      "ai.response.model": fullResponse.modelId,
+                      "ai.response.timestamp": fullResponse.timestamp.toISOString(),
+                      "ai.response.providerMetadata": JSON.stringify(providerMetadata),
+                      "ai.usage.inputTokens": finalUsage.inputTokens,
+                      "ai.usage.outputTokens": finalUsage.outputTokens,
+                      "ai.usage.totalTokens": finalUsage.totalTokens,
+                      "ai.usage.reasoningTokens": finalUsage.reasoningTokens,
+                      "ai.usage.cachedInputTokens": finalUsage.cachedInputTokens,
+                      // standardized gen-ai llm span attributes:
+                      "gen_ai.response.finish_reasons": [finishReason],
+                      "gen_ai.response.id": fullResponse.id,
+                      "gen_ai.response.model": fullResponse.modelId,
+                      "gen_ai.usage.input_tokens": finalUsage.inputTokens,
+                      "gen_ai.usage.output_tokens": finalUsage.outputTokens
+                    }
+                  })
+                );
+                doStreamSpan.end();
+                rootSpan.setAttributes(
+                  await selectTelemetryAttributes({
+                    telemetry,
+                    attributes: {
+                      "ai.usage.inputTokens": finalUsage.inputTokens,
+                      "ai.usage.outputTokens": finalUsage.outputTokens,
+                      "ai.usage.totalTokens": finalUsage.totalTokens,
+                      "ai.usage.reasoningTokens": finalUsage.reasoningTokens,
+                      "ai.usage.cachedInputTokens": finalUsage.cachedInputTokens,
+                      "ai.response.object": {
+                        output: () => JSON.stringify(object2)
+                      },
+                      "ai.response.providerMetadata": JSON.stringify(providerMetadata)
+                    }
+                  })
+                );
+                await (onFinish == null ? void 0 : onFinish({
+                  usage: finalUsage,
+                  object: object2,
+                  error,
+                  response: {
+                    ...fullResponse,
+                    headers: response == null ? void 0 : response.headers
+                  },
+                  warnings,
+                  providerMetadata
+                }));
+              } catch (error2) {
+                controller.enqueue({ type: "error", error: error2 });
+              } finally {
+                rootSpan.end();
+              }
+            }
+          })
+        );
+        stitchableStream.addStream(transformedStream);
+      }
+    }).catch((error) => {
+      stitchableStream.addStream(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue({ type: "error", error });
+            controller.close();
+          }
+        })
+      );
+    }).finally(() => {
+      stitchableStream.close();
+    });
+    this.outputStrategy = outputStrategy;
+  }
+  get object() {
+    return this._object.promise;
+  }
+  get usage() {
+    return this._usage.promise;
+  }
+  get providerMetadata() {
+    return this._providerMetadata.promise;
+  }
+  get warnings() {
+    return this._warnings.promise;
+  }
+  get request() {
+    return this._request.promise;
+  }
+  get response() {
+    return this._response.promise;
+  }
+  get finishReason() {
+    return this._finishReason.promise;
+  }
+  get partialObjectStream() {
+    return createAsyncIterableStream(
+      this.baseStream.pipeThrough(
+        new TransformStream({
+          transform(chunk, controller) {
+            switch (chunk.type) {
+              case "object":
+                controller.enqueue(chunk.object);
+                break;
+              case "text-delta":
+              case "finish":
+              case "error":
+                break;
+              default: {
+                const _exhaustiveCheck = chunk;
+                throw new Error(`Unsupported chunk type: ${_exhaustiveCheck}`);
+              }
+            }
+          }
+        })
+      )
+    );
+  }
+  get elementStream() {
+    return this.outputStrategy.createElementStream(this.baseStream);
+  }
+  get textStream() {
+    return createAsyncIterableStream(
+      this.baseStream.pipeThrough(
+        new TransformStream({
+          transform(chunk, controller) {
+            switch (chunk.type) {
+              case "text-delta":
+                controller.enqueue(chunk.textDelta);
+                break;
+              case "object":
+              case "finish":
+              case "error":
+                break;
+              default: {
+                const _exhaustiveCheck = chunk;
+                throw new Error(`Unsupported chunk type: ${_exhaustiveCheck}`);
+              }
+            }
+          }
+        })
+      )
+    );
+  }
+  get fullStream() {
+    return createAsyncIterableStream(this.baseStream);
+  }
+  pipeTextStreamToResponse(response, init) {
+    pipeTextStreamToResponse({
+      response,
+      textStream: this.textStream,
+      ...init
+    });
+  }
+  toTextStreamResponse(init) {
+    return createTextStreamResponse({
+      textStream: this.textStream,
+      ...init
+    });
+  }
+};
+var DefaultGeneratedAudioFile = class extends DefaultGeneratedFile {
+  constructor({
+    data,
+    mediaType
+  }) {
+    super({ data, mediaType });
+    let format = "mp3";
+    if (mediaType) {
+      const mediaTypeParts = mediaType.split("/");
+      if (mediaTypeParts.length === 2) {
+        if (mediaType !== "audio/mpeg") {
+          format = mediaTypeParts[1];
+        }
+      }
+    }
+    if (!format) {
+      throw new Error(
+        "Audio format must be provided or determinable from media type"
+      );
+    }
+    this.format = format;
+  }
+};
+async function generateSpeech({
+  model,
+  text: text2,
+  voice,
+  outputFormat,
+  instructions,
+  speed,
+  language,
+  providerOptions = {},
+  maxRetries: maxRetriesArg,
+  abortSignal,
+  headers
+}) {
+  var _a22;
+  const resolvedModel = resolveSpeechModel(model);
+  if (!resolvedModel) {
+    throw new Error("Model could not be resolved");
+  }
+  const headersWithUserAgent = withUserAgentSuffix(
+    headers != null ? headers : {},
+    `ai/${VERSION$3}`
+  );
+  const { retry } = prepareRetries({
+    maxRetries: maxRetriesArg,
+    abortSignal
+  });
+  const result = await retry(
+    () => resolvedModel.doGenerate({
+      text: text2,
+      voice,
+      outputFormat,
+      instructions,
+      speed,
+      language,
+      abortSignal,
+      headers: headersWithUserAgent,
+      providerOptions
+    })
+  );
+  if (!result.audio || result.audio.length === 0) {
+    throw new NoSpeechGeneratedError({ responses: [result.response] });
+  }
+  logWarnings({
+    warnings: result.warnings,
+    provider: resolvedModel.provider,
+    model: resolvedModel.modelId
+  });
+  return new DefaultSpeechResult({
+    audio: new DefaultGeneratedAudioFile({
+      data: result.audio,
+      mediaType: (_a22 = detectMediaType({
+        data: result.audio,
+        signatures: audioMediaTypeSignatures
+      })) != null ? _a22 : "audio/mp3"
+    }),
+    warnings: result.warnings,
+    responses: [result.response],
+    providerMetadata: result.providerMetadata
+  });
+}
+var DefaultSpeechResult = class {
+  constructor(options2) {
+    var _a22;
+    this.audio = options2.audio;
+    this.warnings = options2.warnings;
+    this.responses = options2.responses;
+    this.providerMetadata = (_a22 = options2.providerMetadata) != null ? _a22 : {};
+  }
+};
+function pruneMessages({
+  messages,
+  reasoning = "none",
+  toolCalls = [],
+  emptyMessages = "remove"
+}) {
+  if (reasoning === "all" || reasoning === "before-last-message") {
+    messages = messages.map((message, messageIndex) => {
+      if (message.role !== "assistant" || typeof message.content === "string" || reasoning === "before-last-message" && messageIndex === messages.length - 1) {
+        return message;
+      }
+      return {
+        ...message,
+        content: message.content.filter((part) => part.type !== "reasoning")
+      };
+    });
+  }
+  if (toolCalls === "none") {
+    toolCalls = [];
+  } else if (toolCalls === "all") {
+    toolCalls = [{ type: "all" }];
+  } else if (toolCalls === "before-last-message") {
+    toolCalls = [{ type: "before-last-message" }];
+  } else if (typeof toolCalls === "string") {
+    toolCalls = [{ type: toolCalls }];
+  }
+  for (const toolCall of toolCalls) {
+    const keepLastMessagesCount = toolCall.type === "all" ? void 0 : toolCall.type === "before-last-message" ? 1 : Number(
+      toolCall.type.slice("before-last-".length).slice(0, -"-messages".length)
+    );
+    const keptToolCallIds = /* @__PURE__ */ new Set();
+    const keptApprovalIds = /* @__PURE__ */ new Set();
+    if (keepLastMessagesCount != null) {
+      for (const message of messages.slice(-keepLastMessagesCount)) {
+        if ((message.role === "assistant" || message.role === "tool") && typeof message.content !== "string") {
+          for (const part of message.content) {
+            if (part.type === "tool-call" || part.type === "tool-result") {
+              keptToolCallIds.add(part.toolCallId);
+            } else if (part.type === "tool-approval-request" || part.type === "tool-approval-response") {
+              keptApprovalIds.add(part.approvalId);
+            }
+          }
+        }
+      }
+    }
+    messages = messages.map((message, messageIndex) => {
+      if (message.role !== "assistant" && message.role !== "tool" || typeof message.content === "string" || keepLastMessagesCount && messageIndex >= messages.length - keepLastMessagesCount) {
+        return message;
+      }
+      const toolCallIdToToolName = {};
+      const approvalIdToToolName = {};
+      return {
+        ...message,
+        content: message.content.filter((part) => {
+          if (part.type !== "tool-call" && part.type !== "tool-result" && part.type !== "tool-approval-request" && part.type !== "tool-approval-response") {
+            return true;
+          }
+          if (part.type === "tool-call") {
+            toolCallIdToToolName[part.toolCallId] = part.toolName;
+          } else if (part.type === "tool-approval-request") {
+            approvalIdToToolName[part.approvalId] = toolCallIdToToolName[part.toolCallId];
+          }
+          if ((part.type === "tool-call" || part.type === "tool-result") && keptToolCallIds.has(part.toolCallId) || (part.type === "tool-approval-request" || part.type === "tool-approval-response") && keptApprovalIds.has(part.approvalId)) {
+            return true;
+          }
+          return toolCall.tools != null && !toolCall.tools.includes(
+            part.type === "tool-call" || part.type === "tool-result" ? part.toolName : approvalIdToToolName[part.approvalId]
+          );
+        })
+      };
+    });
+  }
+  if (emptyMessages === "remove") {
+    messages = messages.filter((message) => message.content.length > 0);
+  }
+  return messages;
+}
+var CHUNKING_REGEXPS = {
+  word: /\S+\s+/m,
+  line: /\n+/m
+};
+function smoothStream({
+  delayInMs = 10,
+  chunking = "word",
+  _internal: { delay: delay2 = delay } = {}
+} = {}) {
+  let detectChunk;
+  if (chunking != null && typeof chunking === "object" && "segment" in chunking && typeof chunking.segment === "function") {
+    const segmenter = chunking;
+    detectChunk = (buffer) => {
+      if (buffer.length === 0)
+        return null;
+      const iterator = segmenter.segment(buffer)[Symbol.iterator]();
+      const first = iterator.next().value;
+      return (first == null ? void 0 : first.segment) || null;
+    };
+  } else if (typeof chunking === "function") {
+    detectChunk = (buffer) => {
+      const match = chunking(buffer);
+      if (match == null) {
+        return null;
+      }
+      if (!match.length) {
+        throw new Error(`Chunking function must return a non-empty string.`);
+      }
+      if (!buffer.startsWith(match)) {
+        throw new Error(
+          `Chunking function must return a match that is a prefix of the buffer. Received: "${match}" expected to start with "${buffer}"`
+        );
+      }
+      return match;
+    };
+  } else {
+    const chunkingRegex = typeof chunking === "string" ? CHUNKING_REGEXPS[chunking] : chunking instanceof RegExp ? chunking : void 0;
+    if (chunkingRegex == null) {
+      throw new InvalidArgumentError$1({
+        argument: "chunking",
+        message: `Chunking must be "word", "line", a RegExp, an Intl.Segmenter, or a ChunkDetector function. Received: ${chunking}`
+      });
+    }
+    detectChunk = (buffer) => {
+      const match = chunkingRegex.exec(buffer);
+      if (!match) {
+        return null;
+      }
+      return buffer.slice(0, match.index) + (match == null ? void 0 : match[0]);
+    };
+  }
+  return () => {
+    let buffer = "";
+    let id = "";
+    let type = void 0;
+    let providerMetadata = void 0;
+    function flushBuffer(controller) {
+      if (buffer.length > 0 && type !== void 0) {
+        controller.enqueue({
+          type,
+          text: buffer,
+          id,
+          ...providerMetadata != null ? { providerMetadata } : {}
+        });
+        buffer = "";
+        providerMetadata = void 0;
+      }
+    }
+    return new TransformStream({
+      async transform(chunk, controller) {
+        if (chunk.type !== "text-delta" && chunk.type !== "reasoning-delta") {
+          flushBuffer(controller);
+          controller.enqueue(chunk);
+          return;
+        }
+        if ((chunk.type !== type || chunk.id !== id) && buffer.length > 0) {
+          flushBuffer(controller);
+        }
+        buffer += chunk.text;
+        id = chunk.id;
+        type = chunk.type;
+        if (chunk.providerMetadata != null) {
+          providerMetadata = chunk.providerMetadata;
+        }
+        let match;
+        while ((match = detectChunk(buffer)) != null) {
+          controller.enqueue({ type, text: match, id });
+          buffer = buffer.slice(match.length);
+          await delay2(delayInMs);
+        }
+      }
+    });
+  };
+}
+var defaultDownload = createDownload();
+async function experimental_generateVideo({
+  model: modelArg,
+  prompt: promptArg,
+  n = 1,
+  maxVideosPerCall,
+  aspectRatio,
+  resolution,
+  duration: duration2,
+  fps,
+  seed,
+  providerOptions,
+  maxRetries: maxRetriesArg,
+  abortSignal,
+  headers,
+  download: downloadFn = defaultDownload
+}) {
+  var _a22;
+  const model = resolveVideoModel(modelArg);
+  const headersWithUserAgent = withUserAgentSuffix(
+    headers != null ? headers : {},
+    `ai/${VERSION$3}`
+  );
+  const { retry } = prepareRetries({
+    maxRetries: maxRetriesArg,
+    abortSignal
+  });
+  const { prompt, image } = normalizePrompt2(promptArg);
+  const maxVideosPerCallWithDefault = (_a22 = maxVideosPerCall != null ? maxVideosPerCall : await invokeModelMaxVideosPerCall(model)) != null ? _a22 : 1;
+  const callCount = Math.ceil(n / maxVideosPerCallWithDefault);
+  const callVideoCounts = Array.from({ length: callCount }, (_, index2) => {
+    const remaining = n - index2 * maxVideosPerCallWithDefault;
+    return Math.min(remaining, maxVideosPerCallWithDefault);
+  });
+  const results = await Promise.all(
+    callVideoCounts.map(
+      async (callVideoCount) => retry(
+        () => model.doGenerate({
+          prompt,
+          n: callVideoCount,
+          aspectRatio,
+          resolution,
+          duration: duration2,
+          fps,
+          seed,
+          image,
+          providerOptions: providerOptions != null ? providerOptions : {},
+          headers: headersWithUserAgent,
+          abortSignal
+        })
+      )
+    )
+  );
+  const videos = [];
+  const warnings = [];
+  const responses = [];
+  const providerMetadata = {};
+  for (const result of results) {
+    for (const videoData of result.videos) {
+      switch (videoData.type) {
+        case "url": {
+          const { data, mediaType: downloadedMediaType } = await downloadFn({
+            url: new URL(videoData.url),
+            abortSignal
+          });
+          const isUsableMediaType = (type) => !!type && type !== "application/octet-stream";
+          const mediaType = isUsableMediaType(videoData.mediaType) && videoData.mediaType || isUsableMediaType(downloadedMediaType) && downloadedMediaType || detectMediaType({
+            data,
+            signatures: videoMediaTypeSignatures
+          }) || "video/mp4";
+          videos.push(
+            new DefaultGeneratedFile({
+              data,
+              mediaType
+            })
+          );
+          break;
+        }
+        case "base64": {
+          videos.push(
+            new DefaultGeneratedFile({
+              data: videoData.data,
+              mediaType: videoData.mediaType || "video/mp4"
+            })
+          );
+          break;
+        }
+        case "binary": {
+          const mediaType = videoData.mediaType || detectMediaType({
+            data: videoData.data,
+            signatures: videoMediaTypeSignatures
+          }) || "video/mp4";
+          videos.push(
+            new DefaultGeneratedFile({
+              data: videoData.data,
+              mediaType
+            })
+          );
+          break;
+        }
+      }
+    }
+    warnings.push(...result.warnings);
+    responses.push({
+      timestamp: result.response.timestamp,
+      modelId: result.response.modelId,
+      headers: result.response.headers,
+      providerMetadata: result.providerMetadata
+    });
+    if (result.providerMetadata != null) {
+      for (const [providerName, metadata] of Object.entries(
+        result.providerMetadata
+      )) {
+        const existingMetadata = providerMetadata[providerName];
+        if (existingMetadata != null && typeof existingMetadata === "object") {
+          providerMetadata[providerName] = {
+            ...existingMetadata,
+            ...metadata
+          };
+          if ("videos" in existingMetadata && Array.isArray(existingMetadata.videos) && "videos" in metadata && Array.isArray(metadata.videos)) {
+            providerMetadata[providerName].videos = [
+              ...existingMetadata.videos,
+              ...metadata.videos
+            ];
+          }
+        } else {
+          providerMetadata[providerName] = metadata;
+        }
+      }
+    }
+  }
+  if (videos.length === 0) {
+    throw new NoVideoGeneratedError({ responses });
+  }
+  if (warnings.length > 0) {
+    logWarnings({
+      warnings,
+      provider: model.provider,
+      model: model.modelId
+    });
+  }
+  return {
+    video: videos[0],
+    videos,
+    warnings,
+    responses,
+    providerMetadata
+  };
+}
+function normalizePrompt2(promptArg) {
+  var _a22, _b15;
+  if (typeof promptArg === "string") {
+    return {
+      prompt: promptArg,
+      image: void 0
+    };
+  }
+  let image;
+  if (promptArg.image != null) {
+    const dataContent = promptArg.image;
+    if (typeof dataContent === "string") {
+      if (dataContent.startsWith("http://") || dataContent.startsWith("https://")) {
+        image = {
+          type: "url",
+          url: dataContent
+        };
+      } else if (dataContent.startsWith("data:")) {
+        const { mediaType, base64Content } = splitDataUrl(dataContent);
+        image = {
+          type: "file",
+          mediaType: mediaType != null ? mediaType : "image/png",
+          data: convertBase64ToUint8Array(base64Content != null ? base64Content : "")
+        };
+      } else {
+        const bytes = convertBase64ToUint8Array(dataContent);
+        const mediaType = (_a22 = detectMediaType({
+          data: bytes,
+          signatures: imageMediaTypeSignatures
+        })) != null ? _a22 : "image/png";
+        image = {
+          type: "file",
+          mediaType,
+          data: bytes
+        };
+      }
+    } else if (dataContent instanceof Uint8Array) {
+      const mediaType = (_b15 = detectMediaType({
+        data: dataContent,
+        signatures: imageMediaTypeSignatures
+      })) != null ? _b15 : "image/png";
+      image = {
+        type: "file",
+        mediaType,
+        data: dataContent
+      };
+    }
+  }
+  return {
+    prompt: promptArg.text,
+    image
+  };
+}
+async function invokeModelMaxVideosPerCall(model) {
+  if (typeof model.maxVideosPerCall === "function") {
+    return await model.maxVideosPerCall({ modelId: model.modelId });
+  }
+  return model.maxVideosPerCall;
+}
+function defaultEmbeddingSettingsMiddleware({
+  settings
+}) {
+  return {
+    specificationVersion: "v3",
+    transformParams: async ({ params }) => {
+      return mergeObjects(settings, params);
+    }
+  };
+}
+function defaultSettingsMiddleware({
+  settings
+}) {
+  return {
+    specificationVersion: "v3",
+    transformParams: async ({ params }) => {
+      return mergeObjects(settings, params);
+    }
+  };
+}
+function defaultTransform(text2) {
+  return text2.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "").trim();
+}
+function extractJsonMiddleware(options2) {
+  var _a22;
+  const transform2 = (_a22 = options2 == null ? void 0 : options2.transform) != null ? _a22 : defaultTransform;
+  const hasCustomTransform = (options2 == null ? void 0 : options2.transform) !== void 0;
+  return {
+    specificationVersion: "v3",
+    wrapGenerate: async ({ doGenerate }) => {
+      const { content, ...rest } = await doGenerate();
+      const transformedContent = [];
+      for (const part of content) {
+        if (part.type !== "text") {
+          transformedContent.push(part);
+          continue;
+        }
+        transformedContent.push({
+          ...part,
+          text: transform2(part.text)
+        });
+      }
+      return { content: transformedContent, ...rest };
+    },
+    wrapStream: async ({ doStream }) => {
+      const { stream, ...rest } = await doStream();
+      const textBlocks = createIdMap();
+      const SUFFIX_BUFFER_SIZE = 12;
+      return {
+        stream: stream.pipeThrough(
+          new TransformStream({
+            transform: (chunk, controller) => {
+              if (chunk.type === "text-start") {
+                textBlocks[chunk.id] = {
+                  startEvent: chunk,
+                  // Custom transforms need to buffer all content
+                  phase: hasCustomTransform ? "buffering" : "prefix",
+                  buffer: "",
+                  prefixStripped: false
+                };
+                return;
+              }
+              if (chunk.type === "text-delta") {
+                const block = textBlocks[chunk.id];
+                if (!block) {
+                  controller.enqueue(chunk);
+                  return;
+                }
+                block.buffer += chunk.delta;
+                if (block.phase === "buffering") {
+                  return;
+                }
+                if (block.phase === "prefix") {
+                  if (block.buffer.length > 0 && !block.buffer.startsWith("`")) {
+                    block.phase = "streaming";
+                    controller.enqueue(block.startEvent);
+                  } else if (block.buffer.startsWith("```")) {
+                    if (block.buffer.includes("\n")) {
+                      const prefixMatch = block.buffer.match(/^```(?:json)?\s*\n/);
+                      if (prefixMatch) {
+                        block.buffer = block.buffer.slice(
+                          prefixMatch[0].length
+                        );
+                        block.prefixStripped = true;
+                        block.phase = "streaming";
+                        controller.enqueue(block.startEvent);
+                      } else {
+                        block.phase = "streaming";
+                        controller.enqueue(block.startEvent);
+                      }
+                    }
+                  } else if (block.buffer.length >= 3 && !block.buffer.startsWith("```")) {
+                    block.phase = "streaming";
+                    controller.enqueue(block.startEvent);
+                  }
+                }
+                if (block.phase === "streaming" && block.buffer.length > SUFFIX_BUFFER_SIZE) {
+                  const toStream = block.buffer.slice(0, -SUFFIX_BUFFER_SIZE);
+                  block.buffer = block.buffer.slice(-SUFFIX_BUFFER_SIZE);
+                  controller.enqueue({
+                    type: "text-delta",
+                    id: chunk.id,
+                    delta: toStream
+                  });
+                }
+                return;
+              }
+              if (chunk.type === "text-end") {
+                const block = textBlocks[chunk.id];
+                if (block) {
+                  if (block.phase === "prefix" || block.phase === "buffering") {
+                    controller.enqueue(block.startEvent);
+                  }
+                  let remaining = block.buffer;
+                  if (block.phase === "buffering") {
+                    remaining = transform2(remaining);
+                  } else if (block.prefixStripped) {
+                    remaining = remaining.replace(/\n?```\s*$/, "").trimEnd();
+                  } else {
+                    remaining = transform2(remaining);
+                  }
+                  if (remaining.length > 0) {
+                    controller.enqueue({
+                      type: "text-delta",
+                      id: chunk.id,
+                      delta: remaining
+                    });
+                  }
+                  controller.enqueue(chunk);
+                  delete textBlocks[chunk.id];
+                  return;
+                }
+              }
+              controller.enqueue(chunk);
+            }
+          })
+        ),
+        ...rest
+      };
+    }
+  };
+}
+function getPotentialStartIndex(text2, searchedText) {
+  if (searchedText.length === 0) {
+    return null;
+  }
+  const directIndex = text2.indexOf(searchedText);
+  if (directIndex !== -1) {
+    return directIndex;
+  }
+  for (let i = text2.length - 1; i >= 0; i--) {
+    const suffix = text2.substring(i);
+    if (searchedText.startsWith(suffix)) {
+      return i;
+    }
+  }
+  return null;
+}
+function extractReasoningMiddleware({
+  tagName,
+  separator = "\n",
+  startWithReasoning = false
+}) {
+  const openingTag = `<${tagName}>`;
+  const closingTag = `</${tagName}>`;
+  return {
+    specificationVersion: "v3",
+    wrapGenerate: async ({ doGenerate }) => {
+      const { content, ...rest } = await doGenerate();
+      const transformedContent = [];
+      for (const part of content) {
+        if (part.type !== "text") {
+          transformedContent.push(part);
+          continue;
+        }
+        const text2 = startWithReasoning ? openingTag + part.text : part.text;
+        const regexp = new RegExp(`${openingTag}(.*?)${closingTag}`, "gs");
+        const matches = Array.from(text2.matchAll(regexp));
+        if (!matches.length) {
+          transformedContent.push(part);
+          continue;
+        }
+        const reasoningText = matches.map((match) => match[1]).join(separator);
+        let textWithoutReasoning = text2;
+        for (let i = matches.length - 1; i >= 0; i--) {
+          const match = matches[i];
+          const beforeMatch = textWithoutReasoning.slice(0, match.index);
+          const afterMatch = textWithoutReasoning.slice(
+            match.index + match[0].length
+          );
+          textWithoutReasoning = beforeMatch + (beforeMatch.length > 0 && afterMatch.length > 0 ? separator : "") + afterMatch;
+        }
+        transformedContent.push({
+          type: "reasoning",
+          text: reasoningText
+        });
+        transformedContent.push({
+          type: "text",
+          text: textWithoutReasoning
+        });
+      }
+      return { content: transformedContent, ...rest };
+    },
+    wrapStream: async ({ doStream }) => {
+      const { stream, ...rest } = await doStream();
+      const reasoningExtractions = createIdMap();
+      let delayedTextStart;
+      return {
+        stream: stream.pipeThrough(
+          new TransformStream({
+            transform: (chunk, controller) => {
+              if (chunk.type === "text-start") {
+                delayedTextStart = chunk;
+                return;
+              }
+              if (chunk.type === "text-end" && delayedTextStart) {
+                controller.enqueue(delayedTextStart);
+                delayedTextStart = void 0;
+              }
+              if (chunk.type !== "text-delta") {
+                controller.enqueue(chunk);
+                return;
+              }
+              if (reasoningExtractions[chunk.id] == null) {
+                reasoningExtractions[chunk.id] = {
+                  isFirstReasoning: true,
+                  isFirstText: true,
+                  afterSwitch: false,
+                  isReasoning: startWithReasoning,
+                  buffer: "",
+                  idCounter: 0,
+                  textId: chunk.id
+                };
+              }
+              const activeExtraction = reasoningExtractions[chunk.id];
+              activeExtraction.buffer += chunk.delta;
+              function publish(text2) {
+                if (text2.length > 0) {
+                  const prefix = activeExtraction.afterSwitch && (activeExtraction.isReasoning ? !activeExtraction.isFirstReasoning : !activeExtraction.isFirstText) ? separator : "";
+                  if (activeExtraction.isReasoning && (activeExtraction.afterSwitch || activeExtraction.isFirstReasoning)) {
+                    controller.enqueue({
+                      type: "reasoning-start",
+                      id: `reasoning-${activeExtraction.idCounter}`
+                    });
+                  }
+                  if (activeExtraction.isReasoning) {
+                    controller.enqueue({
+                      type: "reasoning-delta",
+                      delta: prefix + text2,
+                      id: `reasoning-${activeExtraction.idCounter}`
+                    });
+                  } else {
+                    if (delayedTextStart) {
+                      controller.enqueue(delayedTextStart);
+                      delayedTextStart = void 0;
+                    }
+                    controller.enqueue({
+                      type: "text-delta",
+                      delta: prefix + text2,
+                      id: activeExtraction.textId
+                    });
+                  }
+                  activeExtraction.afterSwitch = false;
+                  if (activeExtraction.isReasoning) {
+                    activeExtraction.isFirstReasoning = false;
+                  } else {
+                    activeExtraction.isFirstText = false;
+                  }
+                }
+              }
+              do {
+                const nextTag = activeExtraction.isReasoning ? closingTag : openingTag;
+                const startIndex = getPotentialStartIndex(
+                  activeExtraction.buffer,
+                  nextTag
+                );
+                if (startIndex == null) {
+                  publish(activeExtraction.buffer);
+                  activeExtraction.buffer = "";
+                  break;
+                }
+                publish(activeExtraction.buffer.slice(0, startIndex));
+                const foundFullMatch = startIndex + nextTag.length <= activeExtraction.buffer.length;
+                if (foundFullMatch) {
+                  activeExtraction.buffer = activeExtraction.buffer.slice(
+                    startIndex + nextTag.length
+                  );
+                  if (activeExtraction.isReasoning) {
+                    if (activeExtraction.isFirstReasoning) {
+                      controller.enqueue({
+                        type: "reasoning-start",
+                        id: `reasoning-${activeExtraction.idCounter}`
+                      });
+                    }
+                    controller.enqueue({
+                      type: "reasoning-end",
+                      id: `reasoning-${activeExtraction.idCounter++}`
+                    });
+                  }
+                  activeExtraction.isReasoning = !activeExtraction.isReasoning;
+                  activeExtraction.afterSwitch = true;
+                } else {
+                  activeExtraction.buffer = activeExtraction.buffer.slice(startIndex);
+                  break;
+                }
+              } while (true);
+            }
+          })
+        ),
+        ...rest
+      };
+    }
+  };
+}
+function simulateStreamingMiddleware() {
+  return {
+    specificationVersion: "v3",
+    wrapStream: async ({ doGenerate }) => {
+      const result = await doGenerate();
+      let id = 0;
+      const simulatedStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue({
+            type: "stream-start",
+            warnings: result.warnings
+          });
+          controller.enqueue({ type: "response-metadata", ...result.response });
+          for (const part of result.content) {
+            switch (part.type) {
+              case "text": {
+                if (part.text.length > 0) {
+                  controller.enqueue({ type: "text-start", id: String(id) });
+                  controller.enqueue({
+                    type: "text-delta",
+                    id: String(id),
+                    delta: part.text
+                  });
+                  controller.enqueue({ type: "text-end", id: String(id) });
+                  id++;
+                }
+                break;
+              }
+              case "reasoning": {
+                controller.enqueue({
+                  type: "reasoning-start",
+                  id: String(id),
+                  providerMetadata: part.providerMetadata
+                });
+                controller.enqueue({
+                  type: "reasoning-delta",
+                  id: String(id),
+                  delta: part.text
+                });
+                controller.enqueue({ type: "reasoning-end", id: String(id) });
+                id++;
+                break;
+              }
+              default: {
+                controller.enqueue(part);
+                break;
+              }
+            }
+          }
+          controller.enqueue({
+            type: "finish",
+            finishReason: result.finishReason,
+            usage: result.usage,
+            providerMetadata: result.providerMetadata
+          });
+          controller.close();
+        }
+      });
+      return {
+        stream: simulatedStream,
+        request: result.request,
+        response: result.response
+      };
+    }
+  };
+}
+function defaultFormatExample(example) {
+  return JSON.stringify(example.input);
+}
+function addToolInputExamplesMiddleware({
+  prefix = "Input Examples:",
+  format = defaultFormatExample,
+  remove = true
+} = {}) {
+  return {
+    specificationVersion: "v3",
+    transformParams: async ({ params }) => {
+      var _a22;
+      if (!((_a22 = params.tools) == null ? void 0 : _a22.length)) {
+        return params;
+      }
+      const transformedTools = params.tools.map((tool2) => {
+        var _a23;
+        if (tool2.type !== "function" || !((_a23 = tool2.inputExamples) == null ? void 0 : _a23.length)) {
+          return tool2;
+        }
+        const formattedExamples = tool2.inputExamples.map((example, index2) => format(example, index2)).join("\n");
+        const examplesSection = `${prefix}
+${formattedExamples}`;
+        const toolDescription = tool2.description ? `${tool2.description}
+
+${examplesSection}` : examplesSection;
+        return {
+          ...tool2,
+          description: toolDescription,
+          inputExamples: remove ? void 0 : tool2.inputExamples
+        };
+      });
+      return {
+        ...params,
+        tools: transformedTools
+      };
+    }
+  };
+}
 var wrapLanguageModel = ({
   model,
   middleware: middlewareArg,
@@ -17750,6 +22897,52 @@ var doWrap = ({
     }
   };
 };
+var wrapEmbeddingModel = ({
+  model,
+  middleware: middlewareArg,
+  modelId,
+  providerId
+}) => {
+  return [...asArray(middlewareArg)].reverse().reduce((wrappedModel, middleware) => {
+    return doWrap2({ model: wrappedModel, middleware, modelId, providerId });
+  }, model);
+};
+var doWrap2 = ({
+  model,
+  middleware: {
+    transformParams,
+    wrapEmbed,
+    overrideProvider,
+    overrideModelId,
+    overrideMaxEmbeddingsPerCall,
+    overrideSupportsParallelCalls
+  },
+  modelId,
+  providerId
+}) => {
+  var _a22, _b15, _c, _d;
+  async function doTransform({
+    params
+  }) {
+    return transformParams ? await transformParams({ params, model }) : params;
+  }
+  return {
+    specificationVersion: "v3",
+    provider: (_a22 = providerId != null ? providerId : overrideProvider == null ? void 0 : overrideProvider({ model })) != null ? _a22 : model.provider,
+    modelId: (_b15 = modelId != null ? modelId : overrideModelId == null ? void 0 : overrideModelId({ model })) != null ? _b15 : model.modelId,
+    maxEmbeddingsPerCall: (_c = overrideMaxEmbeddingsPerCall == null ? void 0 : overrideMaxEmbeddingsPerCall({ model })) != null ? _c : model.maxEmbeddingsPerCall,
+    supportsParallelCalls: (_d = overrideSupportsParallelCalls == null ? void 0 : overrideSupportsParallelCalls({ model })) != null ? _d : model.supportsParallelCalls,
+    async doEmbed(params) {
+      const transformedParams = await doTransform({ params });
+      const doEmbed = async () => model.doEmbed(transformedParams);
+      return wrapEmbed ? wrapEmbed({
+        doEmbed,
+        params: transformedParams,
+        model
+      }) : doEmbed();
+    }
+  };
+};
 var wrapImageModel = ({
   model,
   middleware: middlewareArg,
@@ -17794,6 +22987,127 @@ var doWrap3 = ({
     }
   };
 };
+function asProviderV3(provider) {
+  if ("specificationVersion" in provider && provider.specificationVersion === "v3") {
+    return provider;
+  }
+  const v2Provider = provider;
+  return {
+    specificationVersion: "v3",
+    languageModel: (modelId) => asLanguageModelV3(v2Provider.languageModel(modelId)),
+    embeddingModel: (modelId) => asEmbeddingModelV3(v2Provider.textEmbeddingModel(modelId)),
+    imageModel: (modelId) => asImageModelV3(v2Provider.imageModel(modelId)),
+    transcriptionModel: v2Provider.transcriptionModel ? (modelId) => asTranscriptionModelV3(v2Provider.transcriptionModel(modelId)) : void 0,
+    speechModel: v2Provider.speechModel ? (modelId) => asSpeechModelV3(v2Provider.speechModel(modelId)) : void 0,
+    rerankingModel: void 0
+    // v2 providers don't have reranking models
+  };
+}
+function wrapProvider({
+  provider,
+  languageModelMiddleware,
+  imageModelMiddleware
+}) {
+  const providerV3 = asProviderV3(provider);
+  return {
+    specificationVersion: "v3",
+    languageModel: (modelId) => wrapLanguageModel({
+      model: providerV3.languageModel(modelId),
+      middleware: languageModelMiddleware
+    }),
+    embeddingModel: providerV3.embeddingModel,
+    imageModel: (modelId) => {
+      let model = providerV3.imageModel(modelId);
+      if (imageModelMiddleware != null) {
+        model = wrapImageModel({ model, middleware: imageModelMiddleware });
+      }
+      return model;
+    },
+    transcriptionModel: providerV3.transcriptionModel,
+    speechModel: providerV3.speechModel,
+    rerankingModel: providerV3.rerankingModel
+  };
+}
+function customProvider({
+  languageModels,
+  embeddingModels,
+  imageModels,
+  transcriptionModels,
+  speechModels,
+  rerankingModels,
+  videoModels,
+  fallbackProvider: fallbackProviderArg
+}) {
+  const fallbackProvider = fallbackProviderArg ? asProviderV3(fallbackProviderArg) : void 0;
+  return {
+    specificationVersion: "v3",
+    languageModel(modelId) {
+      if (languageModels != null && modelId in languageModels) {
+        return languageModels[modelId];
+      }
+      if (fallbackProvider) {
+        return fallbackProvider.languageModel(modelId);
+      }
+      throw new NoSuchModelError({ modelId, modelType: "languageModel" });
+    },
+    embeddingModel(modelId) {
+      if (embeddingModels != null && modelId in embeddingModels) {
+        return embeddingModels[modelId];
+      }
+      if (fallbackProvider) {
+        return fallbackProvider.embeddingModel(modelId);
+      }
+      throw new NoSuchModelError({ modelId, modelType: "embeddingModel" });
+    },
+    imageModel(modelId) {
+      if (imageModels != null && modelId in imageModels) {
+        return imageModels[modelId];
+      }
+      if (fallbackProvider == null ? void 0 : fallbackProvider.imageModel) {
+        return fallbackProvider.imageModel(modelId);
+      }
+      throw new NoSuchModelError({ modelId, modelType: "imageModel" });
+    },
+    transcriptionModel(modelId) {
+      if (transcriptionModels != null && modelId in transcriptionModels) {
+        return transcriptionModels[modelId];
+      }
+      if (fallbackProvider == null ? void 0 : fallbackProvider.transcriptionModel) {
+        return fallbackProvider.transcriptionModel(modelId);
+      }
+      throw new NoSuchModelError({ modelId, modelType: "transcriptionModel" });
+    },
+    speechModel(modelId) {
+      if (speechModels != null && modelId in speechModels) {
+        return speechModels[modelId];
+      }
+      if (fallbackProvider == null ? void 0 : fallbackProvider.speechModel) {
+        return fallbackProvider.speechModel(modelId);
+      }
+      throw new NoSuchModelError({ modelId, modelType: "speechModel" });
+    },
+    rerankingModel(modelId) {
+      if (rerankingModels != null && modelId in rerankingModels) {
+        return rerankingModels[modelId];
+      }
+      if (fallbackProvider == null ? void 0 : fallbackProvider.rerankingModel) {
+        return fallbackProvider.rerankingModel(modelId);
+      }
+      throw new NoSuchModelError({ modelId, modelType: "rerankingModel" });
+    },
+    videoModel(modelId) {
+      if (videoModels != null && modelId in videoModels) {
+        return videoModels[modelId];
+      }
+      const videoModel = fallbackProvider == null ? void 0 : fallbackProvider.videoModel;
+      if (videoModel) {
+        return videoModel(modelId);
+      }
+      throw new NoSuchModelError({ modelId, modelType: "videoModel" });
+    }
+  };
+}
+var experimental_customProvider = customProvider;
 var name21 = "AI_NoSuchProviderError";
 var marker21 = `vercel.ai.error.${name21}`;
 var symbol21 = Symbol.for(marker21);
@@ -17831,6 +23145,7 @@ function createProviderRegistry(providers, {
   }
   return registry2;
 }
+var experimental_createProviderRegistry = createProviderRegistry;
 var DefaultProviderRegistry = class {
   constructor({
     separator,
@@ -17952,6 +23267,1102 @@ var DefaultProviderRegistry = class {
     return model;
   }
 };
+async function rerank({
+  model: modelArg,
+  documents,
+  query,
+  topN,
+  maxRetries: maxRetriesArg,
+  abortSignal,
+  headers,
+  providerOptions,
+  experimental_telemetry: telemetry
+}) {
+  const model = resolveRerankingModel(modelArg);
+  if (documents.length === 0) {
+    return new DefaultRerankResult({
+      originalDocuments: [],
+      ranking: [],
+      providerMetadata: void 0,
+      response: {
+        timestamp: /* @__PURE__ */ new Date(),
+        modelId: model.modelId
+      }
+    });
+  }
+  const { maxRetries, retry } = prepareRetries({
+    maxRetries: maxRetriesArg,
+    abortSignal
+  });
+  const documentsToSend = typeof documents[0] === "string" ? { type: "text", values: documents } : { type: "object", values: documents };
+  const baseTelemetryAttributes = getBaseTelemetryAttributes({
+    model,
+    telemetry,
+    headers,
+    settings: { maxRetries }
+  });
+  const tracer = getTracer(telemetry);
+  return recordSpan({
+    name: "ai.rerank",
+    attributes: selectTelemetryAttributes({
+      telemetry,
+      attributes: {
+        ...assembleOperationName({ operationId: "ai.rerank", telemetry }),
+        ...baseTelemetryAttributes,
+        "ai.documents": {
+          input: () => documents.map((document) => JSON.stringify(document))
+        }
+      }
+    }),
+    tracer,
+    fn: async () => {
+      var _a22, _b15;
+      const { ranking, response, providerMetadata, warnings } = await retry(
+        () => recordSpan({
+          name: "ai.rerank.doRerank",
+          attributes: selectTelemetryAttributes({
+            telemetry,
+            attributes: {
+              ...assembleOperationName({
+                operationId: "ai.rerank.doRerank",
+                telemetry
+              }),
+              ...baseTelemetryAttributes,
+              // specific settings that only make sense on the outer level:
+              "ai.documents": {
+                input: () => documents.map((document) => JSON.stringify(document))
+              }
+            }
+          }),
+          tracer,
+          fn: async (doRerankSpan) => {
+            const modelResponse = await model.doRerank({
+              documents: documentsToSend,
+              query,
+              topN,
+              providerOptions,
+              abortSignal,
+              headers
+            });
+            const ranking2 = modelResponse.ranking;
+            doRerankSpan.setAttributes(
+              await selectTelemetryAttributes({
+                telemetry,
+                attributes: {
+                  "ai.ranking.type": documentsToSend.type,
+                  "ai.ranking": {
+                    output: () => ranking2.map((ranking3) => JSON.stringify(ranking3))
+                  }
+                }
+              })
+            );
+            return {
+              ranking: ranking2,
+              providerMetadata: modelResponse.providerMetadata,
+              response: modelResponse.response,
+              warnings: modelResponse.warnings
+            };
+          }
+        })
+      );
+      logWarnings({
+        warnings: warnings != null ? warnings : [],
+        provider: model.provider,
+        model: model.modelId
+      });
+      return new DefaultRerankResult({
+        originalDocuments: documents,
+        ranking: ranking.map((ranking2) => ({
+          originalIndex: ranking2.index,
+          score: ranking2.relevanceScore,
+          document: documents[ranking2.index]
+        })),
+        providerMetadata,
+        response: {
+          id: response == null ? void 0 : response.id,
+          timestamp: (_a22 = response == null ? void 0 : response.timestamp) != null ? _a22 : /* @__PURE__ */ new Date(),
+          modelId: (_b15 = response == null ? void 0 : response.modelId) != null ? _b15 : model.modelId,
+          headers: response == null ? void 0 : response.headers,
+          body: response == null ? void 0 : response.body
+        }
+      });
+    }
+  });
+}
+var DefaultRerankResult = class {
+  constructor(options2) {
+    this.originalDocuments = options2.originalDocuments;
+    this.ranking = options2.ranking;
+    this.response = options2.response;
+    this.providerMetadata = options2.providerMetadata;
+  }
+  get rerankedDocuments() {
+    return this.ranking.map((ranking) => ranking.document);
+  }
+};
+var defaultDownload2 = createDownload();
+async function transcribe({
+  model,
+  audio,
+  providerOptions = {},
+  maxRetries: maxRetriesArg,
+  abortSignal,
+  headers,
+  download: downloadFn = defaultDownload2
+}) {
+  const resolvedModel = resolveTranscriptionModel(model);
+  if (!resolvedModel) {
+    throw new Error("Model could not be resolved");
+  }
+  const { retry } = prepareRetries({
+    maxRetries: maxRetriesArg,
+    abortSignal
+  });
+  const headersWithUserAgent = withUserAgentSuffix(
+    headers != null ? headers : {},
+    `ai/${VERSION$3}`
+  );
+  const audioData = audio instanceof URL ? (await downloadFn({ url: audio, abortSignal })).data : convertDataContentToUint8Array(audio);
+  const result = await retry(
+    () => {
+      var _a22;
+      return resolvedModel.doGenerate({
+        audio: audioData,
+        abortSignal,
+        headers: headersWithUserAgent,
+        providerOptions,
+        mediaType: (_a22 = detectMediaType({
+          data: audioData,
+          signatures: audioMediaTypeSignatures
+        })) != null ? _a22 : "audio/wav"
+      });
+    }
+  );
+  logWarnings({
+    warnings: result.warnings,
+    provider: resolvedModel.provider,
+    model: resolvedModel.modelId
+  });
+  if (!result.text) {
+    throw new NoTranscriptGeneratedError({ responses: [result.response] });
+  }
+  return new DefaultTranscriptionResult({
+    text: result.text,
+    segments: result.segments,
+    language: result.language,
+    durationInSeconds: result.durationInSeconds,
+    warnings: result.warnings,
+    responses: [result.response],
+    providerMetadata: result.providerMetadata
+  });
+}
+var DefaultTranscriptionResult = class {
+  constructor(options2) {
+    var _a22;
+    this.text = options2.text;
+    this.segments = options2.segments;
+    this.language = options2.language;
+    this.durationInSeconds = options2.durationInSeconds;
+    this.warnings = options2.warnings;
+    this.responses = options2.responses;
+    this.providerMetadata = (_a22 = options2.providerMetadata) != null ? _a22 : {};
+  }
+};
+async function processTextStream({
+  stream,
+  onTextPart
+}) {
+  const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    await onTextPart(value);
+  }
+}
+var getOriginalFetch$1 = () => fetch;
+async function callCompletionApi({
+  api,
+  prompt,
+  credentials,
+  headers,
+  body,
+  streamProtocol = "data",
+  setCompletion,
+  setLoading,
+  setError,
+  setAbortController,
+  onFinish,
+  onError,
+  fetch: fetch2 = getOriginalFetch$1()
+}) {
+  var _a22;
+  try {
+    setLoading(true);
+    setError(void 0);
+    const abortController = new AbortController();
+    setAbortController(abortController);
+    setCompletion("");
+    const response = await fetch2(api, {
+      method: "POST",
+      body: JSON.stringify({
+        prompt,
+        ...body
+      }),
+      credentials,
+      headers: withUserAgentSuffix(
+        {
+          "Content-Type": "application/json",
+          ...headers
+        },
+        `ai-sdk/${VERSION$3}`,
+        getRuntimeEnvironmentUserAgent()
+      ),
+      signal: abortController.signal
+    }).catch((err) => {
+      throw err;
+    });
+    if (!response.ok) {
+      throw new Error(
+        (_a22 = await response.text()) != null ? _a22 : "Failed to fetch the chat response."
+      );
+    }
+    if (!response.body) {
+      throw new Error("The response body is empty.");
+    }
+    let result = "";
+    switch (streamProtocol) {
+      case "text": {
+        await processTextStream({
+          stream: response.body,
+          onTextPart: (chunk) => {
+            result += chunk;
+            setCompletion(result);
+          }
+        });
+        break;
+      }
+      case "data": {
+        await consumeStream({
+          stream: parseJsonEventStream({
+            stream: response.body,
+            schema: uiMessageChunkSchema
+          }).pipeThrough(
+            new TransformStream({
+              async transform(part) {
+                if (!part.success) {
+                  throw part.error;
+                }
+                const streamPart = part.value;
+                if (streamPart.type === "text-delta") {
+                  result += streamPart.delta;
+                  setCompletion(result);
+                } else if (streamPart.type === "error") {
+                  throw new Error(streamPart.errorText);
+                }
+              }
+            })
+          ),
+          onError: (error) => {
+            throw error;
+          }
+        });
+        break;
+      }
+      default: {
+        const exhaustiveCheck = streamProtocol;
+        throw new Error(`Unknown stream protocol: ${exhaustiveCheck}`);
+      }
+    }
+    if (onFinish) {
+      onFinish(prompt, result);
+    }
+    setAbortController(null);
+    return result;
+  } catch (err) {
+    if (err.name === "AbortError") {
+      setAbortController(null);
+      return null;
+    }
+    if (err instanceof Error) {
+      if (onError) {
+        onError(err);
+      }
+    }
+    setError(err);
+  } finally {
+    setLoading(false);
+  }
+}
+async function convertFileListToFileUIParts(files) {
+  if (files == null) {
+    return [];
+  }
+  if (!globalThis.FileList || !(files instanceof globalThis.FileList)) {
+    throw new Error("FileList is not supported in the current environment");
+  }
+  return Promise.all(
+    Array.from(files).map(async (file) => {
+      const { name: name22, type } = file;
+      const dataUrl = await new Promise((resolve3, reject) => {
+        const reader = new FileReader();
+        reader.onload = (readerEvent) => {
+          var _a22;
+          resolve3((_a22 = readerEvent.target) == null ? void 0 : _a22.result);
+        };
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(file);
+      });
+      return {
+        type: "file",
+        mediaType: type,
+        filename: name22,
+        url: dataUrl
+      };
+    })
+  );
+}
+var HttpChatTransport = class {
+  constructor({
+    api = "/api/chat",
+    credentials,
+    headers,
+    body,
+    fetch: fetch2,
+    prepareSendMessagesRequest,
+    prepareReconnectToStreamRequest
+  }) {
+    this.api = api;
+    this.credentials = credentials;
+    this.headers = headers;
+    this.body = body;
+    this.fetch = fetch2;
+    this.prepareSendMessagesRequest = prepareSendMessagesRequest;
+    this.prepareReconnectToStreamRequest = prepareReconnectToStreamRequest;
+  }
+  async sendMessages({
+    abortSignal,
+    ...options2
+  }) {
+    var _a22, _b15, _c, _d, _e;
+    const resolvedBody = await resolve(this.body);
+    const resolvedHeaders = await resolve(this.headers);
+    const resolvedCredentials = await resolve(this.credentials);
+    const baseHeaders = {
+      ...normalizeHeaders(resolvedHeaders),
+      ...normalizeHeaders(options2.headers)
+    };
+    const preparedRequest = await ((_a22 = this.prepareSendMessagesRequest) == null ? void 0 : _a22.call(this, {
+      api: this.api,
+      id: options2.chatId,
+      messages: options2.messages,
+      body: { ...resolvedBody, ...options2.body },
+      headers: baseHeaders,
+      credentials: resolvedCredentials,
+      requestMetadata: options2.metadata,
+      trigger: options2.trigger,
+      messageId: options2.messageId
+    }));
+    const api = (_b15 = preparedRequest == null ? void 0 : preparedRequest.api) != null ? _b15 : this.api;
+    const headers = (preparedRequest == null ? void 0 : preparedRequest.headers) !== void 0 ? normalizeHeaders(preparedRequest.headers) : baseHeaders;
+    const body = (preparedRequest == null ? void 0 : preparedRequest.body) !== void 0 ? preparedRequest.body : {
+      ...resolvedBody,
+      ...options2.body,
+      id: options2.chatId,
+      messages: options2.messages,
+      trigger: options2.trigger,
+      messageId: options2.messageId
+    };
+    const credentials = (_c = preparedRequest == null ? void 0 : preparedRequest.credentials) != null ? _c : resolvedCredentials;
+    const fetch2 = (_d = this.fetch) != null ? _d : globalThis.fetch;
+    const response = await fetch2(api, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...headers
+      },
+      body: JSON.stringify(body),
+      credentials,
+      signal: abortSignal
+    });
+    if (!response.ok) {
+      throw new Error(
+        (_e = await response.text()) != null ? _e : "Failed to fetch the chat response."
+      );
+    }
+    if (!response.body) {
+      throw new Error("The response body is empty.");
+    }
+    return this.processResponseStream(response.body);
+  }
+  async reconnectToStream(options2) {
+    var _a22, _b15, _c, _d, _e;
+    const resolvedBody = await resolve(this.body);
+    const resolvedHeaders = await resolve(this.headers);
+    const resolvedCredentials = await resolve(this.credentials);
+    const baseHeaders = {
+      ...normalizeHeaders(resolvedHeaders),
+      ...normalizeHeaders(options2.headers)
+    };
+    const preparedRequest = await ((_a22 = this.prepareReconnectToStreamRequest) == null ? void 0 : _a22.call(this, {
+      api: this.api,
+      id: options2.chatId,
+      body: { ...resolvedBody, ...options2.body },
+      headers: baseHeaders,
+      credentials: resolvedCredentials,
+      requestMetadata: options2.metadata
+    }));
+    const api = (_b15 = preparedRequest == null ? void 0 : preparedRequest.api) != null ? _b15 : `${this.api}/${options2.chatId}/stream`;
+    const headers = (preparedRequest == null ? void 0 : preparedRequest.headers) !== void 0 ? normalizeHeaders(preparedRequest.headers) : baseHeaders;
+    const credentials = (_c = preparedRequest == null ? void 0 : preparedRequest.credentials) != null ? _c : resolvedCredentials;
+    const fetch2 = (_d = this.fetch) != null ? _d : globalThis.fetch;
+    const response = await fetch2(api, {
+      method: "GET",
+      headers,
+      credentials
+    });
+    if (response.status === 204) {
+      return null;
+    }
+    if (!response.ok) {
+      throw new Error(
+        (_e = await response.text()) != null ? _e : "Failed to fetch the chat response."
+      );
+    }
+    if (!response.body) {
+      throw new Error("The response body is empty.");
+    }
+    return this.processResponseStream(response.body);
+  }
+};
+var DefaultChatTransport = class extends HttpChatTransport {
+  constructor(options2 = {}) {
+    super(options2);
+  }
+  processResponseStream(stream) {
+    return parseJsonEventStream({
+      stream,
+      schema: uiMessageChunkSchema
+    }).pipeThrough(
+      new TransformStream({
+        async transform(chunk, controller) {
+          if (!chunk.success) {
+            throw chunk.error;
+          }
+          controller.enqueue(chunk.value);
+        }
+      })
+    );
+  }
+};
+var AbstractChat = class {
+  constructor({
+    generateId: generateId2 = generateId,
+    id = generateId2(),
+    transport = new DefaultChatTransport(),
+    messageMetadataSchema,
+    dataPartSchemas,
+    state,
+    onError,
+    onToolCall,
+    onFinish,
+    onData,
+    sendAutomaticallyWhen
+  }) {
+    this.activeResponse = void 0;
+    this.jobExecutor = new SerialJobExecutor();
+    this.sendMessage = async (message, options2) => {
+      var _a22, _b15, _c, _d;
+      if (message == null) {
+        await this.makeRequest({
+          trigger: "submit-message",
+          messageId: (_a22 = this.lastMessage) == null ? void 0 : _a22.id,
+          ...options2
+        });
+        return;
+      }
+      let uiMessage;
+      if ("text" in message || "files" in message) {
+        const fileParts = Array.isArray(message.files) ? message.files : await convertFileListToFileUIParts(message.files);
+        uiMessage = {
+          parts: [
+            ...fileParts,
+            ..."text" in message && message.text != null ? [{ type: "text", text: message.text }] : []
+          ]
+        };
+      } else {
+        uiMessage = message;
+      }
+      if (message.messageId != null) {
+        const messageIndex = this.state.messages.findIndex(
+          (m) => m.id === message.messageId
+        );
+        if (messageIndex === -1) {
+          throw new Error(`message with id ${message.messageId} not found`);
+        }
+        if (this.state.messages[messageIndex].role !== "user") {
+          throw new Error(
+            `message with id ${message.messageId} is not a user message`
+          );
+        }
+        this.state.messages = this.state.messages.slice(0, messageIndex + 1);
+        this.state.replaceMessage(messageIndex, {
+          ...uiMessage,
+          id: message.messageId,
+          role: (_b15 = uiMessage.role) != null ? _b15 : "user",
+          metadata: message.metadata
+        });
+      } else {
+        this.state.pushMessage({
+          ...uiMessage,
+          id: (_c = uiMessage.id) != null ? _c : this.generateId(),
+          role: (_d = uiMessage.role) != null ? _d : "user",
+          metadata: message.metadata
+        });
+      }
+      await this.makeRequest({
+        trigger: "submit-message",
+        messageId: message.messageId,
+        ...options2
+      });
+    };
+    this.regenerate = async ({
+      messageId,
+      ...options2
+    } = {}) => {
+      const messageIndex = messageId == null ? this.state.messages.length - 1 : this.state.messages.findIndex((message) => message.id === messageId);
+      if (messageIndex === -1) {
+        throw new Error(`message ${messageId} not found`);
+      }
+      this.state.messages = this.state.messages.slice(
+        0,
+        // if the message is a user message, we need to include it in the request:
+        this.messages[messageIndex].role === "assistant" ? messageIndex : messageIndex + 1
+      );
+      await this.makeRequest({
+        trigger: "regenerate-message",
+        messageId,
+        ...options2
+      });
+    };
+    this.resumeStream = async (options2 = {}) => {
+      await this.makeRequest({ trigger: "resume-stream", ...options2 });
+    };
+    this.clearError = () => {
+      if (this.status === "error") {
+        this.state.error = void 0;
+        this.setStatus({ status: "ready" });
+      }
+    };
+    this.addToolApprovalResponse = async ({
+      id: id2,
+      approved,
+      reason,
+      options: options2
+    }) => this.jobExecutor.run(async () => {
+      const messages = this.state.messages;
+      const lastMessage = messages[messages.length - 1];
+      const updatePart = (part) => isToolUIPart(part) && part.state === "approval-requested" && part.approval.id === id2 ? {
+        ...part,
+        state: "approval-responded",
+        approval: { id: id2, approved, reason }
+      } : part;
+      this.state.replaceMessage(messages.length - 1, {
+        ...lastMessage,
+        parts: lastMessage.parts.map(updatePart)
+      });
+      if (this.activeResponse) {
+        this.activeResponse.state.message.parts = this.activeResponse.state.message.parts.map(updatePart);
+      }
+      if (this.status !== "streaming" && this.status !== "submitted" && this.sendAutomaticallyWhen) {
+        this.shouldSendAutomatically().then((shouldSend) => {
+          var _a22;
+          if (shouldSend) {
+            this.makeRequest({
+              trigger: "submit-message",
+              messageId: (_a22 = this.lastMessage) == null ? void 0 : _a22.id,
+              ...options2
+            });
+          }
+        });
+      }
+    });
+    this.addToolOutput = async ({
+      state: state2 = "output-available",
+      toolCallId,
+      output,
+      errorText,
+      options: options2
+    }) => this.jobExecutor.run(async () => {
+      const messages = this.state.messages;
+      const lastMessage = messages[messages.length - 1];
+      const updatePart = (part) => isToolUIPart(part) && part.toolCallId === toolCallId ? { ...part, state: state2, output, errorText } : part;
+      this.state.replaceMessage(messages.length - 1, {
+        ...lastMessage,
+        parts: lastMessage.parts.map(updatePart)
+      });
+      if (this.activeResponse) {
+        this.activeResponse.state.message.parts = this.activeResponse.state.message.parts.map(updatePart);
+      }
+      if (this.status !== "streaming" && this.status !== "submitted" && this.sendAutomaticallyWhen) {
+        this.shouldSendAutomatically().then((shouldSend) => {
+          var _a22;
+          if (shouldSend) {
+            this.makeRequest({
+              trigger: "submit-message",
+              messageId: (_a22 = this.lastMessage) == null ? void 0 : _a22.id,
+              ...options2
+            });
+          }
+        });
+      }
+    });
+    this.addToolResult = this.addToolOutput;
+    this.stop = async () => {
+      var _a22;
+      if (this.status !== "streaming" && this.status !== "submitted")
+        return;
+      if ((_a22 = this.activeResponse) == null ? void 0 : _a22.abortController) {
+        this.activeResponse.abortController.abort();
+      }
+    };
+    this.id = id;
+    this.transport = transport;
+    this.generateId = generateId2;
+    this.messageMetadataSchema = messageMetadataSchema;
+    this.dataPartSchemas = dataPartSchemas;
+    this.state = state;
+    this.onError = onError;
+    this.onToolCall = onToolCall;
+    this.onFinish = onFinish;
+    this.onData = onData;
+    this.sendAutomaticallyWhen = sendAutomaticallyWhen;
+  }
+  /**
+   * Hook status:
+   *
+   * - `submitted`: The message has been sent to the API and we're awaiting the start of the response stream.
+   * - `streaming`: The response is actively streaming in from the API, receiving chunks of data.
+   * - `ready`: The full response has been received and processed; a new user message can be submitted.
+   * - `error`: An error occurred during the API request, preventing successful completion.
+   */
+  get status() {
+    return this.state.status;
+  }
+  setStatus({
+    status,
+    error
+  }) {
+    if (this.status === status)
+      return;
+    this.state.status = status;
+    this.state.error = error;
+  }
+  get error() {
+    return this.state.error;
+  }
+  get messages() {
+    return this.state.messages;
+  }
+  get lastMessage() {
+    return this.state.messages[this.state.messages.length - 1];
+  }
+  set messages(messages) {
+    this.state.messages = messages;
+  }
+  async shouldSendAutomatically() {
+    if (!this.sendAutomaticallyWhen)
+      return false;
+    const result = this.sendAutomaticallyWhen({
+      messages: this.state.messages
+    });
+    if (result && typeof result === "object" && "then" in result) {
+      return await result;
+    }
+    return result;
+  }
+  async makeRequest({
+    trigger,
+    metadata,
+    headers,
+    body,
+    messageId
+  }) {
+    var _a22, _b15, _c;
+    let resumeStream;
+    if (trigger === "resume-stream") {
+      try {
+        const reconnect = await this.transport.reconnectToStream({
+          chatId: this.id,
+          metadata,
+          headers,
+          body
+        });
+        if (reconnect == null) {
+          return;
+        }
+        resumeStream = reconnect;
+      } catch (err) {
+        if (this.onError && err instanceof Error) {
+          this.onError(err);
+        }
+        this.setStatus({ status: "error", error: err });
+        return;
+      }
+    }
+    this.setStatus({ status: "submitted", error: void 0 });
+    const lastMessage = this.lastMessage;
+    let isAbort = false;
+    let isDisconnect = false;
+    let isError = false;
+    try {
+      const activeResponse = {
+        state: createStreamingUIMessageState({
+          lastMessage: this.state.snapshot(lastMessage),
+          messageId: this.generateId()
+        }),
+        abortController: new AbortController()
+      };
+      activeResponse.abortController.signal.addEventListener("abort", () => {
+        isAbort = true;
+      });
+      this.activeResponse = activeResponse;
+      let stream;
+      if (trigger === "resume-stream") {
+        stream = resumeStream;
+      } else {
+        stream = await this.transport.sendMessages({
+          chatId: this.id,
+          messages: this.state.messages,
+          abortSignal: activeResponse.abortController.signal,
+          metadata,
+          headers,
+          body,
+          trigger,
+          messageId
+        });
+      }
+      const runUpdateMessageJob = (job) => (
+        // serialize the job execution to avoid race conditions:
+        this.jobExecutor.run(
+          () => job({
+            state: activeResponse.state,
+            write: () => {
+              var _a23;
+              this.setStatus({ status: "streaming" });
+              const replaceLastMessage = activeResponse.state.message.id === ((_a23 = this.lastMessage) == null ? void 0 : _a23.id);
+              if (replaceLastMessage) {
+                this.state.replaceMessage(
+                  this.state.messages.length - 1,
+                  activeResponse.state.message
+                );
+              } else {
+                this.state.pushMessage(activeResponse.state.message);
+              }
+            }
+          })
+        )
+      );
+      await consumeStream({
+        stream: processUIMessageStream({
+          stream,
+          onToolCall: this.onToolCall,
+          onData: this.onData,
+          messageMetadataSchema: this.messageMetadataSchema,
+          dataPartSchemas: this.dataPartSchemas,
+          runUpdateMessageJob,
+          onError: (error) => {
+            throw error;
+          }
+        }),
+        onError: (error) => {
+          throw error;
+        }
+      });
+      this.setStatus({ status: "ready" });
+    } catch (err) {
+      if (isAbort || err.name === "AbortError") {
+        isAbort = true;
+        this.setStatus({ status: "ready" });
+        return null;
+      }
+      isError = true;
+      if (err instanceof TypeError && (err.message.toLowerCase().includes("fetch") || err.message.toLowerCase().includes("network"))) {
+        isDisconnect = true;
+      }
+      if (this.onError && err instanceof Error) {
+        this.onError(err);
+      }
+      this.setStatus({ status: "error", error: err });
+    } finally {
+      try {
+        (_b15 = this.onFinish) == null ? void 0 : _b15.call(this, {
+          message: this.activeResponse.state.message,
+          messages: this.state.messages,
+          isAbort,
+          isDisconnect,
+          isError,
+          finishReason: (_a22 = this.activeResponse) == null ? void 0 : _a22.state.finishReason
+        });
+      } catch (err) {
+        console.error(err);
+      }
+      this.activeResponse = void 0;
+    }
+    if (!isError && await this.shouldSendAutomatically()) {
+      await this.makeRequest({
+        trigger: "submit-message",
+        messageId: (_c = this.lastMessage) == null ? void 0 : _c.id,
+        metadata,
+        headers,
+        body
+      });
+    }
+  }
+};
+var DirectChatTransport = class {
+  constructor({
+    agent,
+    options: options2,
+    ...uiMessageStreamOptions
+  }) {
+    this.agent = agent;
+    this.agentOptions = options2;
+    this.uiMessageStreamOptions = uiMessageStreamOptions;
+  }
+  async sendMessages({
+    messages,
+    abortSignal
+  }) {
+    const validatedMessages = await validateUIMessages({
+      messages,
+      tools: this.agent.tools
+    });
+    const modelMessages = await convertToModelMessages(validatedMessages, {
+      tools: this.agent.tools
+    });
+    const result = await this.agent.stream({
+      prompt: modelMessages,
+      abortSignal,
+      ...this.agentOptions !== void 0 ? { options: this.agentOptions } : {}
+    });
+    return result.toUIMessageStream(this.uiMessageStreamOptions);
+  }
+  /**
+   * Direct transport does not support reconnection since there is no
+   * persistent server-side stream to reconnect to.
+   *
+   * @returns Always returns `null`
+   */
+  async reconnectToStream(_options) {
+    return null;
+  }
+};
+function lastAssistantMessageIsCompleteWithApprovalResponses({
+  messages
+}) {
+  const message = messages[messages.length - 1];
+  if (!message) {
+    return false;
+  }
+  if (message.role !== "assistant") {
+    return false;
+  }
+  const lastStepStartIndex = message.parts.reduce((lastIndex, part, index2) => {
+    return part.type === "step-start" ? index2 : lastIndex;
+  }, -1);
+  const lastStepToolInvocations = message.parts.slice(lastStepStartIndex + 1).filter(isToolUIPart);
+  return (
+    // has at least one tool approval response
+    lastStepToolInvocations.filter((part) => part.state === "approval-responded").length > 0 && // all tool approvals must have a response
+    lastStepToolInvocations.every(
+      (part) => part.state === "output-available" || part.state === "output-error" || part.state === "approval-responded"
+    )
+  );
+}
+function lastAssistantMessageIsCompleteWithToolCalls({
+  messages
+}) {
+  const message = messages[messages.length - 1];
+  if (!message) {
+    return false;
+  }
+  if (message.role !== "assistant") {
+    return false;
+  }
+  const lastStepStartIndex = message.parts.reduce((lastIndex, part, index2) => {
+    return part.type === "step-start" ? index2 : lastIndex;
+  }, -1);
+  const lastStepToolInvocations = message.parts.slice(lastStepStartIndex + 1).filter(isToolUIPart).filter((part) => !part.providerExecuted);
+  return lastStepToolInvocations.length > 0 && lastStepToolInvocations.every(
+    (part) => part.state === "output-available" || part.state === "output-error"
+  );
+}
+function transformTextToUiMessageStream({
+  stream
+}) {
+  return stream.pipeThrough(
+    new TransformStream({
+      start(controller) {
+        controller.enqueue({ type: "start" });
+        controller.enqueue({ type: "start-step" });
+        controller.enqueue({ type: "text-start", id: "text-1" });
+      },
+      async transform(part, controller) {
+        controller.enqueue({ type: "text-delta", id: "text-1", delta: part });
+      },
+      async flush(controller) {
+        controller.enqueue({ type: "text-end", id: "text-1" });
+        controller.enqueue({ type: "finish-step" });
+        controller.enqueue({ type: "finish" });
+      }
+    })
+  );
+}
+var TextStreamChatTransport = class extends HttpChatTransport {
+  constructor(options2 = {}) {
+    super(options2);
+  }
+  processResponseStream(stream) {
+    return transformTextToUiMessageStream({
+      stream: stream.pipeThrough(new TextDecoderStream())
+    });
+  }
+};
+const index$1 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
+  __proto__: null,
+  AISDKError,
+  APICallError,
+  AbstractChat,
+  DefaultChatTransport,
+  DefaultGeneratedFile,
+  DirectChatTransport,
+  DownloadError,
+  EmptyResponseBodyError,
+  Experimental_Agent: ToolLoopAgent,
+  HttpChatTransport,
+  InvalidArgumentError: InvalidArgumentError2,
+  InvalidDataContentError,
+  InvalidMessageRoleError,
+  InvalidPromptError,
+  InvalidResponseDataError,
+  InvalidStreamPartError,
+  InvalidToolApprovalError,
+  InvalidToolApprovalSignatureError,
+  InvalidToolInputError,
+  JSONParseError,
+  JsonToSseTransformStream,
+  LoadAPIKeyError,
+  LoadSettingError,
+  MessageConversionError,
+  MissingToolResultsError,
+  NoContentGeneratedError,
+  NoImageGeneratedError,
+  NoObjectGeneratedError,
+  NoOutputGeneratedError,
+  NoSpeechGeneratedError,
+  NoSuchModelError,
+  NoSuchProviderError,
+  NoSuchToolError,
+  NoTranscriptGeneratedError,
+  NoVideoGeneratedError,
+  Output: output_exports,
+  RetryError,
+  SerialJobExecutor,
+  TextStreamChatTransport,
+  TooManyEmbeddingValuesForCallError,
+  ToolCallNotFoundForApprovalError,
+  ToolCallRepairError,
+  ToolLoopAgent,
+  TypeValidationError,
+  UIMessageStreamError,
+  UI_MESSAGE_STREAM_HEADERS,
+  UnsupportedFunctionalityError,
+  UnsupportedModelVersionError,
+  addToolInputExamplesMiddleware,
+  asSchema,
+  assistantModelMessageSchema,
+  bindTelemetryIntegration,
+  callCompletionApi,
+  consumeStream,
+  convertFileListToFileUIParts,
+  convertToModelMessages,
+  cosineSimilarity,
+  createAgentUIStream,
+  createAgentUIStreamResponse,
+  createDownload,
+  createGateway: createGatewayProvider,
+  createIdGenerator,
+  createProviderRegistry,
+  createTextStreamResponse,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  customProvider,
+  defaultEmbeddingSettingsMiddleware,
+  defaultSettingsMiddleware,
+  dynamicTool,
+  embed,
+  embedMany,
+  experimental_createProviderRegistry,
+  experimental_customProvider,
+  experimental_generateImage,
+  experimental_generateSpeech: generateSpeech,
+  experimental_generateVideo,
+  experimental_transcribe: transcribe,
+  extractJsonMiddleware,
+  extractReasoningMiddleware,
+  gateway,
+  generateId,
+  generateImage,
+  generateObject,
+  generateText,
+  getStaticToolName,
+  getTextFromDataUrl,
+  getToolName,
+  getToolOrDynamicToolName,
+  hasToolCall,
+  isDataUIPart,
+  isDeepEqualData,
+  isFileUIPart,
+  isLoopFinished,
+  isReasoningUIPart,
+  isStaticToolUIPart,
+  isTextUIPart,
+  isToolOrDynamicToolUIPart,
+  isToolUIPart,
+  jsonSchema,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  lastAssistantMessageIsCompleteWithToolCalls,
+  modelMessageSchema,
+  parseJsonEventStream,
+  parsePartialJson,
+  pipeAgentUIStreamToResponse,
+  pipeTextStreamToResponse,
+  pipeUIMessageStreamToResponse,
+  pruneMessages,
+  readUIMessageStream,
+  registerTelemetryIntegration,
+  rerank,
+  safeValidateUIMessages,
+  simulateReadableStream,
+  simulateStreamingMiddleware,
+  smoothStream,
+  stepCountIs,
+  streamObject,
+  streamText,
+  systemModelMessageSchema,
+  tool,
+  toolModelMessageSchema,
+  uiMessageChunkSchema,
+  userModelMessageSchema,
+  validateUIMessages,
+  wrapEmbeddingModel,
+  wrapImageModel,
+  wrapLanguageModel,
+  wrapProvider,
+  zodSchema
+}, Symbol.toStringTag, { value: "Module" }));
 var VERSION$2 = "3.0.85";
 var anthropicErrorDataSchema = lazySchema(
   () => zodSchema(
@@ -19018,9 +25429,9 @@ var anthropicLanguageModelOptions = object$1({
 });
 var MAX_CACHE_BREAKPOINTS = 4;
 function getCacheControl(providerMetadata) {
-  var _a17;
+  var _a22;
   const anthropic2 = providerMetadata == null ? void 0 : providerMetadata.anthropic;
-  const cacheControlValue = (_a17 = anthropic2 == null ? void 0 : anthropic2.cacheControl) != null ? _a17 : anthropic2 == null ? void 0 : anthropic2.cache_control;
+  const cacheControlValue = (_a22 = anthropic2 == null ? void 0 : anthropic2.cacheControl) != null ? _a22 : anthropic2 == null ? void 0 : anthropic2.cache_control;
   return cacheControlValue;
 }
 var CacheControlValidator = class {
@@ -19331,7 +25742,7 @@ async function prepareTools$1({
   supportsStrictTools,
   defaultEagerInputStreaming = false
 }) {
-  var _a17, _b15;
+  var _a22, _b15;
   tools = (tools == null ? void 0 : tools.length) ? tools : void 0;
   const toolWarnings = [];
   const betas = /* @__PURE__ */ new Set();
@@ -19347,7 +25758,7 @@ async function prepareTools$1({
           type: "tool definition",
           canCache: true
         });
-        const anthropicOptions = (_a17 = tool2.providerOptions) == null ? void 0 : _a17.anthropic;
+        const anthropicOptions = (_a22 = tool2.providerOptions) == null ? void 0 : _a22.anthropic;
         const eagerInputStreaming = (_b15 = anthropicOptions == null ? void 0 : anthropicOptions.eagerInputStreaming) != null ? _b15 : defaultEagerInputStreaming;
         const deferLoading = anthropicOptions == null ? void 0 : anthropicOptions.deferLoading;
         const allowedCallers = anthropicOptions == null ? void 0 : anthropicOptions.allowedCallers;
@@ -19682,8 +26093,8 @@ function convertAnthropicMessagesUsage({
   usage,
   rawUsage
 }) {
-  var _a17, _b15, _c;
-  const cacheCreationTokens = (_a17 = usage.cache_creation_input_tokens) != null ? _a17 : 0;
+  var _a22, _b15, _c;
+  const cacheCreationTokens = (_a22 = usage.cache_creation_input_tokens) != null ? _a22 : 0;
   const cacheReadTokens = (_b15 = usage.cache_read_input_tokens) != null ? _b15 : 0;
   let inputTokens;
   let outputTokens;
@@ -20063,20 +26474,20 @@ async function convertToAnthropicMessagesPrompt({
   cacheControlValidator,
   toolNameMapping
 }) {
-  var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
+  var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
   const betas = /* @__PURE__ */ new Set();
   const blocks = groupIntoBlocks(prompt);
   const validator = cacheControlValidator || new CacheControlValidator();
   let system = void 0;
   const messages = [];
   async function shouldEnableCitations(providerMetadata) {
-    var _a22, _b22;
+    var _a23, _b22;
     const anthropicOptions = await parseProviderOptions({
       provider: "anthropic",
       providerOptions: providerMetadata,
       schema: anthropicFilePartProviderOptions
     });
-    return (_b22 = (_a22 = anthropicOptions == null ? void 0 : anthropicOptions.citations) == null ? void 0 : _a22.enabled) != null ? _b22 : false;
+    return (_b22 = (_a23 = anthropicOptions == null ? void 0 : anthropicOptions.citations) == null ? void 0 : _a23.enabled) != null ? _b22 : false;
   }
   async function getDocumentMetadata(providerMetadata) {
     const anthropicOptions = await parseProviderOptions({
@@ -20120,10 +26531,10 @@ async function convertToAnthropicMessagesPrompt({
               for (let j = 0; j < content.length; j++) {
                 const part = content[j];
                 const isLastPart = j === content.length - 1;
-                const cacheControl = (_a17 = validator.getCacheControl(part.providerOptions, {
+                const cacheControl = (_a22 = validator.getCacheControl(part.providerOptions, {
                   type: "user message part",
                   canCache: true
-                })) != null ? _a17 : isLastPart ? validator.getCacheControl(message.providerOptions, {
+                })) != null ? _a22 : isLastPart ? validator.getCacheControl(message.providerOptions, {
                   type: "user message",
                   canCache: true
                 }) : void 0;
@@ -20235,7 +26646,7 @@ async function convertToAnthropicMessagesPrompt({
                 switch (output.type) {
                   case "content":
                     contentValue = output.value.map((contentPart) => {
-                      var _a22;
+                      var _a23;
                       switch (contentPart.type) {
                         case "text":
                           return {
@@ -20289,7 +26700,7 @@ async function convertToAnthropicMessagesPrompt({
                           return void 0;
                         }
                         case "custom": {
-                          const anthropicOptions = (_a22 = contentPart.providerOptions) == null ? void 0 : _a22.anthropic;
+                          const anthropicOptions = (_a23 = contentPart.providerOptions) == null ? void 0 : _a23.anthropic;
                           if ((anthropicOptions == null ? void 0 : anthropicOptions.type) === "tool-reference") {
                             return {
                               type: "tool_reference",
@@ -20999,8 +27410,8 @@ function sanitizeSchema(schema) {
   }
   if (schema.definitions != null) {
     result.definitions = Object.fromEntries(
-      Object.entries(schema.definitions).map(([name17, definition]) => [
-        name17,
+      Object.entries(schema.definitions).map(([name22, definition]) => [
+        name22,
         sanitizeDefinition(definition)
       ])
     );
@@ -21008,8 +27419,8 @@ function sanitizeSchema(schema) {
   if (schemaWithDefs.$defs != null) {
     const resultWithDefs = result;
     resultWithDefs.$defs = Object.fromEntries(
-      Object.entries(schemaWithDefs.$defs).map(([name17, definition]) => [
-        name17,
+      Object.entries(schemaWithDefs.$defs).map(([name22, definition]) => [
+        name22,
         sanitizeDefinition(definition)
       ])
     );
@@ -21017,8 +27428,8 @@ function sanitizeSchema(schema) {
   if (schema.type === "object" || schema.properties != null) {
     if (schema.properties != null) {
       result.properties = Object.fromEntries(
-        Object.entries(schema.properties).map(([name17, definition]) => [
-          name17,
+        Object.entries(schema.properties).map(([name22, definition]) => [
+          name22,
           sanitizeDefinition(definition)
         ])
       );
@@ -21067,7 +27478,7 @@ function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function createCitationSource(citation, citationDocuments, generateId3) {
-  var _a17;
+  var _a22;
   if (citation.type === "web_search_result_location") {
     return {
       type: "source",
@@ -21095,7 +27506,7 @@ function createCitationSource(citation, citationDocuments, generateId3) {
     sourceType: "document",
     id: generateId3(),
     mediaType: documentInfo.mediaType,
-    title: (_a17 = citation.document_title) != null ? _a17 : documentInfo.title,
+    title: (_a22 = citation.document_title) != null ? _a22 : documentInfo.title,
     filename: documentInfo.filename,
     providerMetadata: {
       anthropic: citation.type === "page_location" ? {
@@ -21113,10 +27524,10 @@ function createCitationSource(citation, citationDocuments, generateId3) {
 var AnthropicMessagesLanguageModel = class {
   constructor(modelId, config2) {
     this.specificationVersion = "v3";
-    var _a17;
+    var _a22;
     this.modelId = modelId;
     this.config = config2;
-    this.generateId = (_a17 = config2.generateId) != null ? _a17 : generateId;
+    this.generateId = (_a22 = config2.generateId) != null ? _a22 : generateId;
   }
   supportsUrl(url) {
     return url.protocol === "https:";
@@ -21134,8 +27545,8 @@ var AnthropicMessagesLanguageModel = class {
     return dotIndex === -1 ? provider : provider.substring(0, dotIndex);
   }
   get supportedUrls() {
-    var _a17, _b15, _c;
-    return (_c = (_b15 = (_a17 = this.config).supportedUrls) == null ? void 0 : _b15.call(_a17)) != null ? _c : {};
+    var _a22, _b15, _c;
+    return (_c = (_b15 = (_a22 = this.config).supportedUrls) == null ? void 0 : _b15.call(_a22)) != null ? _c : {};
   }
   async getArgs({
     userSuppliedBetas,
@@ -21154,7 +27565,7 @@ var AnthropicMessagesLanguageModel = class {
     providerOptions,
     stream
   }) {
-    var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j;
     const warnings = [];
     if (frequencyPenalty != null) {
       warnings.push({ type: "unsupported", feature: "frequencyPenalty" });
@@ -21239,7 +27650,7 @@ var AnthropicMessagesLanguageModel = class {
       }
     }
     const isAnthropicModel = isKnownModel || this.modelId.startsWith("claude-");
-    const supportsStructuredOutput = ((_a17 = this.config.supportsNativeStructuredOutput) != null ? _a17 : true) && modelSupportsStructuredOutput;
+    const supportsStructuredOutput = ((_a22 = this.config.supportsNativeStructuredOutput) != null ? _a22 : true) && modelSupportsStructuredOutput;
     const supportsStrictTools = ((_b15 = this.config.supportsStrictTools) != null ? _b15 : true) && modelSupportsStructuredOutput;
     const structureOutputMode = (_c = anthropicOptions == null ? void 0 : anthropicOptions.structuredOutputMode) != null ? _c : "auto";
     const useStructuredOutput = structureOutputMode === "outputFormat" || structureOutputMode === "auto" && supportsStructuredOutput;
@@ -21572,9 +27983,9 @@ var AnthropicMessagesLanguageModel = class {
     );
   }
   async getBetasFromHeaders(requestHeaders) {
-    var _a17, _b15;
+    var _a22, _b15;
     const configHeaders = await resolve(this.config.headers);
-    const configBetaHeader = (_a17 = configHeaders["anthropic-beta"]) != null ? _a17 : "";
+    const configBetaHeader = (_a22 = configHeaders["anthropic-beta"]) != null ? _a22 : "";
     const requestBetaHeader = (_b15 = requestHeaders == null ? void 0 : requestHeaders["anthropic-beta"]) != null ? _b15 : "";
     return new Set(
       [
@@ -21584,38 +27995,38 @@ var AnthropicMessagesLanguageModel = class {
     );
   }
   buildRequestUrl(isStreaming) {
-    var _a17, _b15, _c;
-    return (_c = (_b15 = (_a17 = this.config).buildRequestUrl) == null ? void 0 : _b15.call(_a17, this.config.baseURL, isStreaming)) != null ? _c : `${this.config.baseURL}/messages`;
+    var _a22, _b15, _c;
+    return (_c = (_b15 = (_a22 = this.config).buildRequestUrl) == null ? void 0 : _b15.call(_a22, this.config.baseURL, isStreaming)) != null ? _c : `${this.config.baseURL}/messages`;
   }
   transformRequestBody(args, betas) {
-    var _a17, _b15, _c;
-    return (_c = (_b15 = (_a17 = this.config).transformRequestBody) == null ? void 0 : _b15.call(_a17, args, betas)) != null ? _c : args;
+    var _a22, _b15, _c;
+    return (_c = (_b15 = (_a22 = this.config).transformRequestBody) == null ? void 0 : _b15.call(_a22, args, betas)) != null ? _c : args;
   }
   extractCitationDocuments(prompt) {
     const isCitationPart = (part) => {
-      var _a17, _b15;
+      var _a22, _b15;
       if (part.type !== "file") {
         return false;
       }
       if (part.mediaType !== "application/pdf" && part.mediaType !== "text/plain") {
         return false;
       }
-      const anthropic2 = (_a17 = part.providerOptions) == null ? void 0 : _a17.anthropic;
+      const anthropic2 = (_a22 = part.providerOptions) == null ? void 0 : _a22.anthropic;
       const citationsConfig = anthropic2 == null ? void 0 : anthropic2.citations;
       return (_b15 = citationsConfig == null ? void 0 : citationsConfig.enabled) != null ? _b15 : false;
     };
     return prompt.filter((message) => message.role === "user").flatMap((message) => message.content).filter(isCitationPart).map((part) => {
-      var _a17;
+      var _a22;
       const filePart = part;
       return {
-        title: (_a17 = filePart.filename) != null ? _a17 : "Untitled Document",
+        title: (_a22 = filePart.filename) != null ? _a22 : "Untitled Document",
         filename: filePart.filename,
         mediaType: filePart.mediaType
       };
     });
   }
   async doGenerate(options2) {
-    var _a17, _b15, _c, _d, _e, _f, _g;
+    var _a22, _b15, _c, _d, _e, _f, _g;
     const {
       args,
       warnings,
@@ -21822,7 +28233,7 @@ var AnthropicMessagesLanguageModel = class {
         case "web_fetch_tool_result": {
           if (part.content.type === "web_fetch_result") {
             citationDocuments.push({
-              title: (_a17 = part.content.content.title) != null ? _a17 : part.content.url,
+              title: (_a22 = part.content.content.title) != null ? _a22 : part.content.url,
               mediaType: part.content.content.source.media_type
             });
             content.push({
@@ -21866,11 +28277,11 @@ var AnthropicMessagesLanguageModel = class {
               toolCallId: part.tool_use_id,
               toolName: toolNameMapping.toCustomToolName("web_search"),
               result: part.content.map((result) => {
-                var _a22;
+                var _a23;
                 return {
                   url: result.url,
                   title: result.title,
-                  pageAge: (_a22 = result.page_age) != null ? _a22 : null,
+                  pageAge: (_a23 = result.page_age) != null ? _a23 : null,
                   encryptedContent: result.encrypted_content,
                   type: result.type
                 };
@@ -22057,11 +28468,11 @@ var AnthropicMessagesLanguageModel = class {
       },
       warnings,
       providerMetadata: (() => {
-        var _a22, _b22, _c2, _d2, _e2;
+        var _a23, _b22, _c2, _d2, _e2;
         const stopDetails = mapAnthropicStopDetails(response.stop_details);
         const anthropicMetadata = {
           usage: response.usage,
-          cacheCreationInputTokens: (_a22 = response.usage.cache_creation_input_tokens) != null ? _a22 : null,
+          cacheCreationInputTokens: (_a23 = response.usage.cache_creation_input_tokens) != null ? _a23 : null,
           stopSequence: (_b22 = response.stop_sequence) != null ? _b22 : null,
           ...stopDetails != null ? { stopDetails } : {},
           iterations: response.usage.iterations ? response.usage.iterations.map(
@@ -22102,7 +28513,7 @@ var AnthropicMessagesLanguageModel = class {
     };
   }
   async doStream(options2) {
-    var _a17, _b15;
+    var _a22, _b15;
     const {
       args: body,
       warnings,
@@ -22163,7 +28574,7 @@ var AnthropicMessagesLanguageModel = class {
           controller.enqueue({ type: "stream-start", warnings });
         },
         transform(chunk, controller) {
-          var _a22, _b22, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+          var _a23, _b22, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
           if (options2.includeRawChunks) {
             controller.enqueue({ type: "raw", rawValue: chunk.rawValue });
           }
@@ -22344,7 +28755,7 @@ var AnthropicMessagesLanguageModel = class {
                 case "web_fetch_tool_result": {
                   if (part.content.type === "web_fetch_result") {
                     citationDocuments.push({
-                      title: (_a22 = part.content.content.title) != null ? _a22 : part.content.url,
+                      title: (_a23 = part.content.content.title) != null ? _a23 : part.content.url,
                       mediaType: part.content.content.source.media_type
                     });
                     controller.enqueue({
@@ -22930,7 +29341,7 @@ var AnthropicMessagesLanguageModel = class {
     try {
       await firstChunkReader.read();
       let result = await firstChunkReader.read();
-      if (((_a17 = result.value) == null ? void 0 : _a17.type) === "raw") {
+      if (((_a22 = result.value) == null ? void 0 : _a22.type) === "raw") {
         result = await firstChunkReader.read();
       }
       if (((_b15 = result.value) == null ? void 0 : _b15.type) === "error") {
@@ -23552,13 +29963,13 @@ var anthropicTools = {
   toolSearchBm25_20251119
 };
 function createAnthropic(options2 = {}) {
-  var _a17, _b15;
-  const baseURL = (_a17 = withoutTrailingSlash(
+  var _a22, _b15;
+  const baseURL = (_a22 = withoutTrailingSlash(
     loadOptionalSetting({
       settingValue: options2.baseURL,
       environmentVariableName: "ANTHROPIC_BASE_URL"
     })
-  )) != null ? _a17 : "https://api.anthropic.com/v1";
+  )) != null ? _a22 : "https://api.anthropic.com/v1";
   const providerName = (_b15 = options2.name) != null ? _b15 : "anthropic.messages";
   if (options2.apiKey && options2.authToken) {
     throw new InvalidArgumentError$1({
@@ -23584,13 +29995,13 @@ function createAnthropic(options2 = {}) {
     );
   };
   const createChatModel = (modelId) => {
-    var _a22;
+    var _a23;
     return new AnthropicMessagesLanguageModel(modelId, {
       provider: providerName,
       baseURL,
       headers: getHeaders,
       fetch: options2.fetch,
-      generateId: (_a22 = options2.generateId) != null ? _a22 : generateId,
+      generateId: (_a23 = options2.generateId) != null ? _a23 : generateId,
       supportedUrls: () => ({
         "image/*": [/^https?:\/\/.*$/],
         "application/pdf": [/^https?:\/\/.*$/]
@@ -23650,7 +30061,7 @@ function getOpenAILanguageModelCapabilities(modelId) {
   };
 }
 function convertOpenAIChatUsage(usage) {
-  var _a17, _b15, _c, _d, _e, _f;
+  var _a22, _b15, _c, _d, _e, _f;
   if (usage == null) {
     return {
       inputTokens: {
@@ -23667,7 +30078,7 @@ function convertOpenAIChatUsage(usage) {
       raw: void 0
     };
   }
-  const promptTokens = (_a17 = usage.prompt_tokens) != null ? _a17 : 0;
+  const promptTokens = (_a22 = usage.prompt_tokens) != null ? _a22 : 0;
   const completionTokens = (_b15 = usage.completion_tokens) != null ? _b15 : 0;
   const cachedTokens = (_d = (_c = usage.prompt_tokens_details) == null ? void 0 : _c.cached_tokens) != null ? _d : 0;
   const reasoningTokens = (_f = (_e = usage.completion_tokens_details) == null ? void 0 : _e.reasoning_tokens) != null ? _f : 0;
@@ -23693,7 +30104,7 @@ function convertToOpenAIChatMessages({
   prompt,
   systemMessageMode = "system"
 }) {
-  var _a17;
+  var _a22;
   const messages = [];
   const warnings = [];
   for (const { role, content } of prompt) {
@@ -23732,7 +30143,7 @@ function convertToOpenAIChatMessages({
         messages.push({
           role: "user",
           content: content.map((part, index2) => {
-            var _a22, _b15, _c;
+            var _a23, _b15, _c;
             switch (part.type) {
               case "text": {
                 return { type: "text", text: part.text };
@@ -23745,7 +30156,7 @@ function convertToOpenAIChatMessages({
                     image_url: {
                       url: part.data instanceof URL ? part.data.toString() : `data:${mediaType};base64,${convertToBase64(part.data)}`,
                       // OpenAI specific extension: image detail
-                      detail: (_b15 = (_a22 = part.providerOptions) == null ? void 0 : _a22.openai) == null ? void 0 : _b15.imageDetail
+                      detail: (_b15 = (_a23 = part.providerOptions) == null ? void 0 : _a23.openai) == null ? void 0 : _b15.imageDetail
                     }
                   };
                 } else if (part.mediaType.startsWith("audio/")) {
@@ -23846,7 +30257,7 @@ function convertToOpenAIChatMessages({
               contentValue = output.value;
               break;
             case "execution-denied":
-              contentValue = (_a17 = output.reason) != null ? _a17 : "Tool execution denied.";
+              contentValue = (_a22 = output.reason) != null ? _a22 : "Tool execution denied.";
               break;
             case "content":
             case "json":
@@ -24235,13 +30646,13 @@ var OpenAIChatLanguageModel = class {
     toolChoice,
     providerOptions
   }) {
-    var _a17, _b15, _c, _d, _e;
+    var _a22, _b15, _c, _d, _e;
     const warnings = [];
-    const openaiOptions = (_a17 = await parseProviderOptions({
+    const openaiOptions = (_a22 = await parseProviderOptions({
       provider: "openai",
       providerOptions,
       schema: openaiLanguageModelChatOptions
-    })) != null ? _a17 : {};
+    })) != null ? _a22 : {};
     const modelCapabilities = getOpenAILanguageModelCapabilities(this.modelId);
     const isReasoningModel = (_b15 = openaiOptions.forceReasoning) != null ? _b15 : modelCapabilities.isReasoningModel;
     if (topK != null) {
@@ -24402,7 +30813,7 @@ var OpenAIChatLanguageModel = class {
     };
   }
   async doGenerate(options2) {
-    var _a17, _b15, _c, _d, _e, _f, _g;
+    var _a22, _b15, _c, _d, _e, _f, _g;
     const { args: body, warnings } = await this.getArgs(options2);
     const {
       responseHeaders,
@@ -24428,7 +30839,7 @@ var OpenAIChatLanguageModel = class {
     if (text2 != null && text2.length > 0) {
       content.push({ type: "text", text: text2 });
     }
-    for (const toolCall of (_a17 = choice2.message.tool_calls) != null ? _a17 : []) {
+    for (const toolCall of (_a22 = choice2.message.tool_calls) != null ? _a22 : []) {
       content.push({
         type: "tool-call",
         toolCallId: (_b15 = toolCall.id) != null ? _b15 : generateId(),
@@ -24513,7 +30924,7 @@ var OpenAIChatLanguageModel = class {
             controller.enqueue({ type: "stream-start", warnings });
           },
           transform(chunk, controller) {
-            var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+            var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
             if (options2.includeRawChunks) {
               controller.enqueue({ type: "raw", rawValue: chunk.rawValue });
             }
@@ -24540,7 +30951,7 @@ var OpenAIChatLanguageModel = class {
             }
             if (value.usage != null) {
               usage = value.usage;
-              if (((_a17 = value.usage.completion_tokens_details) == null ? void 0 : _a17.accepted_prediction_tokens) != null) {
+              if (((_a22 = value.usage.completion_tokens_details) == null ? void 0 : _a22.accepted_prediction_tokens) != null) {
                 providerMetadata.openai.acceptedPredictionTokens = (_b15 = value.usage.completion_tokens_details) == null ? void 0 : _b15.accepted_prediction_tokens;
               }
               if (((_c = value.usage.completion_tokens_details) == null ? void 0 : _c.rejected_prediction_tokens) != null) {
@@ -24691,7 +31102,7 @@ var OpenAIChatLanguageModel = class {
   }
 };
 function convertOpenAICompletionUsage(usage) {
-  var _a17, _b15, _c, _d;
+  var _a22, _b15, _c, _d;
   if (usage == null) {
     return {
       inputTokens: {
@@ -24708,7 +31119,7 @@ function convertOpenAICompletionUsage(usage) {
       raw: void 0
     };
   }
-  const promptTokens = (_a17 = usage.prompt_tokens) != null ? _a17 : 0;
+  const promptTokens = (_a22 = usage.prompt_tokens) != null ? _a22 : 0;
   const completionTokens = (_b15 = usage.completion_tokens) != null ? _b15 : 0;
   return {
     inputTokens: {
@@ -25008,7 +31419,7 @@ var OpenAICompletionLanguageModel = class {
     };
   }
   async doGenerate(options2) {
-    var _a17;
+    var _a22;
     const { args, warnings } = await this.getArgs(options2);
     const {
       responseHeaders,
@@ -25038,7 +31449,7 @@ var OpenAICompletionLanguageModel = class {
       usage: convertOpenAICompletionUsage(response.usage),
       finishReason: {
         unified: mapOpenAIFinishReason2(choice2.finish_reason),
-        raw: (_a17 = choice2.finish_reason) != null ? _a17 : void 0
+        raw: (_a22 = choice2.finish_reason) != null ? _a22 : void 0
       },
       request: { body: args },
       response: {
@@ -25189,7 +31600,7 @@ var OpenAIEmbeddingModel = class {
     abortSignal,
     providerOptions
   }) {
-    var _a17;
+    var _a22;
     if (values.length > this.maxEmbeddingsPerCall) {
       throw new TooManyEmbeddingValuesForCallError({
         provider: this.provider,
@@ -25198,11 +31609,11 @@ var OpenAIEmbeddingModel = class {
         values
       });
     }
-    const openaiOptions = (_a17 = await parseProviderOptions({
+    const openaiOptions = (_a22 = await parseProviderOptions({
       provider: "openai",
       providerOptions,
       schema: openaiEmbeddingModelOptions
-    })) != null ? _a17 : {};
+    })) != null ? _a22 : {};
     const {
       responseHeaders,
       value: response,
@@ -25345,8 +31756,8 @@ var OpenAIImageModel = class {
     this.specificationVersion = "v3";
   }
   get maxImagesPerCall() {
-    var _a17;
-    return (_a17 = modelMaxImagesPerCall[this.modelId]) != null ? _a17 : 1;
+    var _a22;
+    return (_a22 = modelMaxImagesPerCall[this.modelId]) != null ? _a22 : 1;
   }
   get provider() {
     return this.config.provider;
@@ -25363,7 +31774,7 @@ var OpenAIImageModel = class {
     headers,
     abortSignal
   }) {
-    var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const warnings = [];
     if (aspectRatio != null) {
       warnings.push({
@@ -25375,7 +31786,7 @@ var OpenAIImageModel = class {
     if (seed != null) {
       warnings.push({ type: "unsupported", feature: "seed" });
     }
-    const currentDate = (_c = (_b15 = (_a17 = this.config._internal) == null ? void 0 : _a17.currentDate) == null ? void 0 : _b15.call(_a17)) != null ? _c : /* @__PURE__ */ new Date();
+    const currentDate = (_c = (_b15 = (_a22 = this.config._internal) == null ? void 0 : _a22.currentDate) == null ? void 0 : _b15.call(_a22)) != null ? _c : /* @__PURE__ */ new Date();
     if (files != null) {
       const openaiOptions2 = (_d = await parseProviderOptions({
         provider: "openai",
@@ -25438,10 +31849,10 @@ var OpenAIImageModel = class {
         providerMetadata: {
           openai: {
             images: response2.data.map((item, index2) => {
-              var _a22, _b22, _c2, _d2, _e2, _f2;
+              var _a23, _b22, _c2, _d2, _e2, _f2;
               return {
                 ...item.revised_prompt ? { revisedPrompt: item.revised_prompt } : {},
-                created: (_a22 = response2.created) != null ? _a22 : void 0,
+                created: (_a23 = response2.created) != null ? _a23 : void 0,
                 size: (_b22 = response2.size) != null ? _b22 : void 0,
                 quality: (_c2 = response2.quality) != null ? _c2 : void 0,
                 background: (_d2 = response2.background) != null ? _d2 : void 0,
@@ -25505,10 +31916,10 @@ var OpenAIImageModel = class {
       providerMetadata: {
         openai: {
           images: response.data.map((item, index2) => {
-            var _a22, _b22, _c2, _d2, _e2, _f2;
+            var _a23, _b22, _c2, _d2, _e2, _f2;
             return {
               ...item.revised_prompt ? { revisedPrompt: item.revised_prompt } : {},
-              created: (_a22 = response.created) != null ? _a22 : void 0,
+              created: (_a23 = response.created) != null ? _a23 : void 0,
               size: (_b22 = response.size) != null ? _b22 : void 0,
               quality: (_c2 = response.quality) != null ? _c2 : void 0,
               background: (_d2 = response.background) != null ? _d2 : void 0,
@@ -26142,7 +32553,7 @@ var openaiTools = {
   toolSearch
 };
 function convertOpenAIResponsesUsage(usage) {
-  var _a17, _b15, _c, _d;
+  var _a22, _b15, _c, _d;
   if (usage == null) {
     return {
       inputTokens: {
@@ -26161,7 +32572,7 @@ function convertOpenAIResponsesUsage(usage) {
   }
   const inputTokens = usage.input_tokens;
   const outputTokens = usage.output_tokens;
-  const cachedTokens = (_b15 = (_a17 = usage.input_tokens_details) == null ? void 0 : _a17.cached_tokens) != null ? _b15 : 0;
+  const cachedTokens = (_b15 = (_a22 = usage.input_tokens_details) == null ? void 0 : _a22.cached_tokens) != null ? _b15 : 0;
   const reasoningTokens = (_d = (_c = usage.output_tokens_details) == null ? void 0 : _c.reasoning_tokens) != null ? _d : 0;
   return {
     inputTokens: {
@@ -26200,7 +32611,7 @@ async function convertToOpenAIResponsesInput({
   hasApplyPatchTool = false,
   customProviderToolNames
 }) {
-  var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w;
+  var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w;
   let input = [];
   const warnings = [];
   const processedApprovalIds = /* @__PURE__ */ new Set();
@@ -26236,7 +32647,7 @@ async function convertToOpenAIResponsesInput({
         input.push({
           role: "user",
           content: content.map((part, index2) => {
-            var _a22, _b22, _c2;
+            var _a23, _b22, _c2;
             switch (part.type) {
               case "text": {
                 return { type: "input_text", text: part.text };
@@ -26249,7 +32660,7 @@ async function convertToOpenAIResponsesInput({
                     ...part.data instanceof URL ? { image_url: part.data.toString() } : typeof part.data === "string" && isFileId(part.data, fileIdPrefixes) ? { file_id: part.data } : {
                       image_url: `data:${mediaType};base64,${convertToBase64(part.data)}`
                     },
-                    detail: (_b22 = (_a22 = part.providerOptions) == null ? void 0 : _a22[providerOptionsName]) == null ? void 0 : _b22.imageDetail
+                    detail: (_b22 = (_a23 = part.providerOptions) == null ? void 0 : _a23[providerOptionsName]) == null ? void 0 : _b22.imageDetail
                   };
                 }
                 if (part.data instanceof URL) {
@@ -26281,7 +32692,7 @@ async function convertToOpenAIResponsesInput({
         for (const part of content) {
           switch (part.type) {
             case "text": {
-              const providerOpts = (_a17 = part.providerOptions) == null ? void 0 : _a17[providerOptionsName];
+              const providerOpts = (_a22 = part.providerOptions) == null ? void 0 : _a22[providerOptionsName];
               const id = providerOpts == null ? void 0 : providerOpts.itemId;
               const phase = providerOpts == null ? void 0 : providerOpts.phase;
               if (hasConversation && id != null) {
@@ -26661,7 +33072,7 @@ async function convertToOpenAIResponsesInput({
                 break;
               case "content":
                 outputValue = output.value.map((item) => {
-                  var _a22, _b22, _c2, _d2, _e2;
+                  var _a23, _b22, _c2, _d2, _e2;
                   switch (item.type) {
                     case "text":
                       return { type: "input_text", text: item.text };
@@ -26669,7 +33080,7 @@ async function convertToOpenAIResponsesInput({
                       return {
                         type: "input_image",
                         image_url: `data:${item.mediaType};base64,${item.data}`,
-                        detail: (_b22 = (_a22 = item.providerOptions) == null ? void 0 : _a22[providerOptionsName]) == null ? void 0 : _b22.imageDetail
+                        detail: (_b22 = (_a23 = item.providerOptions) == null ? void 0 : _a23[providerOptionsName]) == null ? void 0 : _b22.imageDetail
                       };
                     case "image-url":
                       return {
@@ -26722,7 +33133,7 @@ async function convertToOpenAIResponsesInput({
               break;
             case "content":
               contentValue = output.value.map((item) => {
-                var _a22, _b22, _c2, _d2, _e2;
+                var _a23, _b22, _c2, _d2, _e2;
                 switch (item.type) {
                   case "text": {
                     return { type: "input_text", text: item.text };
@@ -26731,7 +33142,7 @@ async function convertToOpenAIResponsesInput({
                     return {
                       type: "input_image",
                       image_url: `data:${item.mediaType};base64,${item.data}`,
-                      detail: (_b22 = (_a22 = item.providerOptions) == null ? void 0 : _a22[providerOptionsName]) == null ? void 0 : _b22.imageDetail
+                      detail: (_b22 = (_a23 = item.providerOptions) == null ? void 0 : _a23[providerOptionsName]) == null ? void 0 : _b22.imageDetail
                     };
                   }
                   case "image-url": {
@@ -27842,7 +34253,7 @@ async function prepareResponsesTools({
   toolNameMapping,
   customProviderToolNames
 }) {
-  var _a17, _b15, _c;
+  var _a22, _b15, _c;
   tools = (tools == null ? void 0 : tools.length) ? tools : void 0;
   const toolWarnings = [];
   if (tools == null) {
@@ -27854,7 +34265,7 @@ async function prepareResponsesTools({
   for (const tool2 of tools) {
     switch (tool2.type) {
       case "function": {
-        const openaiOptions = (_a17 = tool2.providerOptions) == null ? void 0 : _a17.openai;
+        const openaiOptions = (_a22 = tool2.providerOptions) == null ? void 0 : _a22.openai;
         const openaiFunctionTool = prepareFunctionTool({
           tool: tool2,
           options: openaiOptions
@@ -28056,11 +34467,11 @@ async function prepareResponsesTools({
       toolChoice: {
         type: "allowed_tools",
         mode: (_b15 = allowedTools.mode) != null ? _b15 : "auto",
-        tools: allowedTools.toolNames.map((name17) => {
-          var _a22;
+        tools: allowedTools.toolNames.map((name22) => {
+          var _a23;
           return {
             type: "function",
-            name: (_a22 = toolNameMapping == null ? void 0 : toolNameMapping.toProviderToolName(name17)) != null ? _a22 : name17
+            name: (_a23 = toolNameMapping == null ? void 0 : toolNameMapping.toProviderToolName(name22)) != null ? _a23 : name22
           };
         })
       },
@@ -28153,13 +34564,13 @@ function mapShellSkills(skills) {
   );
 }
 function extractApprovalRequestIdToToolCallIdMapping(prompt) {
-  var _a17, _b15;
+  var _a22, _b15;
   const mapping = {};
   for (const message of prompt) {
     if (message.role !== "assistant") continue;
     for (const part of message.content) {
       if (part.type !== "tool-call") continue;
-      const approvalRequestId = (_b15 = (_a17 = part.providerOptions) == null ? void 0 : _a17.openai) == null ? void 0 : _b15.approvalRequestId;
+      const approvalRequestId = (_b15 = (_a22 = part.providerOptions) == null ? void 0 : _a22.openai) == null ? void 0 : _b15.approvalRequestId;
       if (approvalRequestId != null) {
         mapping[approvalRequestId] = part.toolCallId;
       }
@@ -28195,7 +34606,7 @@ var OpenAIResponsesLanguageModel = class {
     toolChoice,
     responseFormat
   }) {
-    var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const warnings = [];
     const modelCapabilities = getOpenAILanguageModelCapabilities(this.modelId);
     if (topK != null) {
@@ -28226,7 +34637,7 @@ var OpenAIResponsesLanguageModel = class {
         schema: openaiLanguageModelResponsesOptionsSchema
       });
     }
-    const isReasoningModel = (_a17 = openaiOptions == null ? void 0 : openaiOptions.forceReasoning) != null ? _a17 : modelCapabilities.isReasoningModel;
+    const isReasoningModel = (_a22 = openaiOptions == null ? void 0 : openaiOptions.forceReasoning) != null ? _a22 : modelCapabilities.isReasoningModel;
     if ((openaiOptions == null ? void 0 : openaiOptions.conversation) && (openaiOptions == null ? void 0 : openaiOptions.previousResponseId)) {
       warnings.push({
         type: "unsupported",
@@ -28427,7 +34838,7 @@ var OpenAIResponsesLanguageModel = class {
     };
   }
   async doGenerate(options2) {
-    var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B;
+    var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B;
     const {
       args: body,
       warnings,
@@ -28484,7 +34895,7 @@ var OpenAIResponsesLanguageModel = class {
               providerMetadata: {
                 [providerOptionsName]: {
                   itemId: part.id,
-                  reasoningEncryptedContent: (_a17 = part.encrypted_content) != null ? _a17 : null
+                  reasoningEncryptedContent: (_a22 = part.encrypted_content) != null ? _a22 : null
                 }
               }
             });
@@ -28953,7 +35364,7 @@ var OpenAIResponsesLanguageModel = class {
             controller.enqueue({ type: "stream-start", warnings });
           },
           transform(chunk, controller) {
-            var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L;
+            var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L;
             if (options2.includeRawChunks) {
               controller.enqueue({ type: "raw", rawValue: chunk.rawValue });
             }
@@ -29068,7 +35479,7 @@ var OpenAIResponsesLanguageModel = class {
                 ongoingToolCalls[value.output_index] = {
                   toolName,
                   toolCallId,
-                  toolSearchExecution: (_a17 = value.item.execution) != null ? _a17 : "server"
+                  toolSearchExecution: (_a22 = value.item.execution) != null ? _a22 : "server"
                 };
                 if (isHosted) {
                   controller.enqueue({
@@ -29829,7 +36240,7 @@ function isErrorChunk(chunk) {
   return chunk.type === "error";
 }
 function mapWebSearchOutput(action) {
-  var _a17;
+  var _a22;
   if (action == null) {
     return {};
   }
@@ -29838,7 +36249,7 @@ function mapWebSearchOutput(action) {
       return {
         action: {
           type: "search",
-          query: (_a17 = action.query) != null ? _a17 : void 0,
+          query: (_a22 = action.query) != null ? _a22 : void 0,
           ...action.queries != null && { queries: action.queries }
         },
         // include sources when provided by the Responses API (behind include flag)
@@ -29932,8 +36343,8 @@ var OpenAISpeechModel = class {
     };
   }
   async doGenerate(options2) {
-    var _a17, _b15, _c;
-    const currentDate = (_c = (_b15 = (_a17 = this.config._internal) == null ? void 0 : _a17.currentDate) == null ? void 0 : _b15.call(_a17)) != null ? _c : /* @__PURE__ */ new Date();
+    var _a22, _b15, _c;
+    const currentDate = (_c = (_b15 = (_a22 = this.config._internal) == null ? void 0 : _a22.currentDate) == null ? void 0 : _b15.call(_a22)) != null ? _c : /* @__PURE__ */ new Date();
     const { requestBody, warnings } = await this.getArgs(options2);
     const {
       value: audio,
@@ -30144,8 +36555,8 @@ var OpenAITranscriptionModel = class {
     };
   }
   async doGenerate(options2) {
-    var _a17, _b15, _c, _d, _e, _f, _g, _h;
-    const currentDate = (_c = (_b15 = (_a17 = this.config._internal) == null ? void 0 : _a17.currentDate) == null ? void 0 : _b15.call(_a17)) != null ? _c : /* @__PURE__ */ new Date();
+    var _a22, _b15, _c, _d, _e, _f, _g, _h;
+    const currentDate = (_c = (_b15 = (_a22 = this.config._internal) == null ? void 0 : _a22.currentDate) == null ? void 0 : _b15.call(_a22)) != null ? _c : /* @__PURE__ */ new Date();
     const { formData, warnings } = await this.getArgs(options2);
     const {
       value: response,
@@ -30191,13 +36602,13 @@ var OpenAITranscriptionModel = class {
 };
 var VERSION$1 = "3.0.73";
 function createOpenAI(options2 = {}) {
-  var _a17, _b15;
-  const baseURL = (_a17 = withoutTrailingSlash(
+  var _a22, _b15;
+  const baseURL = (_a22 = withoutTrailingSlash(
     loadOptionalSetting({
       settingValue: options2.baseURL,
       environmentVariableName: "OPENAI_BASE_URL"
     })
-  )) != null ? _a17 : "https://api.openai.com/v1";
+  )) != null ? _a22 : "https://api.openai.com/v1";
   const providerName = (_b15 = options2.name) != null ? _b15 : "openai";
   const getHeaders = () => withUserAgentSuffix(
     {
@@ -30486,7 +36897,7 @@ var googleGenerativeAISingleEmbeddingResponseSchema = lazySchema(
   )
 );
 function convertGoogleGenerativeAIUsage(usage) {
-  var _a17, _b15, _c, _d;
+  var _a22, _b15, _c, _d;
   if (usage == null) {
     return {
       inputTokens: {
@@ -30503,7 +36914,7 @@ function convertGoogleGenerativeAIUsage(usage) {
       raw: void 0
     };
   }
-  const promptTokens = (_a17 = usage.promptTokenCount) != null ? _a17 : 0;
+  const promptTokens = (_a22 = usage.promptTokenCount) != null ? _a22 : 0;
   const candidatesTokens = (_b15 = usage.candidatesTokenCount) != null ? _b15 : 0;
   const cachedContentTokens = (_c = usage.cachedContentTokenCount) != null ? _c : 0;
   const thoughtsTokens = (_d = usage.thoughtsTokenCount) != null ? _d : 0;
@@ -30760,11 +37171,11 @@ function appendLegacyToolResultParts(parts, toolName, outputValue, toolCallId) {
   }
 }
 function convertToGoogleGenerativeAIMessages(prompt, options2) {
-  var _a17, _b15, _c, _d, _e;
+  var _a22, _b15, _c, _d, _e;
   const systemInstructionParts = [];
   const contents = [];
   let systemMessagesAllowed = true;
-  const isGemmaModel = (_a17 = options2 == null ? void 0 : options2.isGemmaModel) != null ? _a17 : false;
+  const isGemmaModel = (_a22 = options2 == null ? void 0 : options2.isGemmaModel) != null ? _a22 : false;
   const isGemini3Model = (_b15 = options2 == null ? void 0 : options2.isGemini3Model) != null ? _b15 : false;
   const providerOptionsName = (_c = options2 == null ? void 0 : options2.providerOptionsName) != null ? _c : "google";
   const supportsFunctionResponseParts = (_d = options2 == null ? void 0 : options2.supportsFunctionResponseParts) != null ? _d : true;
@@ -30976,7 +37387,7 @@ function convertToGoogleGenerativeAIMessages(prompt, options2) {
     const uniqueToolNames = Array.from(new Set(missingSignatureToolNames));
     onWarning({
       type: "other",
-      message: `Replayed ${missingSignatureToolNames.length} \`functionCall\` part(s) for a Gemini 3 model without a \`thoughtSignature\` (tools: ${uniqueToolNames.map((name17) => `\`${name17}\``).join(", ")}). Injected the documented \`skip_thought_signature_validator\` sentinel to keep the request from failing with HTTP 400. The likely cause is application code that drops \`providerOptions.google.thoughtSignature\` when persisting or serializing assistant tool-call messages. See https://ai.google.dev/gemini-api/docs/thought-signatures.`
+      message: `Replayed ${missingSignatureToolNames.length} \`functionCall\` part(s) for a Gemini 3 model without a \`thoughtSignature\` (tools: ${uniqueToolNames.map((name22) => `\`${name22}\``).join(", ")}). Injected the documented \`skip_thought_signature_validator\` sentinel to keep the request from failing with HTTP 400. The likely cause is application code that drops \`providerOptions.google.thoughtSignature\` when persisting or serializing assistant tool-call messages. See https://ai.google.dev/gemini-api/docs/thought-signatures.`
     });
   }
   return {
@@ -31146,7 +37557,7 @@ function prepareTools({
   modelId,
   isVertexProvider = false
 }) {
-  var _a17, _b15;
+  var _a22, _b15;
   tools = (tools == null ? void 0 : tools.length) ? tools : void 0;
   const toolWarnings = [];
   const isLatest = [
@@ -31273,7 +37684,7 @@ function prepareTools({
         if (tool2.type === "function") {
           functionDeclarations2.push({
             name: tool2.name,
-            description: (_a17 = tool2.description) != null ? _a17 : "",
+            description: (_a22 = tool2.description) != null ? _a22 : "",
             parameters: convertJSONSchemaToOpenAPISchema(tool2.inputSchema)
           });
         }
@@ -31611,8 +38022,8 @@ function setNestedValue(obj, segments, value) {
   defineOwnProperty(current, segments[segments.length - 1], value);
 }
 function resolvePartialArgValue(arg) {
-  var _a17, _b15;
-  const value = (_b15 = (_a17 = arg.stringValue) != null ? _a17 : arg.numberValue) != null ? _b15 : arg.boolValue;
+  var _a22, _b15;
+  const value = (_b15 = (_a22 = arg.stringValue) != null ? _a22 : arg.numberValue) != null ? _b15 : arg.boolValue;
   if (value != null) return { value, json: JSON.stringify(value) };
   if ("nullValue" in arg) return { value: null, json: "null" };
   return void 0;
@@ -31644,17 +38055,17 @@ function mapGoogleGenerativeAIFinishReason({
 var GoogleGenerativeAILanguageModel = class {
   constructor(modelId, config2) {
     this.specificationVersion = "v3";
-    var _a17;
+    var _a22;
     this.modelId = modelId;
     this.config = config2;
-    this.generateId = (_a17 = config2.generateId) != null ? _a17 : generateId;
+    this.generateId = (_a22 = config2.generateId) != null ? _a22 : generateId;
   }
   get provider() {
     return this.config.provider;
   }
   get supportedUrls() {
-    var _a17, _b15, _c;
-    return (_c = (_b15 = (_a17 = this.config).supportedUrls) == null ? void 0 : _b15.call(_a17)) != null ? _c : {};
+    var _a22, _b15, _c;
+    return (_c = (_b15 = (_a22 = this.config).supportedUrls) == null ? void 0 : _b15.call(_a22)) != null ? _c : {};
   }
   async getArgs({
     prompt,
@@ -31671,7 +38082,7 @@ var GoogleGenerativeAILanguageModel = class {
     toolChoice,
     providerOptions
   }, { isStreaming = false } = {}) {
-    var _a17, _b15;
+    var _a22, _b15;
     const warnings = [];
     const providerOptionsName = this.config.provider.includes("vertex") ? "vertex" : "google";
     let googleOptions = await parseProviderOptions({
@@ -31745,7 +38156,7 @@ var GoogleGenerativeAILanguageModel = class {
       modelId: this.modelId,
       isVertexProvider
     });
-    const streamFunctionCallArguments = isStreaming && isVertexProvider ? (_a17 = googleOptions == null ? void 0 : googleOptions.streamFunctionCallArguments) != null ? _a17 : false : void 0;
+    const streamFunctionCallArguments = isStreaming && isVertexProvider ? (_a22 = googleOptions == null ? void 0 : googleOptions.streamFunctionCallArguments) != null ? _a22 : false : void 0;
     const toolConfig = googleToolConfig || streamFunctionCallArguments || (googleOptions == null ? void 0 : googleOptions.retrievalConfig) ? {
       ...googleToolConfig,
       ...streamFunctionCallArguments && {
@@ -31804,7 +38215,7 @@ var GoogleGenerativeAILanguageModel = class {
     };
   }
   async doGenerate(options2) {
-    var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
+    var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
     const { args, warnings, providerOptionsName, extraHeaders } = await this.getArgs(options2);
     const mergedHeaders = combineHeaders(
       await resolve(this.config.headers),
@@ -31828,7 +38239,7 @@ var GoogleGenerativeAILanguageModel = class {
     });
     const candidate = response.candidates[0];
     const content = [];
-    const parts = (_b15 = (_a17 = candidate.content) == null ? void 0 : _a17.parts) != null ? _b15 : [];
+    const parts = (_b15 = (_a22 = candidate.content) == null ? void 0 : _a22.parts) != null ? _b15 : [];
     const usageMetadata = response.usageMetadata;
     let lastCodeExecutionToolCallId;
     let lastServerToolCallId;
@@ -32055,7 +38466,7 @@ var GoogleGenerativeAILanguageModel = class {
             controller.enqueue({ type: "stream-start", warnings });
           },
           transform(chunk, controller) {
-            var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+            var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
             if (options2.includeRawChunks) {
               controller.enqueue({ type: "raw", rawValue: chunk.rawValue });
             }
@@ -32068,7 +38479,7 @@ var GoogleGenerativeAILanguageModel = class {
             if (usageMetadata != null) {
               usage = usageMetadata;
             }
-            const candidate = (_a17 = value.candidates) == null ? void 0 : _a17[0];
+            const candidate = (_a22 = value.candidates) == null ? void 0 : _a22[0];
             if (candidate == null) {
               return;
             }
@@ -32411,7 +38822,7 @@ function extractSources({
   groundingMetadata,
   generateId: generateId3
 }) {
-  var _a17, _b15, _c, _d, _e, _f;
+  var _a22, _b15, _c, _d, _e, _f;
   if (!(groundingMetadata == null ? void 0 : groundingMetadata.groundingChunks)) {
     return void 0;
   }
@@ -32423,7 +38834,7 @@ function extractSources({
         sourceType: "url",
         id: generateId3(),
         url: chunk.web.uri,
-        title: (_a17 = chunk.web.title) != null ? _a17 : void 0
+        title: (_a22 = chunk.web.title) != null ? _a22 : void 0
       });
     } else if (chunk.image != null) {
       sources.push({
@@ -32845,7 +39256,7 @@ var GoogleGenerativeAIImageModel = class {
     return this.doGenerateImagen(options2);
   }
   async doGenerateImagen(options2) {
-    var _a17, _b15, _c;
+    var _a22, _b15, _c;
     const {
       prompt,
       n = 1,
@@ -32888,7 +39299,7 @@ var GoogleGenerativeAIImageModel = class {
       providerOptions,
       schema: googleImageModelOptionsSchema
     });
-    const currentDate = (_c = (_b15 = (_a17 = this.config._internal) == null ? void 0 : _a17.currentDate) == null ? void 0 : _b15.call(_a17)) != null ? _c : /* @__PURE__ */ new Date();
+    const currentDate = (_c = (_b15 = (_a22 = this.config._internal) == null ? void 0 : _a22.currentDate) == null ? void 0 : _b15.call(_a22)) != null ? _c : /* @__PURE__ */ new Date();
     const parameters = {
       sampleCount: n
     };
@@ -32941,7 +39352,7 @@ var GoogleGenerativeAIImageModel = class {
     };
   }
   async doGenerateGemini(options2) {
-    var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const {
       prompt,
       n,
@@ -33001,7 +39412,7 @@ var GoogleGenerativeAIImageModel = class {
       providerOptions,
       schema: googleImageModelOptionsSchema
     });
-    const { googleSearch: _strippedGoogleSearch, ...passthroughGoogleOptions } = (_a17 = providerOptions == null ? void 0 : providerOptions.google) != null ? _a17 : {};
+    const { googleSearch: _strippedGoogleSearch, ...passthroughGoogleOptions } = (_a22 = providerOptions == null ? void 0 : providerOptions.google) != null ? _a22 : {};
     const languageModel = new GoogleGenerativeAILanguageModel(this.modelId, {
       provider: this.config.provider,
       baseURL: this.config.baseURL,
@@ -33103,8 +39514,8 @@ var GoogleGenerativeAIVideoModel = class {
     return 4;
   }
   async doGenerate(options2) {
-    var _a17, _b15, _c, _d, _e, _f, _g, _h;
-    const currentDate = (_c = (_b15 = (_a17 = this.config._internal) == null ? void 0 : _a17.currentDate) == null ? void 0 : _b15.call(_a17)) != null ? _c : /* @__PURE__ */ new Date();
+    var _a22, _b15, _c, _d, _e, _f, _g, _h;
+    const currentDate = (_c = (_b15 = (_a22 = this.config._internal) == null ? void 0 : _a22.currentDate) == null ? void 0 : _b15.call(_a22)) != null ? _c : /* @__PURE__ */ new Date();
     const warnings = [];
     const googleOptions = await parseProviderOptions({
       provider: "google",
@@ -33338,7 +39749,7 @@ var googleVideoModelOptionsSchema = lazySchema(
   )
 );
 function convertGoogleInteractionsUsage(usage) {
-  var _a17, _b15, _c, _d, _e, _f, _g, _h;
+  var _a22, _b15, _c, _d, _e, _f, _g, _h;
   if (usage == null) {
     return {
       inputTokens: {
@@ -33355,7 +39766,7 @@ function convertGoogleInteractionsUsage(usage) {
       raw: void 0
     };
   }
-  const totalInput = (_a17 = usage.total_input_tokens) != null ? _a17 : 0;
+  const totalInput = (_a22 = usage.total_input_tokens) != null ? _a22 : 0;
   const totalOutput = (_b15 = usage.total_output_tokens) != null ? _b15 : 0;
   const totalThought = (_c = usage.total_thought_tokens) != null ? _c : 0;
   const totalCached = (_d = usage.total_cached_tokens) != null ? _d : 0;
@@ -33398,7 +39809,7 @@ function annotationToSource({
   annotation,
   generateId: generateId3
 }) {
-  var _a17, _b15, _c, _d, _e;
+  var _a22, _b15, _c, _d, _e;
   switch (annotation.type) {
     case "url_citation": {
       const a = annotation;
@@ -33413,7 +39824,7 @@ function annotationToSource({
     }
     case "file_citation": {
       const a = annotation;
-      const uri = (_b15 = (_a17 = a.url) != null ? _a17 : a.document_uri) != null ? _b15 : a.file_name;
+      const uri = (_b15 = (_a22 = a.url) != null ? _a22 : a.document_uri) != null ? _b15 : a.file_name;
       if (uri == null || uri.length === 0) return void 0;
       if (uri.startsWith("http://") || uri.startsWith("https://")) {
         return {
@@ -33454,11 +39865,11 @@ function builtinToolResultToSources({
   block,
   generateId: generateId3
 }) {
-  var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+  var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k;
   const sources = [];
   switch (block.type) {
     case "url_context_result": {
-      const result = (_a17 = block.result) != null ? _a17 : [];
+      const result = (_a22 = block.result) != null ? _a22 : [];
       for (const entry of result) {
         if ((entry == null ? void 0 : entry.url) == null || entry.url.length === 0) continue;
         if (entry.status != null && entry.status !== "success") continue;
@@ -33539,14 +39950,14 @@ function annotationsToSources({
   annotations,
   generateId: generateId3
 }) {
-  var _a17;
+  var _a22;
   if (annotations == null) return [];
   const seen = /* @__PURE__ */ new Set();
   const sources = [];
   for (const annotation of annotations) {
     const source = annotationToSource({ annotation, generateId: generateId3 });
     if (source == null) continue;
-    const key = source.sourceType === "url" ? `url:${source.url}` : `doc:${(_a17 = source.filename) != null ? _a17 : source.title}`;
+    const key = source.sourceType === "url" ? `url:${source.url}` : `doc:${(_a22 = source.filename) != null ? _a22 : source.title}`;
     if (seen.has(key)) continue;
     seen.add(key);
     sources.push(source);
@@ -33609,15 +40020,15 @@ function buildGoogleInteractionsStreamTransform({
   const openBlocks = /* @__PURE__ */ new Map();
   const emittedSourceKeys = /* @__PURE__ */ new Set();
   function sourceKey(source) {
-    var _a17;
-    return source.sourceType === "url" ? `url:${source.url}` : `doc:${(_a17 = source.filename) != null ? _a17 : source.title}`;
+    var _a22;
+    return source.sourceType === "url" ? `url:${source.url}` : `doc:${(_a22 = source.filename) != null ? _a22 : source.title}`;
   }
   return new TransformStream({
     start(controller) {
       controller.enqueue({ type: "stream-start", warnings });
     },
     transform(chunk, controller) {
-      var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
+      var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
       if (includeRawChunks) {
         controller.enqueue({ type: "raw", rawValue: chunk.rawValue });
       }
@@ -33656,7 +40067,7 @@ function buildGoogleInteractionsStreamTransform({
           const blockId = `${interactionId != null ? interactionId : "interaction"}:${index2}`;
           const stepType = step == null ? void 0 : step.type;
           if (stepType === "model_output") {
-            const initial = (_a17 = step == null ? void 0 : step.content) == null ? void 0 : _a17[0];
+            const initial = (_a22 = step == null ? void 0 : step.content) == null ? void 0 : _a22[0];
             if ((initial == null ? void 0 : initial.type) === "text") {
               openBlocks.set(index2, {
                 kind: "text",
@@ -34063,7 +40474,7 @@ function convertToGoogleInteractionsInput({
   store,
   mediaResolution
 }) {
-  var _a17, _b15, _c, _d, _e, _f, _g;
+  var _a22, _b15, _c, _d, _e, _f, _g;
   const warnings = [];
   const incoherentCombo = previousInteractionId != null && store === false;
   const shouldCompact = previousInteractionId != null && store !== false;
@@ -34120,7 +40531,7 @@ function convertToGoogleInteractionsInput({
             pendingModelOutput.push({ type: "text", text: part.text });
           } else if (part.type === "reasoning") {
             flushModelOutput();
-            const signature = (_b15 = (_a17 = part.providerOptions) == null ? void 0 : _a17.google) == null ? void 0 : _b15.signature;
+            const signature = (_b15 = (_a22 = part.providerOptions) == null ? void 0 : _a22.google) == null ? void 0 : _b15.signature;
             steps.push({
               type: "thought",
               ...signature != null ? { signature } : {},
@@ -34247,8 +40658,8 @@ function compactPromptForPreviousInteraction({
   for (const message of prompt) {
     if (message.role === "assistant") {
       const matchesLinkedInteraction = message.content.some((part) => {
-        var _a17, _b15;
-        const partInteractionId = (_b15 = (_a17 = part.providerOptions) == null ? void 0 : _a17.google) == null ? void 0 : _b15.interactionId;
+        var _a22, _b15;
+        const partInteractionId = (_b15 = (_a22 = part.providerOptions) == null ? void 0 : _a22.google) == null ? void 0 : _b15.interactionId;
         return partInteractionId === previousInteractionId;
       });
       if (matchesLinkedInteraction) {
@@ -34300,7 +40711,7 @@ function convertToolResultPart({
   signature,
   warnings
 }) {
-  var _a17;
+  var _a22;
   const base = {
     type: "function_result",
     call_id: toolCallId,
@@ -34320,7 +40731,7 @@ function convertToolResultPart({
       return {
         ...base,
         is_error: true,
-        result: (_a17 = output.reason) != null ? _a17 : "Tool execution denied by user."
+        result: (_a22 = output.reason) != null ? _a22 : "Tool execution denied by user."
       };
     case "content": {
       const blocks = [];
@@ -34964,7 +41375,7 @@ function parseGoogleInteractionsOutputs({
   generateId: generateId3,
   interactionId
 }) {
-  var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+  var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k;
   const content = [];
   let hasFunctionCall = false;
   if (steps == null) {
@@ -34979,7 +41390,7 @@ function parseGoogleInteractionsOutputs({
         break;
       }
       case "model_output": {
-        const blocks = (_a17 = step.content) != null ? _a17 : [];
+        const blocks = (_a22 = step.content) != null ? _a22 : [];
         for (const block of blocks) {
           if (block == null || typeof block !== "object") continue;
           const blockType = block.type;
@@ -35182,7 +41593,7 @@ function prepareGoogleInteractionsTools({
   tools,
   toolChoice
 }) {
-  var _a17, _b15, _c, _d;
+  var _a22, _b15, _c, _d;
   const toolWarnings = [];
   const normalized = (tools == null ? void 0 : tools.length) ? tools : void 0;
   if (normalized == null) {
@@ -35194,7 +41605,7 @@ function prepareGoogleInteractionsTools({
       interactionsTools.push({
         type: "function",
         name: tool2.name,
-        description: (_a17 = tool2.description) != null ? _a17 : "",
+        description: (_a22 = tool2.description) != null ? _a22 : "",
         parameters: tool2.inputSchema
       });
       continue;
@@ -35493,7 +41904,7 @@ function synthesizeGoogleInteractionsAgentStream({
 }) {
   return new ReadableStream({
     start(controller) {
-      var _a17, _b15, _c;
+      var _a22, _b15, _c;
       controller.enqueue({ type: "stream-start", warnings });
       const interactionId = typeof response.id === "string" && response.id.length > 0 ? response.id : void 0;
       let timestamp;
@@ -35507,7 +41918,7 @@ function synthesizeGoogleInteractionsAgentStream({
       controller.enqueue({
         type: "response-metadata",
         ...interactionId != null ? { id: interactionId } : {},
-        modelId: (_a17 = response.model) != null ? _a17 : void 0,
+        modelId: (_a22 = response.model) != null ? _a22 : void 0,
         ...timestamp ? { timestamp } : {}
       });
       if (includeRawChunks) {
@@ -35655,7 +42066,7 @@ var GoogleInteractionsLanguageModel = class {
     };
   }
   async getArgs(options2) {
-    var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z;
+    var _a22, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z;
     const warnings = [];
     const opts = await parseProviderOptions({
       provider: "google",
@@ -35681,7 +42092,7 @@ var GoogleInteractionsLanguageModel = class {
       warnings.push(...prepared.toolWarnings);
     }
     const responseFormatEntries = [];
-    if (((_a17 = options2.responseFormat) == null ? void 0 : _a17.type) === "json") {
+    if (((_a22 = options2.responseFormat) == null ? void 0 : _a22.type) === "json") {
       if (isAgent) {
         warnings.push({
           type: "other",
@@ -35824,7 +42235,7 @@ var GoogleInteractionsLanguageModel = class {
       } else {
         const env = opts.environment;
         const sources = (_u = env.sources) == null ? void 0 : _u.map((s) => {
-          var _a22;
+          var _a23;
           if (s.type === "inline") {
             return {
               type: "inline",
@@ -35835,7 +42246,7 @@ var GoogleInteractionsLanguageModel = class {
           return pruneUndefined({
             type: s.type,
             source: s.source,
-            target: (_a22 = s.target) != null ? _a22 : void 0
+            target: (_a23 = s.target) != null ? _a23 : void 0
           });
         });
         let network;
@@ -35845,10 +42256,10 @@ var GoogleInteractionsLanguageModel = class {
           network = {
             allowlist: env.network.allowlist.map(
               (entry) => {
-                var _a22;
+                var _a23;
                 return pruneUndefined({
                   domain: entry.domain,
-                  transform: (_a22 = entry.transform) != null ? _a22 : void 0
+                  transform: (_a23 = entry.transform) != null ? _a23 : void 0
                 });
               }
             )
@@ -35885,7 +42296,7 @@ var GoogleInteractionsLanguageModel = class {
     };
   }
   async doGenerate(options2) {
-    var _a17, _b15, _c, _d, _e, _f;
+    var _a22, _b15, _c, _d, _e, _f;
     const { args, warnings, isAgent, pollingTimeoutMs } = await this.getArgs(options2);
     const url = `${this.config.baseURL}/interactions`;
     const mergedHeaders = combineHeaders(
@@ -35920,7 +42331,7 @@ var GoogleInteractionsLanguageModel = class {
       });
       response = polled.response;
       rawResponse = polled.rawResponse;
-      responseHeaders = (_a17 = polled.responseHeaders) != null ? _a17 : responseHeaders;
+      responseHeaders = (_a22 = polled.responseHeaders) != null ? _a22 : responseHeaders;
     }
     const interactionId = typeof response.id === "string" && response.id.length > 0 ? response.id : void 0;
     const { content, hasFunctionCall } = parseGoogleInteractionsOutputs({
@@ -35966,7 +42377,7 @@ var GoogleInteractionsLanguageModel = class {
     };
   }
   async doStream(options2) {
-    var _a17;
+    var _a22;
     const { args, warnings, isBackground, pollingTimeoutMs } = await this.getArgs(options2);
     const url = `${this.config.baseURL}/interactions`;
     const mergedHeaders = combineHeaders(
@@ -35999,7 +42410,7 @@ var GoogleInteractionsLanguageModel = class {
     const headerServiceTier = responseHeaders == null ? void 0 : responseHeaders["x-gemini-service-tier"];
     const transform2 = buildGoogleInteractionsStreamTransform({
       warnings,
-      generateId: (_a17 = this.config.generateId) != null ? _a17 : generateId,
+      generateId: (_a22 = this.config.generateId) != null ? _a22 : generateId,
       includeRawChunks: options2.includeRawChunks,
       serviceTier: headerServiceTier
     });
@@ -36035,7 +42446,7 @@ var GoogleInteractionsLanguageModel = class {
     options: options2,
     pollingTimeoutMs
   }) {
-    var _a17, _b15;
+    var _a22, _b15;
     const postResult = await postJsonToApi({
       url,
       headers: mergedHeaders,
@@ -36059,7 +42470,7 @@ var GoogleInteractionsLanguageModel = class {
       const synthesized = synthesizeGoogleInteractionsAgentStream({
         response: postResponse,
         warnings,
-        generateId: (_a17 = this.config.generateId) != null ? _a17 : generateId,
+        generateId: (_a22 = this.config.generateId) != null ? _a22 : generateId,
         includeRawChunks: options2.includeRawChunks,
         headerServiceTier
       });
@@ -36101,8 +42512,8 @@ function pruneUndefined(obj) {
   return result;
 }
 function createGoogleGenerativeAI(options2 = {}) {
-  var _a17, _b15;
-  const baseURL = (_a17 = withoutTrailingSlash(options2.baseURL)) != null ? _a17 : "https://generativelanguage.googleapis.com/v1beta";
+  var _a22, _b15;
+  const baseURL = (_a22 = withoutTrailingSlash(options2.baseURL)) != null ? _a22 : "https://generativelanguage.googleapis.com/v1beta";
   const providerName = (_b15 = options2.name) != null ? _b15 : "google.generative-ai";
   const getHeaders = () => withUserAgentSuffix(
     {
@@ -36116,12 +42527,12 @@ function createGoogleGenerativeAI(options2 = {}) {
     `ai-sdk/google/${VERSION}`
   );
   const createChatModel = (modelId) => {
-    var _a22;
+    var _a23;
     return new GoogleGenerativeAILanguageModel(modelId, {
       provider: providerName,
       baseURL,
       headers: getHeaders,
-      generateId: (_a22 = options2.generateId) != null ? _a22 : generateId,
+      generateId: (_a23 = options2.generateId) != null ? _a23 : generateId,
       supportedUrls: () => ({
         "*": [
           // Google Generative Language "files" endpoint
@@ -36150,24 +42561,24 @@ function createGoogleGenerativeAI(options2 = {}) {
     fetch: options2.fetch
   });
   const createVideoModel = (modelId) => {
-    var _a22;
+    var _a23;
     return new GoogleGenerativeAIVideoModel(modelId, {
       provider: providerName,
       baseURL,
       headers: getHeaders,
       fetch: options2.fetch,
-      generateId: (_a22 = options2.generateId) != null ? _a22 : generateId
+      generateId: (_a23 = options2.generateId) != null ? _a23 : generateId
     });
   };
   const createInteractionsModel = (modelIdOrAgent) => {
-    var _a22;
+    var _a23;
     return new GoogleInteractionsLanguageModel(
       modelIdOrAgent,
       {
         provider: `${providerName}.interactions`,
         baseURL,
         headers: getHeaders,
-        generateId: (_a22 = options2.generateId) != null ? _a22 : generateId,
+        generateId: (_a23 = options2.generateId) != null ? _a23 : generateId,
         fetch: options2.fetch
       }
     );
@@ -36331,14 +42742,24 @@ const chatController = ({ strapi }) => ({
         modeAtSend: mode
       });
     }
-    const trimmed = messages.map((message, index2) => {
-      const keepFiles = index2 === messages.length - 1 && supportsVision;
-      return keepFiles ? message : { ...message, parts: (message.parts ?? []).filter((part) => part.type !== "file") };
-    });
+    const context2 = await threads().buildContext(threadId, ownerId);
+    const history = context2?.messages ?? [];
+    const incomingFileParts = supportsVision && lastMessage?.role === "user" ? (lastMessage.parts ?? []).filter((part) => part?.type === "file") : [];
+    const replayed = history.map((message, index2) => ({
+      id: message.id,
+      role: message.role,
+      parts: index2 === history.length - 1 && incomingFileParts.length > 0 ? [...message.parts, ...incomingFileParts] : message.parts
+    }));
     const result = streamText({
       model,
-      system: plugin.service("prompt").build({ mode, supportsVision }),
-      messages: await convertToModelMessages(trimmed),
+      system: [
+        plugin.service("prompt").build({ mode, supportsVision }),
+        context2?.summary ? `## Earlier in this conversation (condensed)
+These notes replace older turns that were summarized to stay inside the model's context. Treat them as fact.
+
+${context2.summary}` : null
+      ].filter(Boolean).join("\n\n"),
+      messages: await convertToModelMessages(replayed),
       tools,
       stopWhen: stepCountIs(8),
       onError({ error }) {
@@ -36386,6 +42807,16 @@ const chatController = ({ strapi }) => ({
 const createSchema = object$1({
   mode: _enum(CHAT_MODES).optional()
 });
+const updateSchema = object$1({
+  title: string().max(120).optional(),
+  mode: _enum(CHAT_MODES).optional()
+}).refine((body) => body.title !== void 0 || body.mode !== void 0, {
+  message: "Provide a title or a mode."
+});
+const listSchema = object$1({
+  limit: number().int().min(1).max(100).optional(),
+  cursor: string().optional()
+});
 const NOT_FOUND$1 = "That conversation does not exist.";
 const threadsController = ({ strapi }) => {
   const threads = () => strapi.plugin("ai-content-studio").service("threads");
@@ -36408,6 +42839,22 @@ const threadsController = ({ strapi }) => {
       ctx.body = thread;
       return void 0;
     },
+    async find(ctx) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized("Not authenticated.");
+      }
+      const parsed = listSchema.safeParse(ctx.request.query ?? {});
+      if (!parsed.success) {
+        return ctx.badRequest("`limit` must be between 1 and 100.");
+      }
+      ctx.body = await threads().listThreads({
+        ownerId,
+        limit: parsed.data.limit ?? 30,
+        cursor: parsed.data.cursor ?? null
+      });
+      return void 0;
+    },
     async findOne(ctx) {
       const ownerId = ownerOf(ctx);
       if (ownerId === null) {
@@ -36418,6 +42865,38 @@ const threadsController = ({ strapi }) => {
         return ctx.notFound(NOT_FOUND$1);
       }
       ctx.body = history;
+      return void 0;
+    },
+    async update(ctx) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized("Not authenticated.");
+      }
+      const parsed = updateSchema.safeParse(ctx.request.body ?? {});
+      if (!parsed.success) {
+        return ctx.badRequest("Provide a title, or a mode of content, layout or audit.");
+      }
+      const id = String(ctx.params.id);
+      if (parsed.data.mode) {
+        await threads().setMode(id, ownerId, parsed.data.mode);
+      }
+      const summary = parsed.data.title !== void 0 ? await threads().renameThread(id, ownerId, parsed.data.title) : await threads().getOwnedThread(id, ownerId).then((thread) => thread ? threads().summarize(thread) : null);
+      if (!summary) {
+        return ctx.notFound(NOT_FOUND$1);
+      }
+      ctx.body = summary;
+      return void 0;
+    },
+    async delete(ctx) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized("Not authenticated.");
+      }
+      const deleted = await threads().deleteThread(String(ctx.params.id), ownerId);
+      if (!deleted) {
+        return ctx.notFound(NOT_FOUND$1);
+      }
+      ctx.status = 204;
       return void 0;
     }
   };
@@ -36947,8 +43426,11 @@ const routes = {
     routes: [
       chatRoute("POST", "/chat", "chat.chat"),
       // Threads — the caller's own conversations only.
+      chatRoute("GET", "/threads", "threads.find"),
       chatRoute("POST", "/threads", "threads.create"),
       chatRoute("GET", "/threads/:id", "threads.findOne"),
+      chatRoute("PATCH", "/threads/:id", "threads.update"),
+      chatRoute("DELETE", "/threads/:id", "threads.delete"),
       // Change plans. `apply` is the only route in this plugin that mutates content.
       chatRoute("GET", "/change-sets/:id", "change-sets.findOne"),
       chatRoute("POST", "/change-sets/:id/apply", "change-sets.apply"),
@@ -37312,6 +43794,16 @@ const promptService = ({ strapi: _strapi }) => ({
 });
 const DEFAULT_TITLE = "New conversation";
 const MAX_TITLE_CHARS = 60;
+const VERBATIM_BUDGET_CHARS = 6e4;
+const MIN_VERBATIM_TURNS = 4;
+const CONDENSE_INPUT_CHARS = 24e3;
+const textOf = (message) => (message.parts ?? []).map((part) => {
+  const p = part;
+  if (p?.type === "text" && typeof p.text === "string") {
+    return p.text;
+  }
+  return p?.type ? `[${p.type}]` : "";
+}).filter(Boolean).join("\n");
 const threadsService = ({ strapi }) => {
   const docs = (uid) => strapi.documents(uid);
   const chains = /* @__PURE__ */ new Map();
@@ -37426,6 +43918,78 @@ const threadsService = ({ strapi }) => {
           changeSetId: null
         };
       });
+    },
+    /**
+     * The caller's own threads, most-recent-first (FR-018). Cursor is a `lastActivityAt` ISO
+     * string, so paging is stable while new activity lands at the front.
+     */
+    async listThreads({
+      ownerId,
+      limit = 30,
+      cursor
+    }) {
+      const clamped = Math.min(100, Math.max(1, Math.trunc(limit) || 30));
+      const rows = await docs(UID.thread).findMany({
+        filters: {
+          ownerId,
+          ...cursor ? { lastActivityAt: { $lt: cursor } } : {}
+        },
+        sort: "lastActivityAt:desc",
+        // One extra row tells us whether another page exists without a second count query.
+        limit: clamped + 1
+      });
+      const list = Array.isArray(rows) ? rows : [];
+      const page = list.slice(0, clamped);
+      const counts = await Promise.all(
+        page.map(
+          (thread) => docs(UID.message).count({ filters: { thread: { documentId: thread.documentId } } })
+        )
+      );
+      return {
+        threads: page.map((thread, i) => ({
+          ...service.summarize(thread),
+          messageCount: Number(counts[i] ?? 0)
+        })),
+        nextCursor: list.length > clamped ? page[page.length - 1]?.lastActivityAt ?? null : null
+      };
+    },
+    /** Rename. The user's title wins over the automatic one from then on (FR-019). */
+    async renameThread(threadId, ownerId, title) {
+      const thread = await service.getOwnedThread(threadId, ownerId);
+      if (!thread) {
+        return null;
+      }
+      const trimmed = (title ?? "").trim().slice(0, MAX_TITLE_CHARS);
+      if (trimmed === "") {
+        return service.summarize(thread);
+      }
+      const updated = await docs(UID.thread).update({
+        documentId: threadId,
+        data: { title: trimmed }
+      });
+      return service.summarize(updated);
+    },
+    /**
+     * Delete a thread and everything belonging to it: messages, change sets, preview sessions and
+     * their staged bytes (FR-022). Content and Media Library entries an APPLIED plan already
+     * produced are deliberately left alone — deleting a conversation must not undo approved work.
+     */
+    async deleteThread(threadId, ownerId) {
+      const thread = await service.getOwnedThread(threadId, ownerId);
+      if (!thread) {
+        return false;
+      }
+      const messages = await docs(UID.message).findMany({
+        filters: { thread: { documentId: threadId } },
+        fields: ["documentId"],
+        limit: -1
+      });
+      for (const message of Array.isArray(messages) ? messages : []) {
+        await docs(UID.message).delete({ documentId: message.documentId });
+      }
+      await strapi.plugin("ai-content-studio").service("change-sets").deleteForThread(threadId);
+      await docs(UID.thread).delete({ documentId: threadId });
+      return true;
     },
     /** Ordered messages for one thread. Owner-scoped; empty array is a valid history. */
     async listMessages(threadId) {
@@ -37567,6 +44131,78 @@ const threadsService = ({ strapi }) => {
         return;
       }
       await docs(UID.thread).update({ documentId: threadId, data: { mode } });
+    },
+    /**
+     * Context for the next model request (R9, FR-021).
+     *
+     * Recent turns go verbatim up to a character budget; everything older is replaced by a running
+     * summary stored on the thread and refreshed when the tail grows past the budget. The request
+     * NEVER fails because a thread got long, and the UI is told detail was condensed.
+     *
+     * The summary is produced by the ACTIVE provider, so no second provider is introduced
+     * (Constitution III).
+     */
+    async buildContext(threadId, ownerId) {
+      const thread = await service.getOwnedThread(threadId, ownerId);
+      if (!thread) {
+        return null;
+      }
+      const all = await service.listMessages(threadId);
+      const verbatim = [];
+      let used = 0;
+      for (let i = all.length - 1; i >= 0; i -= 1) {
+        const size = textOf(all[i]).length;
+        if (verbatim.length >= MIN_VERBATIM_TURNS && used + size > VERBATIM_BUDGET_CHARS) {
+          break;
+        }
+        verbatim.unshift(all[i]);
+        used += size;
+      }
+      const older = all.slice(0, all.length - verbatim.length);
+      if (older.length === 0) {
+        return { summary: thread.contextSummary ?? null, messages: verbatim, condensed: false };
+      }
+      const lastOlderId = older[older.length - 1].id;
+      if (thread.contextSummary && thread.summarizedThroughMessageId === lastOlderId) {
+        return { summary: thread.contextSummary, messages: verbatim, condensed: true };
+      }
+      const summary = await service.summarizeTurns(older, thread.contextSummary ?? null);
+      if (summary) {
+        await docs(UID.thread).update({
+          documentId: threadId,
+          data: { contextSummary: summary, summarizedThroughMessageId: lastOlderId }
+        });
+        return { summary, messages: verbatim, condensed: true };
+      }
+      return { summary: thread.contextSummary ?? null, messages: verbatim, condensed: true };
+    },
+    /** Condense older turns into a running summary with the active provider. Null on failure. */
+    async summarizeTurns(older, previousSummary) {
+      const transcript = older.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${textOf(m).slice(0, 2e3)}`).join("\n").slice(0, CONDENSE_INPUT_CHARS);
+      if (transcript.trim() === "") {
+        return previousSummary;
+      }
+      try {
+        const { generateText: generateText2 } = await Promise.resolve().then(() => index$1);
+        const { model } = await strapi.plugin("ai-content-studio").service("registry").getActiveModel();
+        const { text: text2 } = await generateText2({
+          model,
+          system: "You compress a Strapi content-editing conversation into durable notes. Keep every concrete referent a later turn might need: content-type uids, documentIds, entry titles, field paths, values that were changed, decisions the user made, and anything still outstanding. Drop pleasantries and narration. No preamble — notes only, under 250 words.",
+          prompt: previousSummary ? `Existing notes:
+${previousSummary}
+
+Fold these newly-condensed turns into the notes:
+${transcript}` : `Condense these turns into notes:
+${transcript}`
+        });
+        const summary = text2.trim();
+        return summary === "" ? previousSummary : summary;
+      } catch (err) {
+        strapi.log.warn(
+          `[ai-content-studio] could not condense thread history: ${strapi.plugin("ai-content-studio").service("redact").describeError(err)}`
+        );
+        return null;
+      }
     },
     summarize(thread) {
       return {
@@ -38574,8 +45210,8 @@ const toolsService = ({ strapi }) => ({
             kind: ct.kind,
             displayName: ct.info?.displayName ?? uid,
             draftAndPublish: Boolean(ct.options?.draftAndPublish),
-            attributes: Object.entries(ct.attributes ?? {}).map(([name17, a]) => ({
-              name: name17,
+            attributes: Object.entries(ct.attributes ?? {}).map(([name22, a]) => ({
+              name: name22,
               type: a.type,
               ...a.required ? { required: true } : {},
               ...a.type === "relation" ? { target: a.target, relation: a.relation } : {},

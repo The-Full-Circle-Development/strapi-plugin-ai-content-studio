@@ -39,6 +39,12 @@ const ToolPill = styled.div<{ $danger?: boolean }>`
   }
 `;
 
+const Expired = styled.div`
+  font-size: 1.15rem;
+  font-style: italic;
+  color: ${({ theme }) => theme.colors.warning600};
+`;
+
 const Empty = styled.div`
   min-height: calc(100vh - 18rem);
   display: flex;
@@ -279,6 +285,19 @@ export const MessageList = ({
               {message.parts.map((part, index) =>
                 part.type === 'text' ? <span key={index}>{part.text}</span> : null
               )}
+              {/*
+                Held files live in browser memory and do not survive a reload, by design (FR-038).
+                Say so plainly rather than leaving a silent gap, and invite re-attaching.
+              */}
+              {expiredOrdinalsByMessage?.[message.id]?.length ? (
+                <Expired>
+                  {expiredOrdinalsByMessage[message.id].map((o) => `#${o}`).join(', ')}{' '}
+                  {expiredOrdinalsByMessage[message.id].length === 1 ? 'was' : 'were'} never added to
+                  the Media Library and {expiredOrdinalsByMessage[message.id].length === 1 ? 'is' : 'are'}{' '}
+                  no longer held. Re-attach {expiredOrdinalsByMessage[message.id].length === 1 ? 'it' : 'them'}{' '}
+                  to continue.
+                </Expired>
+              ) : null}
             </UserBubble>
           </UserRow>
         ) : (
