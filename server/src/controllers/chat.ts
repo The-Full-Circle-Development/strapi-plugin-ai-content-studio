@@ -37,6 +37,10 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       return ctx.unauthorized('Not authenticated.');
     }
 
+    // Opportunistic, rate-limited, and never blocking: keeps expired plans and previews from
+    // accumulating without owning a timer in the host process.
+    void plugin.service('change-sets').sweepIfDue();
+
     // Owner-scoped: a thread belonging to anyone else is indistinguishable from a missing one.
     const thread = await threads().getOwnedThread(threadId, ownerId);
     if (!thread) {

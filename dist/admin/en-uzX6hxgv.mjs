@@ -1,4 +1,4 @@
-{
+const en = {
   "plugin.name": "AI Content Studio",
   "menu.label": "AI Studio",
   "settings.section": "AI Content Studio",
@@ -17,7 +17,6 @@
   "chat.condensed": "Earlier detail in this conversation was condensed into notes so it keeps fitting the model's context.",
   "chat.interrupted": "Stopped.",
   "chat.interruptedNothingApplied": "Nothing was applied in this turn.",
-
   "threads.new": "New conversation",
   "threads.empty": "No conversations yet. Ask something to start one.",
   "threads.loading": "Loading conversations…",
@@ -32,7 +31,6 @@
   "threads.openError": "Could not open that conversation.",
   "threads.renameError": "Could not rename that conversation.",
   "threads.deleteError": "Could not delete that conversation.",
-
   "mode.label": "Mode",
   "mode.content": "Content Editing",
   "mode.layout": "Layout Mapping",
@@ -40,7 +38,6 @@
   "mode.contentHint": "Propose text, media and publish changes for your approval.",
   "mode.layoutHint": "Map page sections and place media into the slots that exist.",
   "mode.auditHint": "Read-only. QA and security findings; no content change is possible.",
-
   "plan.title": "Proposed changes",
   "plan.nothingWritten": "Nothing has been written yet.",
   "plan.expiresAt": "This plan expires at {time}.",
@@ -64,13 +61,11 @@
   "plan.applyError": "Could not apply the change plan.",
   "plan.rejectError": "Could not reject the change plan.",
   "plan.appliedAt": "Applied {time}",
-
   "preview.open": "Preview on the site",
   "preview.openError": "Could not open the preview.",
   "preview.active": "Preview open — it expires at {time} and stops working as soon as this plan is approved or rejected.",
   "preview.fallbackTitle": "Before / after",
   "preview.unavailable": "Preview is unavailable for this project. Showing the field comparison instead.",
-
   "attachments.notUploaded": "{size} KB · not uploaded yet",
   "attachments.tooLarge": "Larger than this project's upload limit of {limit} MB.",
   "attachments.overBudget": "Would exceed the {budget} MB held per conversation.",
@@ -78,7 +73,6 @@
   "attachments.remove": "Remove {name}",
   "attachments.expired": "These files were never added to the Media Library and are no longer held. Re-attach them to continue.",
   "attachments.ingestError": "Could not add the files to the Media Library.",
-
   "audit.qaTitle": "Functional QA pass",
   "audit.securityTitle": "Security audit",
   "audit.noFindings": "No problems found for the checks that ran.",
@@ -89,7 +83,6 @@
   "audit.whyItMatters": "Why it matters:",
   "audit.fix": "Fix:",
   "audit.remediationAdvice": "Remediations are advice. Applying one goes through the normal change plan and your normal permission checks.",
-
   "settings.title": "AI Content Studio — Configuration",
   "settings.subtitle": "Choose the active provider and model, and manage API keys. Keys are encrypted at rest and never shown again.",
   "settings.activeProvider": "Active provider",
@@ -99,4 +92,7 @@
   "settings.loadError": "Failed to load AI settings.",
   "settings.saveSuccess": "AI settings saved.",
   "settings.saveError": "Could not save AI settings."
-}
+};
+export {
+  en as default
+};

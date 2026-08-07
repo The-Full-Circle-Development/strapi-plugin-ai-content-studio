@@ -304,11 +304,18 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
       return true;
     },
 
-    /** Ordered messages for one thread. Owner-scoped; empty array is a valid history. */
+    /**
+     * Ordered messages for one thread. Owner-scoped; empty array is a valid history.
+     *
+     * `createdAt` is a secondary sort, not decoration: `appendMessage` serializes allocation per
+     * thread within an instance, but a multi-instance deployment could still land two appends on the
+     * same `sequence`. The tiebreaker means the two turns render in a stable, non-interleaved order
+     * instead of arbitrarily — neither reply is lost or shuffled into the other.
+     */
     async listMessages(threadId: string): Promise<StoredMessage[]> {
       const rows = await docs(UID.message).findMany({
         filters: { thread: { documentId: threadId } },
-        sort: 'sequence:asc',
+        sort: ['sequence:asc', 'createdAt:asc'],
         populate: { changeSet: { fields: ['documentId'] } },
         limit: -1,
       });

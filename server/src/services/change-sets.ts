@@ -69,6 +69,10 @@ const ACTION_FOR: Record<ChangeOperation, 'create' | 'update' | 'publish'> = {
 const MAX_VALUE_CHARS = 600;
 const MAX_ITEMS = 50;
 
+/** How often the opportunistic expiry sweep may run, per instance. */
+const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+let lastSweepAt = 0;
+
 const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
   const docs = (uid: string): any => strapi.documents(uid as never);
   const plugin = () => strapi.plugin('ai-content-studio');
@@ -457,9 +461,29 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
       return set;
     },
 
-    /** Client-facing shape. Untruncated proposed values never leave the server verbatim. */
+    /**
+     * Client-facing shape. Untruncated proposed values never leave the server verbatim.
+     *
+     * An item whose content type no longer exists still RENDERS — history must not break when a
+     * type is removed — but it is marked unapprovable with a plain explanation rather than offered
+     * as something the user could apply into a void.
+     */
     present(set: any): Record<string, unknown> {
       const items: ChangeItem[] = Array.isArray(set.items) ? set.items : [];
+      const live = new Set(allowedUids());
+      const presented = items.map((item) => {
+        const missingType = !live.has(item.contentTypeUid);
+        return {
+          ...item,
+          proposedValue: forDisplay(item.proposedValue),
+          ...(missingType
+            ? {
+                permissionVerdict: 'denied' as const,
+                permissionReason: `${item.contentTypeUid} no longer exists in this project, so this change cannot be applied.`,
+              }
+            : {}),
+        };
+      });
       return {
         id: set.documentId,
         threadId: set.thread?.documentId ?? null,
@@ -468,9 +492,9 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
         proposedAt: set.proposedAt,
         expiresAt: set.expiresAt,
         resolvedAt: set.resolvedAt ?? null,
-        hasDestructive: items.some((i) => i.destructive && i.permissionVerdict === 'allowed'),
+        hasDestructive: presented.some((i) => i.destructive && i.permissionVerdict === 'allowed'),
         destructiveConfirmed: Boolean(set.destructiveConfirmed),
-        items: items.map((i) => ({ ...i, proposedValue: forDisplay(i.proposedValue) })),
+        items: presented,
       };
     },
 
@@ -571,6 +595,15 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
       const outcomes = new Map<string, ChangeItemOutcome>();
 
       for (const item of selected) {
+        // The content type may have been removed since the plan was generated.
+        if (!allowedUids().includes(item.contentTypeUid)) {
+          outcomes.set(item.id, {
+            state: 'blocked',
+            message: `${item.contentTypeUid} no longer exists in this project.`,
+          });
+          continue;
+        }
+
         // --- gate 3: LIVE permission re-check. A permission revoked since the plan was shown
         // blocks the item here, writing nothing.
         const action = ACTION_FOR[item.operation];
@@ -766,8 +799,14 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
     },
 
     /**
-     * Sweep overdue pending sets (T091). Called opportunistically, so storage does not grow with
-     * plans nobody resolved. Content is never touched.
+     * Sweep overdue pending sets and overdue preview sessions.
+     *
+     * Storage growth is an edge case the spec calls out: without this, plans nobody resolved
+     * accumulate and their staged bytes sit in the heap until restart. Content is never touched —
+     * expiry only transitions status and frees memory.
+     *
+     * Run opportunistically (see `sweepIfDue`) rather than on a timer: no cron or background
+     * scanning is in scope, and a plugin has no business owning an interval in the host process.
      */
     async expirePending(): Promise<number> {
       const overdue = await docs(UID.changeSet).findMany({
@@ -779,7 +818,35 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
       for (const row of rows) {
         await service.expire(row.documentId);
       }
+
+      let preview: any = null;
+      try {
+        preview = plugin().service('preview');
+      } catch {
+        preview = null;
+      }
+      if (preview?.revokeExpired) {
+        await preview.revokeExpired();
+      }
       return rows.length;
+    },
+
+    /**
+     * Rate-limited sweep, safe to call on any request. Never throws and never blocks the caller's
+     * own work — a failed sweep is a log line, not a failed request.
+     */
+    async sweepIfDue(): Promise<void> {
+      if (Date.now() - lastSweepAt < SWEEP_INTERVAL_MS) {
+        return;
+      }
+      lastSweepAt = Date.now();
+      try {
+        await service.expirePending();
+      } catch (err) {
+        strapi.log.warn(
+          `[ai-content-studio] expiry sweep failed: ${plugin().service('redact').describeError(err)}`
+        );
+      }
     },
 
     /**

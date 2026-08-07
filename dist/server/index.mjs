@@ -42709,6 +42709,7 @@ const chatController = ({ strapi }) => ({
     if (!Number.isInteger(ownerId)) {
       return ctx.unauthorized("Not authenticated.");
     }
+    void plugin.service("change-sets").sweepIfDue();
     const thread = await threads().getOwnedThread(threadId, ownerId);
     if (!thread) {
       return ctx.notFound("That conversation does not exist.");
@@ -44133,11 +44134,18 @@ const threadsService = ({ strapi }) => {
       await docs(UID.thread).delete({ documentId: threadId });
       return true;
     },
-    /** Ordered messages for one thread. Owner-scoped; empty array is a valid history. */
+    /**
+     * Ordered messages for one thread. Owner-scoped; empty array is a valid history.
+     *
+     * `createdAt` is a secondary sort, not decoration: `appendMessage` serializes allocation per
+     * thread within an instance, but a multi-instance deployment could still land two appends on the
+     * same `sequence`. The tiebreaker means the two turns render in a stable, non-interleaved order
+     * instead of arbitrarily — neither reply is lost or shuffled into the other.
+     */
     async listMessages(threadId) {
       const rows = await docs(UID.message).findMany({
         filters: { thread: { documentId: threadId } },
-        sort: "sequence:asc",
+        sort: ["sequence:asc", "createdAt:asc"],
         populate: { changeSet: { fields: ["documentId"] } },
         limit: -1
       });
@@ -44367,6 +44375,8 @@ const ACTION_FOR = {
 };
 const MAX_VALUE_CHARS = 600;
 const MAX_ITEMS = 50;
+const SWEEP_INTERVAL_MS = 5 * 60 * 1e3;
+let lastSweepAt = 0;
 const changeSetsService = ({ strapi }) => {
   const docs = (uid) => strapi.documents(uid);
   const plugin = () => strapi.plugin("ai-content-studio");
@@ -44690,9 +44700,27 @@ const changeSetsService = ({ strapi }) => {
       }
       return set;
     },
-    /** Client-facing shape. Untruncated proposed values never leave the server verbatim. */
+    /**
+     * Client-facing shape. Untruncated proposed values never leave the server verbatim.
+     *
+     * An item whose content type no longer exists still RENDERS — history must not break when a
+     * type is removed — but it is marked unapprovable with a plain explanation rather than offered
+     * as something the user could apply into a void.
+     */
     present(set) {
       const items = Array.isArray(set.items) ? set.items : [];
+      const live = new Set(allowedUids());
+      const presented = items.map((item) => {
+        const missingType = !live.has(item.contentTypeUid);
+        return {
+          ...item,
+          proposedValue: forDisplay(item.proposedValue),
+          ...missingType ? {
+            permissionVerdict: "denied",
+            permissionReason: `${item.contentTypeUid} no longer exists in this project, so this change cannot be applied.`
+          } : {}
+        };
+      });
       return {
         id: set.documentId,
         threadId: set.thread?.documentId ?? null,
@@ -44701,9 +44729,9 @@ const changeSetsService = ({ strapi }) => {
         proposedAt: set.proposedAt,
         expiresAt: set.expiresAt,
         resolvedAt: set.resolvedAt ?? null,
-        hasDestructive: items.some((i) => i.destructive && i.permissionVerdict === "allowed"),
+        hasDestructive: presented.some((i) => i.destructive && i.permissionVerdict === "allowed"),
         destructiveConfirmed: Boolean(set.destructiveConfirmed),
-        items: items.map((i) => ({ ...i, proposedValue: forDisplay(i.proposedValue) }))
+        items: presented
       };
     },
     /**
@@ -44783,6 +44811,13 @@ const changeSetsService = ({ strapi }) => {
       }
       const outcomes = /* @__PURE__ */ new Map();
       for (const item of selected) {
+        if (!allowedUids().includes(item.contentTypeUid)) {
+          outcomes.set(item.id, {
+            state: "blocked",
+            message: `${item.contentTypeUid} no longer exists in this project.`
+          });
+          continue;
+        }
         const action = ACTION_FOR[item.operation];
         if (!can(item.contentTypeUid, action, userAbility)) {
           outcomes.set(item.id, {
@@ -44941,8 +44976,14 @@ const changeSetsService = ({ strapi }) => {
       await service.revokePreviews(changeSetId);
     },
     /**
-     * Sweep overdue pending sets (T091). Called opportunistically, so storage does not grow with
-     * plans nobody resolved. Content is never touched.
+     * Sweep overdue pending sets and overdue preview sessions.
+     *
+     * Storage growth is an edge case the spec calls out: without this, plans nobody resolved
+     * accumulate and their staged bytes sit in the heap until restart. Content is never touched —
+     * expiry only transitions status and frees memory.
+     *
+     * Run opportunistically (see `sweepIfDue`) rather than on a timer: no cron or background
+     * scanning is in scope, and a plugin has no business owning an interval in the host process.
      */
     async expirePending() {
       const overdue = await docs(UID.changeSet).findMany({
@@ -44954,7 +44995,33 @@ const changeSetsService = ({ strapi }) => {
       for (const row of rows) {
         await service.expire(row.documentId);
       }
+      let preview2 = null;
+      try {
+        preview2 = plugin().service("preview");
+      } catch {
+        preview2 = null;
+      }
+      if (preview2?.revokeExpired) {
+        await preview2.revokeExpired();
+      }
       return rows.length;
+    },
+    /**
+     * Rate-limited sweep, safe to call on any request. Never throws and never blocks the caller's
+     * own work — a failed sweep is a log line, not a failed request.
+     */
+    async sweepIfDue() {
+      if (Date.now() - lastSweepAt < SWEEP_INTERVAL_MS) {
+        return;
+      }
+      lastSweepAt = Date.now();
+      try {
+        await service.expirePending();
+      } catch (err) {
+        strapi.log.warn(
+          `[ai-content-studio] expiry sweep failed: ${plugin().service("redact").describeError(err)}`
+        );
+      }
     },
     /**
      * Revoke every preview session of a set and drop its staged bytes (FR-012). Called on apply,
