@@ -1,29 +1,10 @@
-"use strict";
-Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
-const jsxRuntime = require("react/jsx-runtime");
-const React = require("react");
-const admin = require("@strapi/strapi/admin");
-const designSystem = require("@strapi/design-system");
-const icons = require("@strapi/icons");
-const styledComponents = require("styled-components");
-function _interopNamespace(e) {
-  if (e && e.__esModule) return e;
-  const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
-  if (e) {
-    for (const k in e) {
-      if (k !== "default") {
-        const d = Object.getOwnPropertyDescriptor(e, k);
-        Object.defineProperty(n, k, d.get ? d : {
-          enumerable: true,
-          get: () => e[k]
-        });
-      }
-    }
-  }
-  n.default = e;
-  return Object.freeze(n);
-}
-const React__namespace = /* @__PURE__ */ _interopNamespace(React);
+import { jsxs, jsx, Fragment } from "react/jsx-runtime";
+import * as React from "react";
+import { useRef, useCallback, useSyncExternalStore, useEffect } from "react";
+import { useAuth, useNotification, Page } from "@strapi/strapi/admin";
+import { Loader, Typography, Button, Checkbox, IconButton as IconButton$1, Field as Field$1, SingleSelect, SingleSelectOption } from "@strapi/design-system";
+import { Sparkle, Cross, Paperclip, Stop, ArrowUp, Plus, Check, Pencil, Trash } from "@strapi/icons";
+import { styled } from "styled-components";
 var marker = "vercel.ai.error";
 var symbol = Symbol.for(marker);
 var _a$2, _b;
@@ -9276,7 +9257,7 @@ function useChat({
   resume = false,
   ...options
 } = {}) {
-  const callbacksRef = React.useRef(
+  const callbacksRef = useRef(
     !("chat" in options) ? {
       onToolCall: options.onToolCall,
       onData: options.onData,
@@ -9317,35 +9298,35 @@ function useChat({
       return (_c = (_b2 = (_a2 = callbacksRef.current).sendAutomaticallyWhen) == null ? void 0 : _b2.call(_a2, arg)) != null ? _c : false;
     }
   };
-  const chatRef = React.useRef(
+  const chatRef = useRef(
     "chat" in options ? options.chat : new Chat$1(optionsWithCallbacks)
   );
   const shouldRecreateChat = "chat" in options && options.chat !== chatRef.current || "id" in options && chatRef.current.id !== options.id;
   if (shouldRecreateChat) {
     chatRef.current = "chat" in options ? options.chat : new Chat$1(optionsWithCallbacks);
   }
-  const subscribeToMessages = React.useCallback(
+  const subscribeToMessages = useCallback(
     (update) => chatRef.current["~registerMessagesCallback"](update, throttleWaitMs),
     // `chatRef.current.id` is required to trigger re-subscription when the chat ID changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [throttleWaitMs, chatRef.current.id]
   );
-  const messages = React.useSyncExternalStore(
+  const messages = useSyncExternalStore(
     subscribeToMessages,
     () => chatRef.current.messages,
     () => chatRef.current.messages
   );
-  const status = React.useSyncExternalStore(
+  const status = useSyncExternalStore(
     chatRef.current["~registerStatusCallback"],
     () => chatRef.current.status,
     () => chatRef.current.status
   );
-  const error = React.useSyncExternalStore(
+  const error = useSyncExternalStore(
     chatRef.current["~registerErrorCallback"],
     () => chatRef.current.error,
     () => chatRef.current.error
   );
-  const setMessages = React.useCallback(
+  const setMessages = useCallback(
     (messagesParam) => {
       if (typeof messagesParam === "function") {
         messagesParam = messagesParam(chatRef.current.messages);
@@ -9354,7 +9335,7 @@ function useChat({
     },
     [chatRef]
   );
-  React.useEffect(() => {
+  useEffect(() => {
     if (resume) {
       chatRef.current.resumeStream();
     }
@@ -11197,11 +11178,11 @@ function addChildren(props, children) {
     }
   }
 }
-function productionCreate(_, jsx, jsxs) {
+function productionCreate(_, jsx2, jsxs2) {
   return create2;
   function create2(_2, type, props, key) {
     const isStaticChildren = Array.isArray(props.children);
-    const fn = isStaticChildren ? jsxs : jsx;
+    const fn = isStaticChildren ? jsxs2 : jsx2;
     return key ? fn(type, props, key) : fn(type, props);
   }
 }
@@ -18972,11 +18953,11 @@ function post(tree, options) {
   }
   visit(tree, transform2);
   return toJsxRuntime(tree, {
-    Fragment: jsxRuntime.Fragment,
+    Fragment,
     components,
     ignoreInvalidStyle: true,
-    jsx: jsxRuntime.jsx,
-    jsxs: jsxRuntime.jsxs,
+    jsx,
+    jsxs,
     passKeys: true,
     passNode: true
   });
@@ -22156,30 +22137,30 @@ const LOADING_WORDS = [
   "Zigzagging"
 ];
 const COLUMN_WIDTH = "46rem";
-const Shell = styledComponents.styled.div`
+const Shell = styled.div`
   display: flex;
   flex-direction: column;
   height: calc(100vh - 6rem);
   background: ${({ theme }) => theme.colors.neutral0};
 `;
-const Scroll = styledComponents.styled.div`
+const Scroll = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: 2rem 1.5rem 1rem;
 `;
-const Column = styledComponents.styled.div`
+const Column = styled.div`
   width: 100%;
   max-width: ${COLUMN_WIDTH};
   margin: 0 auto;
 `;
-const Turn = styledComponents.styled.div`
+const Turn = styled.div`
   margin-bottom: 2.4rem;
 `;
-const UserRow = styledComponents.styled(Turn)`
+const UserRow = styled(Turn)`
   display: flex;
   justify-content: flex-end;
 `;
-const UserBubble = styledComponents.styled.div`
+const UserBubble = styled.div`
   max-width: 85%;
   background: ${({ theme }) => theme.colors.primary100};
   color: ${({ theme }) => theme.colors.neutral800};
@@ -22193,12 +22174,12 @@ const UserBubble = styledComponents.styled.div`
   flex-direction: column;
   gap: 0.6rem;
 `;
-const AssistantRow = styledComponents.styled(Turn)`
+const AssistantRow = styled(Turn)`
   display: flex;
   gap: 1rem;
   align-items: flex-start;
 `;
-const Avatar = styledComponents.styled.div`
+const Avatar = styled.div`
   flex: 0 0 auto;
   width: 2.6rem;
   height: 2.6rem;
@@ -22213,7 +22194,7 @@ const Avatar = styledComponents.styled.div`
     height: 1.5rem;
   }
 `;
-const AssistantContent = styledComponents.styled.div`
+const AssistantContent = styled.div`
   flex: 1;
   min-width: 0;
   padding-top: 0.3rem;
@@ -22222,20 +22203,20 @@ const AssistantContent = styledComponents.styled.div`
   gap: 0.8rem;
   color: ${({ theme }) => theme.colors.neutral800};
 `;
-const Working = styledComponents.styled.div`
+const Working = styled.div`
   display: flex;
   align-items: center;
   gap: 0.8rem;
   color: ${({ theme }) => theme.colors.neutral500};
   font-size: 1.3rem;
 `;
-const MsgImage = styledComponents.styled.img`
+const MsgImage = styled.img`
   max-width: 22rem;
   max-height: 22rem;
   border-radius: 0.8rem;
   display: block;
 `;
-const IconButton = styledComponents.styled.button`
+const IconButton = styled.button`
   width: 3.2rem;
   height: 3.2rem;
   border-radius: 50%;
@@ -22259,12 +22240,12 @@ const IconButton = styledComponents.styled.button`
     height: 1.7rem;
   }
 `;
-const ErrorText = styledComponents.styled.div`
+const ErrorText = styled.div`
   color: ${({ theme }) => theme.colors.danger600};
   font-size: 1.3rem;
   margin-bottom: 1rem;
 `;
-const MarkdownBody = styledComponents.styled.div`
+const MarkdownBody = styled.div`
   font-size: 1.4rem;
   line-height: 1.6;
 
@@ -22352,7 +22333,7 @@ const MarkdownBody = styledComponents.styled.div`
     text-align: left;
   }
 `;
-const ToolPill = styledComponents.styled.div`
+const ToolPill = styled.div`
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
@@ -22371,7 +22352,7 @@ const ToolPill = styledComponents.styled.div`
     background: ${({ theme, $danger }) => $danger ? theme.colors.danger600 : theme.colors.success600};
   }
 `;
-const Interrupted = styledComponents.styled.div`
+const Interrupted = styled.div`
   align-self: stretch;
   font-size: 1.2rem;
   color: ${({ theme }) => theme.colors.warning700};
@@ -22380,12 +22361,12 @@ const Interrupted = styledComponents.styled.div`
   border-radius: 0.6rem;
   padding: 0.5rem 0.8rem;
 `;
-const Expired = styledComponents.styled.div`
+const Expired = styled.div`
   font-size: 1.15rem;
   font-style: italic;
   color: ${({ theme }) => theme.colors.warning600};
 `;
-const Empty$1 = styledComponents.styled.div`
+const Empty$1 = styled.div`
   min-height: calc(100vh - 18rem);
   display: flex;
   flex-direction: column;
@@ -22394,7 +22375,7 @@ const Empty$1 = styledComponents.styled.div`
   text-align: center;
   gap: 1.2rem;
 `;
-const EmptyLogo = styledComponents.styled.div`
+const EmptyLogo = styled.div`
   width: 4rem;
   height: 4rem;
   border-radius: 50%;
@@ -22408,19 +22389,19 @@ const EmptyLogo = styledComponents.styled.div`
     height: 2rem;
   }
 `;
-const Greeting = styledComponents.styled.div`
+const Greeting = styled.div`
   font-size: 2rem;
   font-weight: 600;
   color: ${({ theme }) => theme.colors.neutral800};
 `;
-const Suggestions = styledComponents.styled.div`
+const Suggestions = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 0.8rem;
   justify-content: center;
   margin-top: 0.8rem;
 `;
-const Suggestion = styledComponents.styled.button`
+const Suggestion = styled.button`
   border: 1px solid ${({ theme }) => theme.colors.neutral200};
   background: ${({ theme }) => theme.colors.neutral0};
   color: ${({ theme }) => theme.colors.neutral700};
@@ -22454,12 +22435,12 @@ const toolLabel = (state, name2) => {
   }
 };
 function useCyclingWord(active, words, intervalMs = 2500) {
-  const pick2 = React__namespace.useCallback(
+  const pick2 = React.useCallback(
     () => words[Math.floor(Math.random() * words.length)] ?? "Working",
     [words]
   );
-  const [word, setWord] = React__namespace.useState(pick2);
-  React__namespace.useEffect(() => {
+  const [word, setWord] = React.useState(pick2);
+  React.useEffect(() => {
     if (!active) {
       return void 0;
     }
@@ -22473,7 +22454,7 @@ const changeSetIdOf = (part) => {
   const output = part.output;
   return output?.ok && typeof output.changeSetId === "string" ? output.changeSetId : null;
 };
-const ReportBox = styledComponents.styled.div`
+const ReportBox = styled.div`
   border: 1px solid ${({ theme }) => theme.colors.neutral200};
   border-radius: 0.8rem;
   padding: 0.9rem 1.1rem;
@@ -22483,7 +22464,7 @@ const ReportBox = styledComponents.styled.div`
   flex-direction: column;
   gap: 0.4rem;
 `;
-const ReportRow = styledComponents.styled.div`
+const ReportRow = styled.div`
   color: ${({ theme, $tone }) => $tone === "success" ? theme.colors.success600 : $tone === "danger" ? theme.colors.danger600 : $tone === "warning" ? theme.colors.warning600 : theme.colors.neutral600};
   word-break: break-word;
 `;
@@ -22507,23 +22488,23 @@ const showValue = (value) => {
     return String(value);
   }
 };
-const ApplyReport = ({ report }) => /* @__PURE__ */ jsxRuntime.jsxs(ReportBox, { children: [
-  /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Typography, { variant: "pi", fontWeight: "bold", children: [
+const ApplyReport = ({ report }) => /* @__PURE__ */ jsxs(ReportBox, { children: [
+  /* @__PURE__ */ jsxs(Typography, { variant: "pi", fontWeight: "bold", children: [
     "Applied ",
     new Date(report.appliedAt).toLocaleString()
   ] }),
-  report.items.map((item) => /* @__PURE__ */ jsxRuntime.jsxs(ReportRow, { $tone: REPORT_TONE[item.state] ?? "neutral", children: [
-    /* @__PURE__ */ jsxRuntime.jsx("strong", { children: item.state }),
+  report.items.map((item) => /* @__PURE__ */ jsxs(ReportRow, { $tone: REPORT_TONE[item.state] ?? "neutral", children: [
+    /* @__PURE__ */ jsx("strong", { children: item.state }),
     " — ",
     item.field ? `${item.field} on ` : "",
     item.documentLabel,
-    item.state === "applied" ? /* @__PURE__ */ jsxRuntime.jsxs(jsxRuntime.Fragment, { children: [
+    item.state === "applied" ? /* @__PURE__ */ jsxs(Fragment, { children: [
       ": ",
       showValue(item.oldValue),
       " → ",
       showValue(item.newValue),
       item.resultingState === "unchanged" ? "" : ` (${item.resultingState})`
-    ] }) : item.message ? /* @__PURE__ */ jsxRuntime.jsxs(jsxRuntime.Fragment, { children: [
+    ] }) : item.message ? /* @__PURE__ */ jsxs(Fragment, { children: [
       ": ",
       item.message
     ] }) : null
@@ -22539,23 +22520,23 @@ const MessageList = ({
   const busy = status === "submitted" || status === "streaming";
   const loadingWord = useCyclingWord(busy, LOADING_WORDS);
   const renderImageParts = (message) => message.parts.map(
-    (part, index2) => isFileUIPart(part) && part.mediaType?.startsWith("image/") ? /* @__PURE__ */ jsxRuntime.jsx(MsgImage, { src: part.url, alt: part.filename ?? "attachment" }, `img-${index2}`) : null
+    (part, index2) => isFileUIPart(part) && part.mediaType?.startsWith("image/") ? /* @__PURE__ */ jsx(MsgImage, { src: part.url, alt: part.filename ?? "attachment" }, `img-${index2}`) : null
   );
   if (messages.length === 0) {
-    return /* @__PURE__ */ jsxRuntime.jsxs(Empty$1, { children: [
-      /* @__PURE__ */ jsxRuntime.jsx(EmptyLogo, { children: /* @__PURE__ */ jsxRuntime.jsx(icons.Sparkle, {}) }),
-      /* @__PURE__ */ jsxRuntime.jsx(Greeting, { children: "How can I help with your content?" }),
-      /* @__PURE__ */ jsxRuntime.jsx(Suggestions, { children: SUGGESTIONS.map((s) => /* @__PURE__ */ jsxRuntime.jsx(Suggestion, { onClick: () => onPickSuggestion(s), children: s }, s)) })
+    return /* @__PURE__ */ jsxs(Empty$1, { children: [
+      /* @__PURE__ */ jsx(EmptyLogo, { children: /* @__PURE__ */ jsx(Sparkle, {}) }),
+      /* @__PURE__ */ jsx(Greeting, { children: "How can I help with your content?" }),
+      /* @__PURE__ */ jsx(Suggestions, { children: SUGGESTIONS.map((s) => /* @__PURE__ */ jsx(Suggestion, { onClick: () => onPickSuggestion(s), children: s }, s)) })
     ] });
   }
-  return /* @__PURE__ */ jsxRuntime.jsxs(jsxRuntime.Fragment, { children: [
+  return /* @__PURE__ */ jsxs(Fragment, { children: [
     messages.map(
-      (message) => message.role === "user" ? /* @__PURE__ */ jsxRuntime.jsx(UserRow, { children: /* @__PURE__ */ jsxRuntime.jsxs(UserBubble, { children: [
+      (message) => message.role === "user" ? /* @__PURE__ */ jsx(UserRow, { children: /* @__PURE__ */ jsxs(UserBubble, { children: [
         renderImageParts(message),
         message.parts.map(
-          (part, index2) => part.type === "text" ? /* @__PURE__ */ jsxRuntime.jsx("span", { children: part.text }, index2) : null
+          (part, index2) => part.type === "text" ? /* @__PURE__ */ jsx("span", { children: part.text }, index2) : null
         ),
-        expiredOrdinalsByMessage?.[message.id]?.length ? /* @__PURE__ */ jsxRuntime.jsxs(Expired, { children: [
+        expiredOrdinalsByMessage?.[message.id]?.length ? /* @__PURE__ */ jsxs(Expired, { children: [
           expiredOrdinalsByMessage[message.id].map((o) => `#${o}`).join(", "),
           " ",
           expiredOrdinalsByMessage[message.id].length === 1 ? "was" : "were",
@@ -22567,22 +22548,22 @@ const MessageList = ({
           " ",
           "to continue."
         ] }) : null
-      ] }) }, message.id) : /* @__PURE__ */ jsxRuntime.jsxs(AssistantRow, { children: [
-        /* @__PURE__ */ jsxRuntime.jsx(Avatar, { children: /* @__PURE__ */ jsxRuntime.jsx(icons.Sparkle, {}) }),
-        /* @__PURE__ */ jsxRuntime.jsx(AssistantContent, { children: message.parts.map((part, index2) => {
+      ] }) }, message.id) : /* @__PURE__ */ jsxs(AssistantRow, { children: [
+        /* @__PURE__ */ jsx(Avatar, { children: /* @__PURE__ */ jsx(Sparkle, {}) }),
+        /* @__PURE__ */ jsx(AssistantContent, { children: message.parts.map((part, index2) => {
           if (part.type === "text") {
-            return /* @__PURE__ */ jsxRuntime.jsx(MarkdownBody, { children: /* @__PURE__ */ jsxRuntime.jsx(Markdown, { remarkPlugins: [remarkGfm], children: part.text }) }, index2);
+            return /* @__PURE__ */ jsx(MarkdownBody, { children: /* @__PURE__ */ jsx(Markdown, { remarkPlugins: [remarkGfm], children: part.text }) }, index2);
           }
           if (part.type === "reasoning") {
-            return /* @__PURE__ */ jsxRuntime.jsx(Working, { style: { fontStyle: "italic" }, children: part.text }, index2);
+            return /* @__PURE__ */ jsx(Working, { style: { fontStyle: "italic" }, children: part.text }, index2);
           }
           if (part.type === "data-apply-report") {
-            return /* @__PURE__ */ jsxRuntime.jsx(ApplyReport, { report: part.data }, index2);
+            return /* @__PURE__ */ jsx(ApplyReport, { report: part.data }, index2);
           }
           if (part.type === "data-interrupted") {
             const data = part.data;
-            return /* @__PURE__ */ jsxRuntime.jsxs(Interrupted, { children: [
-              /* @__PURE__ */ jsxRuntime.jsx("strong", { children: "Stopped." }),
+            return /* @__PURE__ */ jsxs(Interrupted, { children: [
+              /* @__PURE__ */ jsx("strong", { children: "Stopped." }),
               " ",
               data.applied?.length ? `${data.applied.length} change${data.applied.length === 1 ? "" : "s"} had already been applied in this turn: ${data.applied.map((a) => `${a.field ?? "entry"} on ${a.documentLabel}`).join("; ")}.` : "Nothing was applied in this turn."
             ] }, index2);
@@ -22592,32 +22573,32 @@ const MessageList = ({
             if (name2 === "proposeChanges" && part.state === "output-available") {
               const changeSetId = changeSetIdOf(part);
               if (changeSetId && renderChangeSet) {
-                return /* @__PURE__ */ jsxRuntime.jsx(React__namespace.Fragment, { children: renderChangeSet(changeSetId) }, index2);
+                return /* @__PURE__ */ jsx(React.Fragment, { children: renderChangeSet(changeSetId) }, index2);
               }
             }
             const { text: text2, danger } = toolLabel(part.state, name2);
-            return /* @__PURE__ */ jsxRuntime.jsx(ToolPill, { $danger: danger, children: text2 }, index2);
+            return /* @__PURE__ */ jsx(ToolPill, { $danger: danger, children: text2 }, index2);
           }
           if (isFileUIPart(part) && part.mediaType?.startsWith("image/")) {
-            return /* @__PURE__ */ jsxRuntime.jsx(MsgImage, { src: part.url, alt: part.filename ?? "image" }, index2);
+            return /* @__PURE__ */ jsx(MsgImage, { src: part.url, alt: part.filename ?? "image" }, index2);
           }
           return null;
         }) })
       ] }, message.id)
     ),
-    status === "submitted" ? /* @__PURE__ */ jsxRuntime.jsxs(AssistantRow, { children: [
-      /* @__PURE__ */ jsxRuntime.jsx(Avatar, { children: /* @__PURE__ */ jsxRuntime.jsx(icons.Sparkle, {}) }),
-      /* @__PURE__ */ jsxRuntime.jsx(AssistantContent, { children: /* @__PURE__ */ jsxRuntime.jsxs(Working, { children: [
-        /* @__PURE__ */ jsxRuntime.jsx(designSystem.Loader, { small: true, children: "Working…" }),
+    status === "submitted" ? /* @__PURE__ */ jsxs(AssistantRow, { children: [
+      /* @__PURE__ */ jsx(Avatar, { children: /* @__PURE__ */ jsx(Sparkle, {}) }),
+      /* @__PURE__ */ jsx(AssistantContent, { children: /* @__PURE__ */ jsxs(Working, { children: [
+        /* @__PURE__ */ jsx(Loader, { small: true, children: "Working…" }),
         `${loadingWord}…`
       ] }) })
     ] }) : null
   ] });
 };
-const ComposerWrap = styledComponents.styled.div`
+const ComposerWrap = styled.div`
   padding: 0.5rem 1.5rem 1.5rem;
 `;
-const Box = styledComponents.styled.div`
+const Box = styled.div`
   border: 1px solid ${({ theme }) => theme.colors.neutral200};
   background: ${({ theme }) => theme.colors.neutral0};
   border-radius: 1.6rem;
@@ -22629,19 +22610,31 @@ const Box = styledComponents.styled.div`
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
   }
 `;
-const Thumbs = styledComponents.styled.div`
+const Thumbs = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
   padding: 0.2rem 0.4rem 0.6rem;
 `;
-const Thumb = styledComponents.styled.div`
+const Chip = styled.div`
   position: relative;
-  width: 4.4rem;
-  height: 4.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 22rem;
+  padding: 0.4rem 2rem 0.4rem 0.4rem;
   border-radius: 0.6rem;
+  border: 1px solid
+    ${({ theme, $invalid }) => $invalid ? theme.colors.danger500 : theme.colors.neutral200};
+  background: ${({ theme, $invalid }) => $invalid ? theme.colors.danger100 : theme.colors.neutral100};
+`;
+const Thumb = styled.div`
+  flex: 0 0 auto;
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 0.4rem;
   overflow: hidden;
-  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  background: ${({ theme }) => theme.colors.neutral150};
   img {
     width: 100%;
     height: 100%;
@@ -22649,7 +22642,42 @@ const Thumb = styledComponents.styled.div`
     display: block;
   }
 `;
-const ThumbRemove = styledComponents.styled.button`
+const FileGlyph = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: ${({ theme }) => theme.colors.neutral600};
+`;
+const ChipText = styled.div`
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+`;
+const ChipName = styled.span`
+  font-size: 1.15rem;
+  color: ${({ theme }) => theme.colors.neutral800};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+const ChipMeta = styled.span`
+  font-size: 1.05rem;
+  color: ${({ theme, $invalid }) => $invalid ? theme.colors.danger600 : theme.colors.neutral600};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+const extensionOf = (filename) => {
+  const dot = filename.lastIndexOf(".");
+  return dot > 0 ? filename.slice(dot + 1).slice(0, 4) : "file";
+};
+const ThumbRemove = styled.button`
   position: absolute;
   top: 0.2rem;
   right: 0.2rem;
@@ -22671,7 +22699,7 @@ const ThumbRemove = styledComponents.styled.button`
     fill: #fff;
   }
 `;
-const Editor = styledComponents.styled.textarea`
+const Editor = styled.textarea`
   width: 100%;
   border: none;
   outline: none;
@@ -22687,13 +22715,13 @@ const Editor = styledComponents.styled.textarea`
     color: ${({ theme }) => theme.colors.neutral500};
   }
 `;
-const Bar = styledComponents.styled.div`
+const Bar = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.2rem 0.2rem 0;
 `;
-const SendButton = styledComponents.styled(IconButton)`
+const SendButton = styled(IconButton)`
   border: none;
   background: ${({ theme }) => theme.colors.primary600};
   color: #fff;
@@ -22707,7 +22735,7 @@ const SendButton = styledComponents.styled(IconButton)`
     background: ${({ theme }) => theme.colors.neutral200};
   }
 `;
-const Hint = styledComponents.styled.div`
+const Hint = styled.div`
   text-align: center;
   font-size: 1.1rem;
   color: ${({ theme }) => theme.colors.neutral500};
@@ -22726,22 +22754,27 @@ const Composer = ({
   onStop,
   hint
 }) => {
-  const fileInputRef = React__namespace.useRef(null);
-  const editorRef = React__namespace.useRef(null);
-  const [previews, setPreviews] = React__namespace.useState([]);
-  React__namespace.useEffect(() => {
-    const urls = attachments.map((file) => URL.createObjectURL(file));
+  const fileInputRef = React.useRef(null);
+  const editorRef = React.useRef(null);
+  const [previews, setPreviews] = React.useState({});
+  React.useEffect(() => {
+    const urls = {};
+    for (const attachment of attachments) {
+      if (attachment.mimeType.startsWith("image/")) {
+        urls[attachment.ordinal] = URL.createObjectURL(attachment.file);
+      }
+    }
     setPreviews(urls);
-    return () => urls.forEach((url) => URL.revokeObjectURL(url));
+    return () => Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
   }, [attachments]);
-  const autoGrow = React__namespace.useCallback(() => {
+  const autoGrow = React.useCallback(() => {
     const el = editorRef.current;
     if (el) {
       el.style.height = "auto";
       el.style.height = `${Math.min(el.scrollHeight, 288)}px`;
     }
   }, []);
-  React__namespace.useEffect(() => {
+  React.useEffect(() => {
     autoGrow();
   }, [input, autoGrow]);
   const onPasteImages = (event) => {
@@ -22766,21 +22799,30 @@ const Composer = ({
       onAddFiles(images);
     }
   };
-  return /* @__PURE__ */ jsxRuntime.jsx(ComposerWrap, { children: /* @__PURE__ */ jsxRuntime.jsxs(Column, { children: [
-    /* @__PURE__ */ jsxRuntime.jsxs(Box, { children: [
-      attachments.length > 0 ? /* @__PURE__ */ jsxRuntime.jsx(Thumbs, { children: attachments.map((file, i) => /* @__PURE__ */ jsxRuntime.jsxs(Thumb, { children: [
-        previews[i] ? /* @__PURE__ */ jsxRuntime.jsx("img", { src: previews[i], alt: file.name }) : null,
-        /* @__PURE__ */ jsxRuntime.jsx(
+  return /* @__PURE__ */ jsx(ComposerWrap, { children: /* @__PURE__ */ jsxs(Column, { children: [
+    /* @__PURE__ */ jsxs(Box, { children: [
+      attachments.length > 0 ? /* @__PURE__ */ jsx(Thumbs, { children: attachments.map((attachment) => /* @__PURE__ */ jsxs(Chip, { $invalid: attachment.validation !== "ok", children: [
+        /* @__PURE__ */ jsx(Thumb, { children: previews[attachment.ordinal] ? /* @__PURE__ */ jsx("img", { src: previews[attachment.ordinal], alt: attachment.filename }) : /* @__PURE__ */ jsx(FileGlyph, { children: extensionOf(attachment.filename) }) }),
+        /* @__PURE__ */ jsxs(ChipText, { children: [
+          /* @__PURE__ */ jsxs(ChipName, { title: attachment.filename, children: [
+            "#",
+            attachment.ordinal,
+            " ",
+            attachment.filename
+          ] }),
+          /* @__PURE__ */ jsx(ChipMeta, { $invalid: attachment.validation !== "ok", children: attachment.validation === "ok" ? `${Math.max(1, Math.round(attachment.sizeBytes / 1024))} KB · not uploaded yet` : attachment.validationMessage ?? "This file cannot be attached." })
+        ] }),
+        /* @__PURE__ */ jsx(
           ThumbRemove,
           {
             type: "button",
-            "aria-label": `Remove ${file.name}`,
-            onClick: () => onRemoveAttachment(i),
-            children: /* @__PURE__ */ jsxRuntime.jsx(icons.Cross, {})
+            "aria-label": `Remove ${attachment.filename}`,
+            onClick: () => onRemoveAttachment(attachment.ordinal),
+            children: /* @__PURE__ */ jsx(Cross, {})
           }
         )
-      ] }, `${file.name}-${i}`)) }) : null,
-      /* @__PURE__ */ jsxRuntime.jsx(
+      ] }, attachment.ordinal)) }) : null,
+      /* @__PURE__ */ jsx(
         Editor,
         {
           ref: editorRef,
@@ -22798,19 +22840,19 @@ const Composer = ({
           }
         }
       ),
-      /* @__PURE__ */ jsxRuntime.jsxs(Bar, { children: [
-        /* @__PURE__ */ jsxRuntime.jsx(
+      /* @__PURE__ */ jsxs(Bar, { children: [
+        /* @__PURE__ */ jsx(
           IconButton,
           {
             type: "button",
-            "aria-label": "Attach image",
-            title: "Attach image",
+            "aria-label": "Attach file",
+            title: "Attach a file — it is held here, not uploaded",
             disabled: busy || disabled,
             onClick: () => fileInputRef.current?.click(),
-            children: /* @__PURE__ */ jsxRuntime.jsx(icons.Paperclip, {})
+            children: /* @__PURE__ */ jsx(Paperclip, {})
           }
         ),
-        busy ? /* @__PURE__ */ jsxRuntime.jsx(IconButton, { type: "button", "aria-label": "Stop", title: "Stop", onClick: onStop, children: /* @__PURE__ */ jsxRuntime.jsx(icons.Stop, {}) }) : /* @__PURE__ */ jsxRuntime.jsx(
+        busy ? /* @__PURE__ */ jsx(IconButton, { type: "button", "aria-label": "Stop", title: "Stop", onClick: onStop, children: /* @__PURE__ */ jsx(Stop, {}) }) : /* @__PURE__ */ jsx(
           SendButton,
           {
             type: "button",
@@ -22818,16 +22860,15 @@ const Composer = ({
             title: "Send",
             disabled: !canSend,
             onClick: onSend,
-            children: /* @__PURE__ */ jsxRuntime.jsx(icons.ArrowUp, {})
+            children: /* @__PURE__ */ jsx(ArrowUp, {})
           }
         )
       ] }),
-      /* @__PURE__ */ jsxRuntime.jsx(
+      /* @__PURE__ */ jsx(
         "input",
         {
           ref: fileInputRef,
           type: "file",
-          accept: "image/*",
           multiple: true,
           style: { display: "none" },
           onChange: (event) => {
@@ -22840,7 +22881,7 @@ const Composer = ({
         }
       )
     ] }),
-    /* @__PURE__ */ jsxRuntime.jsx(Hint, { children: hint ?? "AI Content Studio can edit live content — review important changes." })
+    /* @__PURE__ */ jsx(Hint, { children: hint ?? "AI Content Studio can edit live content — review important changes." })
   ] }) });
 };
 const backendURL = () => {
@@ -22881,26 +22922,26 @@ async function adminFetch(path2, token, init = {}) {
   return payload;
 }
 function useThreads() {
-  const token = admin.useAuth("AiContentStudioChat", (state) => state.token);
-  const tokenRef = React__namespace.useRef(token);
-  React__namespace.useEffect(() => {
+  const token = useAuth("AiContentStudioChat", (state) => state.token);
+  const tokenRef = React.useRef(token);
+  React.useEffect(() => {
     tokenRef.current = token;
   }, [token]);
-  const [threads, setThreads] = React__namespace.useState([]);
-  const [currentThreadId, setCurrentThreadId] = React__namespace.useState(null);
-  const [mode, setMode] = React__namespace.useState("content");
-  const [loading, setLoading] = React__namespace.useState(false);
-  const [nextCursor, setNextCursor] = React__namespace.useState(null);
-  const [error, setError] = React__namespace.useState(null);
-  const threadIdRef = React__namespace.useRef(null);
-  React__namespace.useEffect(() => {
+  const [threads, setThreads] = React.useState([]);
+  const [currentThreadId, setCurrentThreadId] = React.useState(null);
+  const [mode, setMode] = React.useState("content");
+  const [loading, setLoading] = React.useState(false);
+  const [nextCursor, setNextCursor] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  const threadIdRef = React.useRef(null);
+  React.useEffect(() => {
     threadIdRef.current = currentThreadId;
   }, [currentThreadId]);
-  const modeRef = React__namespace.useRef(mode);
-  React__namespace.useEffect(() => {
+  const modeRef = React.useRef(mode);
+  React.useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
-  const refresh = React__namespace.useCallback(async (cursor) => {
+  const refresh = React.useCallback(async (cursor) => {
     setLoading(true);
     setError(null);
     try {
@@ -22920,12 +22961,12 @@ function useThreads() {
       setLoading(false);
     }
   }, []);
-  React__namespace.useEffect(() => {
+  React.useEffect(() => {
     if (token) {
       void refresh();
     }
   }, [token, refresh]);
-  const createThread = React__namespace.useCallback(
+  const createThread = React.useCallback(
     async (nextMode = "content") => {
       const thread = await adminFetch("/threads", tokenRef.current, {
         method: "POST",
@@ -22939,7 +22980,7 @@ function useThreads() {
     },
     []
   );
-  const loadHistory = React__namespace.useCallback(async (threadId) => {
+  const loadHistory = React.useCallback(async (threadId) => {
     setError(null);
     try {
       const history = await adminFetch(`/threads/${threadId}`, tokenRef.current);
@@ -22952,7 +22993,7 @@ function useThreads() {
       return null;
     }
   }, []);
-  const renameThread = React__namespace.useCallback(async (threadId, title) => {
+  const renameThread = React.useCallback(async (threadId, title) => {
     setThreads((current) => current.map((t) => t.id === threadId ? { ...t, title } : t));
     try {
       await adminFetch(`/threads/${threadId}`, tokenRef.current, {
@@ -22964,7 +23005,7 @@ function useThreads() {
       await refresh();
     }
   }, [refresh]);
-  const deleteThread = React__namespace.useCallback(
+  const deleteThread = React.useCallback(
     async (threadId) => {
       try {
         await adminFetch(`/threads/${threadId}`, tokenRef.current, { method: "DELETE" });
@@ -22981,7 +23022,7 @@ function useThreads() {
     },
     []
   );
-  const changeMode = React__namespace.useCallback(
+  const changeMode = React.useCallback(
     async (nextMode) => {
       setMode(nextMode);
       modeRef.current = nextMode;
@@ -23001,7 +23042,7 @@ function useThreads() {
     },
     []
   );
-  const ensureThread = React__namespace.useCallback(async () => {
+  const ensureThread = React.useCallback(async () => {
     if (threadIdRef.current) {
       return threadIdRef.current;
     }
@@ -23033,16 +23074,16 @@ function useThreads() {
   };
 }
 function useChangeSet(changeSetId) {
-  const token = admin.useAuth("AiContentStudioChangeSet", (state) => state.token);
-  const tokenRef = React__namespace.useRef(token);
-  React__namespace.useEffect(() => {
+  const token = useAuth("AiContentStudioChangeSet", (state) => state.token);
+  const tokenRef = React.useRef(token);
+  React.useEffect(() => {
     tokenRef.current = token;
   }, [token]);
-  const [changeSet, setChangeSet] = React__namespace.useState(null);
-  const [selected, setSelected] = React__namespace.useState([]);
-  const [busy, setBusy] = React__namespace.useState(false);
-  const [error, setError] = React__namespace.useState(null);
-  const load = React__namespace.useCallback(async (id) => {
+  const [changeSet, setChangeSet] = React.useState(null);
+  const [selected, setSelected] = React.useState([]);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const load = React.useCallback(async (id) => {
     setError(null);
     try {
       const set = await adminFetch(`/change-sets/${id}`, tokenRef.current);
@@ -23052,7 +23093,7 @@ function useChangeSet(changeSetId) {
       setError(err instanceof Error ? err.message : "Could not load the change plan.");
     }
   }, []);
-  React__namespace.useEffect(() => {
+  React.useEffect(() => {
     if (changeSetId) {
       void load(changeSetId);
     } else {
@@ -23060,7 +23101,7 @@ function useChangeSet(changeSetId) {
       setSelected([]);
     }
   }, [changeSetId, load]);
-  const toggleItem = React__namespace.useCallback(
+  const toggleItem = React.useCallback(
     (itemId) => {
       const item = changeSet?.items.find((i) => i.id === itemId);
       if (!item || item.permissionVerdict === "denied") {
@@ -23072,16 +23113,16 @@ function useChangeSet(changeSetId) {
     },
     [changeSet]
   );
-  const selectedItems = React__namespace.useMemo(
+  const selectedItems = React.useMemo(
     () => (changeSet?.items ?? []).filter((i) => selected.includes(i.id)),
     [changeSet, selected]
   );
   const selectionHasDestructive = selectedItems.some((i) => i.destructive);
-  const selectedOrdinals = React__namespace.useMemo(
+  const selectedOrdinals = React.useMemo(
     () => selectedItems.map((i) => i.attachmentOrdinal).filter((ordinal) => typeof ordinal === "number"),
     [selectedItems]
   );
-  const apply = React__namespace.useCallback(
+  const apply = React.useCallback(
     async ({
       itemIds,
       confirmDestructive = false,
@@ -23108,7 +23149,7 @@ function useChangeSet(changeSetId) {
     },
     [changeSet, load]
   );
-  const reject = React__namespace.useCallback(async () => {
+  const reject = React.useCallback(async () => {
     if (!changeSet) {
       return false;
     }
@@ -23140,30 +23181,30 @@ function useChangeSet(changeSetId) {
     error
   };
 }
-const Wrap = styledComponents.styled.div`
+const Wrap = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
   padding: 0.9rem 1.2rem;
   border-top: 1px solid ${({ theme }) => theme.colors.neutral150};
 `;
-const Row$1 = styledComponents.styled.div`
+const Row$1 = styled.div`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.8rem;
 `;
-const Note$1 = styledComponents.styled.div`
+const Note$1 = styled.div`
   font-size: 1.15rem;
   color: ${({ theme }) => theme.colors.neutral600};
 `;
-const DiffTable = styledComponents.styled.div`
+const DiffTable = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   margin-top: 0.3rem;
 `;
-const DiffRow = styledComponents.styled.div`
+const DiffRow = styled.div`
   font-size: 1.2rem;
   display: flex;
   flex-direction: column;
@@ -23174,16 +23215,16 @@ const DiffRow = styledComponents.styled.div`
     border-bottom: none;
   }
 `;
-const Field = styledComponents.styled.span`
+const Field = styled.span`
   color: ${({ theme }) => theme.colors.neutral800};
   font-weight: 600;
 `;
-const Old$1 = styledComponents.styled.span`
+const Old$1 = styled.span`
   color: ${({ theme }) => theme.colors.neutral600};
   text-decoration: line-through;
   word-break: break-word;
 `;
-const New$1 = styledComponents.styled.span`
+const New$1 = styled.span`
   color: ${({ theme }) => theme.colors.success600};
   word-break: break-word;
 `;
@@ -23201,15 +23242,15 @@ const show$1 = (value) => {
   }
 };
 const PreviewPanel = ({ changeSetId, items, disabled = false, filesByOrdinal }) => {
-  const token = admin.useAuth("AiContentStudioPreview", (state) => state.token);
-  const tokenRef = React__namespace.useRef(token);
-  React__namespace.useEffect(() => {
+  const token = useAuth("AiContentStudioPreview", (state) => state.token);
+  const tokenRef = React.useRef(token);
+  React.useEffect(() => {
     tokenRef.current = token;
   }, [token]);
-  const [busy, setBusy] = React__namespace.useState(false);
-  const [session, setSession] = React__namespace.useState(null);
-  const [fallback, setFallback] = React__namespace.useState(null);
-  const [error, setError] = React__namespace.useState(null);
+  const [busy, setBusy] = React.useState(false);
+  const [session, setSession] = React.useState(null);
+  const [fallback, setFallback] = React.useState(null);
+  const [error, setError] = React.useState(null);
   const previewable = items.filter(
     (i) => i.field && i.documentId && i.permissionVerdict === "allowed" && i.operation !== "publish"
   );
@@ -23251,10 +23292,10 @@ const PreviewPanel = ({ changeSetId, items, disabled = false, filesByOrdinal }) 
       setBusy(false);
     }
   };
-  return /* @__PURE__ */ jsxRuntime.jsxs(Wrap, { children: [
-    /* @__PURE__ */ jsxRuntime.jsxs(Row$1, { children: [
-      /* @__PURE__ */ jsxRuntime.jsx(
-        designSystem.Button,
+  return /* @__PURE__ */ jsxs(Wrap, { children: [
+    /* @__PURE__ */ jsxs(Row$1, { children: [
+      /* @__PURE__ */ jsx(
+        Button,
         {
           variant: "secondary",
           onClick: () => void openPreview(),
@@ -23263,36 +23304,36 @@ const PreviewPanel = ({ changeSetId, items, disabled = false, filesByOrdinal }) 
           children: "Preview on the site"
         }
       ),
-      session ? /* @__PURE__ */ jsxRuntime.jsxs(Note$1, { children: [
+      session ? /* @__PURE__ */ jsxs(Note$1, { children: [
         "Preview open — it expires at ",
         new Date(session.expiresAt).toLocaleTimeString(),
         " and stops working as soon as this plan is approved or rejected."
       ] }) : null,
-      error ? /* @__PURE__ */ jsxRuntime.jsx(Note$1, { children: error }) : null
+      error ? /* @__PURE__ */ jsx(Note$1, { children: error }) : null
     ] }),
-    fallback ? /* @__PURE__ */ jsxRuntime.jsxs(jsxRuntime.Fragment, { children: [
-      /* @__PURE__ */ jsxRuntime.jsx(Note$1, { children: fallback }),
-      /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", fontWeight: "bold", children: "Before / after" }),
-      /* @__PURE__ */ jsxRuntime.jsx(DiffTable, { children: previewable.map((item) => /* @__PURE__ */ jsxRuntime.jsxs(DiffRow, { children: [
-        /* @__PURE__ */ jsxRuntime.jsxs(Field, { children: [
+    fallback ? /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx(Note$1, { children: fallback }),
+      /* @__PURE__ */ jsx(Typography, { variant: "pi", fontWeight: "bold", children: "Before / after" }),
+      /* @__PURE__ */ jsx(DiffTable, { children: previewable.map((item) => /* @__PURE__ */ jsxs(DiffRow, { children: [
+        /* @__PURE__ */ jsxs(Field, { children: [
           item.field,
           " — ",
           item.documentLabel
         ] }),
-        /* @__PURE__ */ jsxRuntime.jsx(Old$1, { children: show$1(item.currentValue) }),
-        /* @__PURE__ */ jsxRuntime.jsx(New$1, { children: item.attachmentOrdinal !== null ? `attachment #${item.attachmentOrdinal}` : show$1(item.proposedValue) })
+        /* @__PURE__ */ jsx(Old$1, { children: show$1(item.currentValue) }),
+        /* @__PURE__ */ jsx(New$1, { children: item.attachmentOrdinal !== null ? `attachment #${item.attachmentOrdinal}` : show$1(item.proposedValue) })
       ] }, item.id)) })
     ] }) : null
   ] });
 };
-const Card = styledComponents.styled.div`
+const Card = styled.div`
   border: 1px solid ${({ theme }) => theme.colors.neutral200};
   border-radius: 0.8rem;
   background: ${({ theme }) => theme.colors.neutral0};
   overflow: hidden;
   align-self: stretch;
 `;
-const Head$1 = styledComponents.styled.div`
+const Head$1 = styled.div`
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -23301,7 +23342,7 @@ const Head$1 = styledComponents.styled.div`
   border-bottom: 1px solid ${({ theme }) => theme.colors.neutral150};
   background: ${({ theme }) => theme.colors.neutral100};
 `;
-const StatusChip = styledComponents.styled.span`
+const StatusChip = styled.span`
   font-size: 1.1rem;
   padding: 0.2rem 0.7rem;
   border-radius: 1rem;
@@ -23309,7 +23350,7 @@ const StatusChip = styledComponents.styled.span`
   color: ${({ theme, $tone }) => $tone === "success" ? theme.colors.success600 : $tone === "danger" ? theme.colors.danger600 : $tone === "warning" ? theme.colors.warning600 : theme.colors.neutral600};
   background: ${({ theme, $tone }) => $tone === "success" ? theme.colors.success100 : $tone === "danger" ? theme.colors.danger100 : $tone === "warning" ? theme.colors.warning100 : theme.colors.neutral150};
 `;
-const Row = styledComponents.styled.div`
+const Row = styled.div`
   display: flex;
   gap: 0.8rem;
   padding: 0.9rem 1.2rem;
@@ -23321,47 +23362,47 @@ const Row = styledComponents.styled.div`
     border-bottom: none;
   }
 `;
-const RowBody = styledComponents.styled.div`
+const RowBody = styled.div`
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
 `;
-const Target = styledComponents.styled.div`
+const Target = styled.div`
   font-size: 1.3rem;
   color: ${({ theme }) => theme.colors.neutral800};
   font-weight: 600;
   word-break: break-word;
 `;
-const Meta = styledComponents.styled.div`
+const Meta = styled.div`
   font-size: 1.1rem;
   color: ${({ theme }) => theme.colors.neutral600};
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
 `;
-const Diff = styledComponents.styled.div`
+const Diff = styled.div`
   font-size: 1.2rem;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
   margin-top: 0.2rem;
 `;
-const Old = styledComponents.styled.div`
+const Old = styled.div`
   color: ${({ theme }) => theme.colors.neutral600};
   text-decoration: line-through;
   word-break: break-word;
 `;
-const New = styledComponents.styled.div`
+const New = styled.div`
   color: ${({ theme }) => theme.colors.success600};
   word-break: break-word;
 `;
-const Reason = styledComponents.styled.div`
+const Reason = styled.div`
   font-size: 1.15rem;
   color: ${({ theme }) => theme.colors.danger600};
 `;
-const Actions = styledComponents.styled.div`
+const Actions = styled.div`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -23369,7 +23410,7 @@ const Actions = styledComponents.styled.div`
   padding: 1rem 1.2rem;
   border-top: 1px solid ${({ theme }) => theme.colors.neutral150};
 `;
-const Confirm = styledComponents.styled.div`
+const Confirm = styled.div`
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -23379,7 +23420,7 @@ const Confirm = styledComponents.styled.div`
   color: ${({ theme }) => theme.colors.danger700};
   font-size: 1.2rem;
 `;
-const Note = styledComponents.styled.div`
+const Note = styled.div`
   font-size: 1.15rem;
   color: ${({ theme }) => theme.colors.neutral600};
   padding: 0.8rem 1.2rem 0;
@@ -23431,15 +23472,15 @@ const ChangePlanCard = ({
     busy,
     error
   } = useChangeSet(changeSetId);
-  const [confirmDestructive, setConfirmDestructive] = React__namespace.useState(false);
-  const [localError, setLocalError] = React__namespace.useState(null);
-  React__namespace.useEffect(() => {
+  const [confirmDestructive, setConfirmDestructive] = React.useState(false);
+  const [localError, setLocalError] = React.useState(null);
+  React.useEffect(() => {
     if (!selectionHasDestructive) {
       setConfirmDestructive(false);
     }
   }, [selectionHasDestructive]);
   if (!changeSet) {
-    return error ? /* @__PURE__ */ jsxRuntime.jsx(Note, { children: error }) : null;
+    return error ? /* @__PURE__ */ jsx(Note, { children: error }) : null;
   }
   const resolved = changeSet.status !== "pending";
   const allowedIds = changeSet.items.filter((i) => i.permissionVerdict === "allowed").map((i) => i.id);
@@ -23485,10 +23526,10 @@ const ChangePlanCard = ({
       });
     }
   };
-  return /* @__PURE__ */ jsxRuntime.jsxs(Card, { children: [
-    /* @__PURE__ */ jsxRuntime.jsxs(Head$1, { children: [
-      /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "delta", children: changeSet.summary ?? "Proposed changes" }),
-      /* @__PURE__ */ jsxRuntime.jsx(
+  return /* @__PURE__ */ jsxs(Card, { children: [
+    /* @__PURE__ */ jsxs(Head$1, { children: [
+      /* @__PURE__ */ jsx(Typography, { variant: "delta", children: changeSet.summary ?? "Proposed changes" }),
+      /* @__PURE__ */ jsx(
         StatusChip,
         {
           $tone: changeSet.status === "applied" ? "success" : changeSet.status === "partially_applied" ? "warning" : changeSet.status === "pending" ? "neutral" : "danger",
@@ -23496,16 +23537,16 @@ const ChangePlanCard = ({
         }
       )
     ] }),
-    changeSet.status === "pending" ? /* @__PURE__ */ jsxRuntime.jsxs(Note, { children: [
+    changeSet.status === "pending" ? /* @__PURE__ */ jsxs(Note, { children: [
       "Nothing has been written yet.",
       " ",
       expired ? "This plan has expired — ask for a fresh one." : `This plan expires at ${new Date(changeSet.expiresAt).toLocaleTimeString()}.`
     ] }) : null,
     changeSet.items.map((item) => {
       const blocked = item.permissionVerdict === "denied";
-      return /* @__PURE__ */ jsxRuntime.jsxs(Row, { $destructive: item.destructive, $blocked: blocked, children: [
-        !resolved ? /* @__PURE__ */ jsxRuntime.jsx(
-          designSystem.Checkbox,
+      return /* @__PURE__ */ jsxs(Row, { $destructive: item.destructive, $blocked: blocked, children: [
+        !resolved ? /* @__PURE__ */ jsx(
+          Checkbox,
           {
             checked: selected.includes(item.id),
             disabled: blocked || busy || expired,
@@ -23513,52 +23554,52 @@ const ChangePlanCard = ({
             "aria-label": `Approve ${item.field ?? item.operation} on ${item.documentLabel}`
           }
         ) : null,
-        /* @__PURE__ */ jsxRuntime.jsxs(RowBody, { children: [
-          /* @__PURE__ */ jsxRuntime.jsx(Target, { children: item.operation === "publish" ? `Publish ${item.documentLabel}` : `${item.field ?? item.operation} — ${item.documentLabel}` }),
-          /* @__PURE__ */ jsxRuntime.jsxs(Meta, { children: [
-            /* @__PURE__ */ jsxRuntime.jsx("span", { children: item.contentTypeUid }),
-            /* @__PURE__ */ jsxRuntime.jsxs("span", { children: [
+        /* @__PURE__ */ jsxs(RowBody, { children: [
+          /* @__PURE__ */ jsx(Target, { children: item.operation === "publish" ? `Publish ${item.documentLabel}` : `${item.field ?? item.operation} — ${item.documentLabel}` }),
+          /* @__PURE__ */ jsxs(Meta, { children: [
+            /* @__PURE__ */ jsx("span", { children: item.contentTypeUid }),
+            /* @__PURE__ */ jsxs("span", { children: [
               "result:",
               " ",
               item.resultingState === "unchanged" ? "no content change" : item.resultingState
             ] }),
-            item.destructive ? /* @__PURE__ */ jsxRuntime.jsx(StatusChip, { $tone: "danger", children: "removes content" }) : null,
-            item.attachmentOrdinal !== null ? /* @__PURE__ */ jsxRuntime.jsxs("span", { children: [
+            item.destructive ? /* @__PURE__ */ jsx(StatusChip, { $tone: "danger", children: "removes content" }) : null,
+            item.attachmentOrdinal !== null ? /* @__PURE__ */ jsxs("span", { children: [
               "attachment #",
               item.attachmentOrdinal
             ] }) : null
           ] }),
-          item.operation !== "publish" ? /* @__PURE__ */ jsxRuntime.jsxs(Diff, { children: [
-            /* @__PURE__ */ jsxRuntime.jsx(Old, { children: show(item.currentValue) }),
-            /* @__PURE__ */ jsxRuntime.jsx(New, { children: item.attachmentOrdinal !== null ? `attachment #${item.attachmentOrdinal}` : show(item.proposedValue) })
+          item.operation !== "publish" ? /* @__PURE__ */ jsxs(Diff, { children: [
+            /* @__PURE__ */ jsx(Old, { children: show(item.currentValue) }),
+            /* @__PURE__ */ jsx(New, { children: item.attachmentOrdinal !== null ? `attachment #${item.attachmentOrdinal}` : show(item.proposedValue) })
           ] }) : null,
-          blocked ? /* @__PURE__ */ jsxRuntime.jsx(Reason, { children: item.permissionReason ?? "You cannot perform this change." }) : null,
-          item.outcome ? /* @__PURE__ */ jsxRuntime.jsxs(Meta, { children: [
-            /* @__PURE__ */ jsxRuntime.jsx(StatusChip, { $tone: OUTCOME_TONE[item.outcome.state] ?? "neutral", children: item.outcome.state }),
-            item.outcome.message ? /* @__PURE__ */ jsxRuntime.jsx("span", { children: item.outcome.message }) : null
+          blocked ? /* @__PURE__ */ jsx(Reason, { children: item.permissionReason ?? "You cannot perform this change." }) : null,
+          item.outcome ? /* @__PURE__ */ jsxs(Meta, { children: [
+            /* @__PURE__ */ jsx(StatusChip, { $tone: OUTCOME_TONE[item.outcome.state] ?? "neutral", children: item.outcome.state }),
+            item.outcome.message ? /* @__PURE__ */ jsx("span", { children: item.outcome.message }) : null
           ] }) : null
         ] })
       ] }, item.id);
     }),
-    !resolved && selectionHasDestructive ? /* @__PURE__ */ jsxRuntime.jsxs(Confirm, { children: [
-      /* @__PURE__ */ jsxRuntime.jsx(
-        designSystem.Checkbox,
+    !resolved && selectionHasDestructive ? /* @__PURE__ */ jsxs(Confirm, { children: [
+      /* @__PURE__ */ jsx(
+        Checkbox,
         {
           checked: confirmDestructive,
           onCheckedChange: () => setConfirmDestructive((v) => !v),
           "aria-label": "Confirm the changes that remove content"
         }
       ),
-      /* @__PURE__ */ jsxRuntime.jsxs("span", { children: [
+      /* @__PURE__ */ jsxs("span", { children: [
         selectedItems.filter((i) => i.destructive).length,
         " selected change",
         selectedItems.filter((i) => i.destructive).length === 1 ? "" : "s",
         " will remove content. Confirm explicitly to include them."
       ] })
     ] }) : null,
-    !resolved ? /* @__PURE__ */ jsxRuntime.jsxs(Actions, { children: [
-      /* @__PURE__ */ jsxRuntime.jsx(
-        designSystem.Button,
+    !resolved ? /* @__PURE__ */ jsxs(Actions, { children: [
+      /* @__PURE__ */ jsx(
+        Button,
         {
           onClick: () => void runApply(allowedIds),
           disabled: busy || expired || allowedIds.length === 0,
@@ -23566,8 +23607,8 @@ const ChangePlanCard = ({
           children: "Approve all"
         }
       ),
-      /* @__PURE__ */ jsxRuntime.jsxs(
-        designSystem.Button,
+      /* @__PURE__ */ jsxs(
+        Button,
         {
           variant: "secondary",
           onClick: () => void runApply(selected),
@@ -23579,8 +23620,8 @@ const ChangePlanCard = ({
           ]
         }
       ),
-      /* @__PURE__ */ jsxRuntime.jsx(
-        designSystem.Button,
+      /* @__PURE__ */ jsx(
+        Button,
         {
           variant: "tertiary",
           onClick: () => {
@@ -23594,9 +23635,9 @@ const ChangePlanCard = ({
           children: "Reject"
         }
       ),
-      selected.length !== allowedIds.length ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { variant: "ghost", onClick: () => setSelected(allowedIds), disabled: busy, children: "Select all" }) : null
+      selected.length !== allowedIds.length ? /* @__PURE__ */ jsx(Button, { variant: "ghost", onClick: () => setSelected(allowedIds), disabled: busy, children: "Select all" }) : null
     ] }) : null,
-    footer2 ?? /* @__PURE__ */ jsxRuntime.jsx(
+    footer2 ?? /* @__PURE__ */ jsx(
       PreviewPanel,
       {
         changeSetId: changeSet.id,
@@ -23605,10 +23646,10 @@ const ChangePlanCard = ({
         filesByOrdinal
       }
     ),
-    localError ?? error ? /* @__PURE__ */ jsxRuntime.jsx(Note, { children: localError ?? error }) : null
+    localError ?? error ? /* @__PURE__ */ jsx(Note, { children: localError ?? error }) : null
   ] });
 };
-const Aside = styledComponents.styled.aside`
+const Aside = styled.aside`
   width: 24rem;
   flex: 0 0 24rem;
   display: flex;
@@ -23616,13 +23657,13 @@ const Aside = styledComponents.styled.aside`
   border-right: 1px solid ${({ theme }) => theme.colors.neutral150};
   background: ${({ theme }) => theme.colors.neutral100};
 `;
-const Head = styledComponents.styled.div`
+const Head = styled.div`
   padding: 1.2rem 1.2rem 0.8rem;
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
 `;
-const List = styledComponents.styled.div`
+const List = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: 0 0.6rem 1.2rem;
@@ -23630,7 +23671,7 @@ const List = styledComponents.styled.div`
   flex-direction: column;
   gap: 0.2rem;
 `;
-const Item = styledComponents.styled.div`
+const Item = styled.div`
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -23641,7 +23682,7 @@ const Item = styledComponents.styled.div`
     background: ${({ theme, $active }) => $active ? theme.colors.primary100 : theme.colors.neutral150};
   }
 `;
-const Open = styledComponents.styled.button`
+const Open = styled.button`
   flex: 1;
   min-width: 0;
   border: none;
@@ -23653,18 +23694,18 @@ const Open = styledComponents.styled.button`
   flex-direction: column;
   gap: 0.1rem;
 `;
-const Title = styledComponents.styled.span`
+const Title = styled.span`
   font-size: 1.3rem;
   color: ${({ theme }) => theme.colors.neutral800};
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 `;
-const When = styledComponents.styled.span`
+const When = styled.span`
   font-size: 1.1rem;
   color: ${({ theme }) => theme.colors.neutral600};
 `;
-const RenameInput = styledComponents.styled.input`
+const RenameInput = styled.input`
   flex: 1;
   min-width: 0;
   font-size: 1.3rem;
@@ -23675,7 +23716,7 @@ const RenameInput = styledComponents.styled.input`
   background: ${({ theme }) => theme.colors.neutral0};
   color: ${({ theme }) => theme.colors.neutral800};
 `;
-const Empty = styledComponents.styled.div`
+const Empty = styled.div`
   padding: 1.2rem;
   font-size: 1.2rem;
   color: ${({ theme }) => theme.colors.neutral600};
@@ -23717,8 +23758,8 @@ const ThreadSidebar = ({
   onLoadMore,
   header
 }) => {
-  const [renamingId, setRenamingId] = React__namespace.useState(null);
-  const [draft, setDraft] = React__namespace.useState("");
+  const [renamingId, setRenamingId] = React.useState(null);
+  const [draft, setDraft] = React.useState("");
   const startRename = (thread) => {
     setRenamingId(thread.id);
     setDraft(thread.title);
@@ -23730,15 +23771,15 @@ const ThreadSidebar = ({
     setRenamingId(null);
     setDraft("");
   };
-  return /* @__PURE__ */ jsxRuntime.jsxs(Aside, { children: [
-    /* @__PURE__ */ jsxRuntime.jsxs(Head, { children: [
-      /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { startIcon: /* @__PURE__ */ jsxRuntime.jsx(icons.Plus, {}), onClick: onNew, fullWidth: true, children: "New conversation" }),
+  return /* @__PURE__ */ jsxs(Aside, { children: [
+    /* @__PURE__ */ jsxs(Head, { children: [
+      /* @__PURE__ */ jsx(Button, { startIcon: /* @__PURE__ */ jsx(Plus, {}), onClick: onNew, fullWidth: true, children: "New conversation" }),
       header
     ] }),
-    /* @__PURE__ */ jsxRuntime.jsxs(List, { children: [
-      threads.length === 0 && !loading ? /* @__PURE__ */ jsxRuntime.jsx(Empty, { children: "No conversations yet. Ask something to start one." }) : null,
-      threads.map((thread) => /* @__PURE__ */ jsxRuntime.jsx(Item, { $active: thread.id === currentThreadId, children: renamingId === thread.id ? /* @__PURE__ */ jsxRuntime.jsxs(jsxRuntime.Fragment, { children: [
-        /* @__PURE__ */ jsxRuntime.jsx(
+    /* @__PURE__ */ jsxs(List, { children: [
+      threads.length === 0 && !loading ? /* @__PURE__ */ jsx(Empty, { children: "No conversations yet. Ask something to start one." }) : null,
+      threads.map((thread) => /* @__PURE__ */ jsx(Item, { $active: thread.id === currentThreadId, children: renamingId === thread.id ? /* @__PURE__ */ jsxs(Fragment, { children: [
+        /* @__PURE__ */ jsx(
           RenameInput,
           {
             autoFocus: true,
@@ -23756,21 +23797,21 @@ const ThreadSidebar = ({
             "aria-label": "Conversation title"
           }
         ),
-        /* @__PURE__ */ jsxRuntime.jsx(designSystem.IconButton, { label: "Save title", variant: "ghost", onClick: commitRename, children: /* @__PURE__ */ jsxRuntime.jsx(icons.Check, {}) }),
-        /* @__PURE__ */ jsxRuntime.jsx(designSystem.IconButton, { label: "Cancel", variant: "ghost", onClick: () => setRenamingId(null), children: /* @__PURE__ */ jsxRuntime.jsx(icons.Cross, {}) })
-      ] }) : /* @__PURE__ */ jsxRuntime.jsxs(jsxRuntime.Fragment, { children: [
-        /* @__PURE__ */ jsxRuntime.jsxs(Open, { onClick: () => onSelect(thread.id), title: thread.title, children: [
-          /* @__PURE__ */ jsxRuntime.jsx(Title, { children: thread.title }),
-          /* @__PURE__ */ jsxRuntime.jsxs(When, { children: [
+        /* @__PURE__ */ jsx(IconButton$1, { label: "Save title", variant: "ghost", onClick: commitRename, children: /* @__PURE__ */ jsx(Check, {}) }),
+        /* @__PURE__ */ jsx(IconButton$1, { label: "Cancel", variant: "ghost", onClick: () => setRenamingId(null), children: /* @__PURE__ */ jsx(Cross, {}) })
+      ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
+        /* @__PURE__ */ jsxs(Open, { onClick: () => onSelect(thread.id), title: thread.title, children: [
+          /* @__PURE__ */ jsx(Title, { children: thread.title }),
+          /* @__PURE__ */ jsxs(When, { children: [
             relative(thread.lastActivityAt),
             typeof thread.messageCount === "number" ? ` · ${thread.messageCount} messages` : ""
           ] })
         ] }),
-        /* @__PURE__ */ jsxRuntime.jsx(designSystem.IconButton, { label: "Rename", variant: "ghost", onClick: () => startRename(thread), children: /* @__PURE__ */ jsxRuntime.jsx(icons.Pencil, {}) }),
-        /* @__PURE__ */ jsxRuntime.jsx(designSystem.IconButton, { label: "Delete", variant: "ghost", onClick: () => onDelete(thread.id), children: /* @__PURE__ */ jsxRuntime.jsx(icons.Trash, {}) })
+        /* @__PURE__ */ jsx(IconButton$1, { label: "Rename", variant: "ghost", onClick: () => startRename(thread), children: /* @__PURE__ */ jsx(Pencil, {}) }),
+        /* @__PURE__ */ jsx(IconButton$1, { label: "Delete", variant: "ghost", onClick: () => onDelete(thread.id), children: /* @__PURE__ */ jsx(Trash, {}) })
       ] }) }, thread.id)),
-      hasMore && onLoadMore ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { variant: "ghost", onClick: onLoadMore, loading, children: "Load older" }) : null,
-      loading && threads.length === 0 ? /* @__PURE__ */ jsxRuntime.jsx(Empty, { children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", children: "Loading conversations…" }) }) : null
+      hasMore && onLoadMore ? /* @__PURE__ */ jsx(Button, { variant: "ghost", onClick: onLoadMore, loading, children: "Load older" }) : null,
+      loading && threads.length === 0 ? /* @__PURE__ */ jsx(Empty, { children: /* @__PURE__ */ jsx(Typography, { variant: "pi", children: "Loading conversations…" }) }) : null
     ] })
   ] });
 };
@@ -23784,31 +23825,162 @@ const MODE_HINTS = {
   layout: "Map page sections and place media into the slots that exist.",
   audit: "Read-only. QA and security findings; no content change is possible."
 };
-const ModeSelect = ({ mode, onChange, disabled = false }) => /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Field.Root, { hint: MODE_HINTS[mode], children: [
-  /* @__PURE__ */ jsxRuntime.jsx(designSystem.Field.Label, { children: "Mode" }),
-  /* @__PURE__ */ jsxRuntime.jsx(
-    designSystem.SingleSelect,
+const ModeSelect = ({ mode, onChange, disabled = false }) => /* @__PURE__ */ jsxs(Field$1.Root, { hint: MODE_HINTS[mode], children: [
+  /* @__PURE__ */ jsx(Field$1.Label, { children: "Mode" }),
+  /* @__PURE__ */ jsx(
+    SingleSelect,
     {
       value: mode,
       disabled,
       onChange: (value) => onChange(String(value)),
-      children: Object.keys(MODE_LABELS).map((value) => /* @__PURE__ */ jsxRuntime.jsx(designSystem.SingleSelectOption, { value, children: MODE_LABELS[value] }, value))
+      children: Object.keys(MODE_LABELS).map((value) => /* @__PURE__ */ jsx(SingleSelectOption, { value, children: MODE_LABELS[value] }, value))
     }
   ),
-  /* @__PURE__ */ jsxRuntime.jsx(designSystem.Field.Hint, {})
+  /* @__PURE__ */ jsx(Field$1.Hint, {})
 ] });
-const Split = styledComponents.styled.div`
+const mb = (bytes) => Math.round(bytes / 1024 / 1024);
+function useAttachments(threadIdRef) {
+  const token = useAuth("AiContentStudioAttachments", (state) => state.token);
+  const tokenRef = React.useRef(token);
+  React.useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+  const [held, setHeld] = React.useState([]);
+  const [limits, setLimits] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  const nextOrdinal = React.useRef(1);
+  React.useEffect(() => {
+    if (!token) {
+      return;
+    }
+    void adminFetch("/attachments/limits", tokenRef.current).then(setLimits).catch(() => setLimits(null));
+  }, [token]);
+  const addFiles = React.useCallback(
+    (files) => {
+      setError(null);
+      setHeld((current) => {
+        const sizeLimit = limits?.sizeLimitBytes ?? Number.POSITIVE_INFINITY;
+        const budget = limits?.totalBudgetBytes ?? Number.POSITIVE_INFINITY;
+        let usedBytes = current.filter((a) => a.validation === "ok").reduce((sum, a) => sum + a.sizeBytes, 0);
+        const added = [];
+        for (const file of files) {
+          let validation = "ok";
+          let validationMessage;
+          if (file.size > sizeLimit) {
+            validation = "too-large";
+            validationMessage = `Larger than this project's upload limit of ${mb(sizeLimit)} MB.`;
+          } else if (usedBytes + file.size > budget) {
+            validation = "over-budget";
+            validationMessage = `Would exceed the ${mb(budget)} MB held per conversation.`;
+          } else if (limits?.blockedMimeTypes?.length && limits.blockedMimeTypes.includes(file.type)) {
+            validation = "rejected";
+            validationMessage = `This project does not accept ${file.type || "this file type"}.`;
+          }
+          if (validation === "ok") {
+            usedBytes += file.size;
+          }
+          added.push({
+            ordinal: nextOrdinal.current,
+            file,
+            filename: file.name,
+            mimeType: file.type || "application/octet-stream",
+            sizeBytes: file.size,
+            validation,
+            validationMessage,
+            ingestionState: "held"
+          });
+          nextOrdinal.current += 1;
+        }
+        return [...current, ...added];
+      });
+    },
+    [limits]
+  );
+  const removeOrdinal = React.useCallback((ordinal) => {
+    setHeld((current) => current.filter((a) => a.ordinal !== ordinal));
+  }, []);
+  const clear = React.useCallback(() => {
+    setHeld([]);
+  }, []);
+  const sendable = React.useMemo(
+    () => held.filter((a) => a.validation === "ok").sort((a, b) => a.ordinal - b.ordinal),
+    [held]
+  );
+  const manifest = React.useMemo(
+    () => sendable.map(({ ordinal, filename, mimeType, sizeBytes }) => ({
+      ordinal,
+      filename,
+      mimeType,
+      sizeBytes
+    })),
+    [sendable]
+  );
+  const filesByOrdinal = React.useMemo(
+    () => Object.fromEntries(held.map((a) => [a.ordinal, a.file])),
+    [held]
+  );
+  const ingestOrdinals = React.useCallback(
+    async (ordinals) => {
+      const threadId = threadIdRef.current;
+      if (!threadId) {
+        throw new Error("This conversation has not started yet.");
+      }
+      const wanted = held.filter((a) => ordinals.includes(a.ordinal) && a.validation === "ok");
+      const missing = ordinals.filter((o) => !wanted.some((a) => a.ordinal === o));
+      if (missing.length > 0) {
+        throw new Error(
+          `Attachment${missing.length > 1 ? "s" : ""} ${missing.map((o) => `#${o}`).join(", ")} ${missing.length > 1 ? "are" : "is"} no longer held. Re-attach and try again.`
+        );
+      }
+      const form = new FormData();
+      form.append("threadId", threadId);
+      for (const attachment of wanted) {
+        form.append(`attachment[${attachment.ordinal}]`, attachment.file, attachment.filename);
+        const hash = await sha256(attachment.file);
+        form.append(`idempotencyKey[${attachment.ordinal}]`, hash);
+      }
+      const result = await adminFetch("/attachments/ingest", tokenRef.current, { method: "POST", body: form });
+      setHeld(
+        (current) => current.map((a) => {
+          const entry = result.ingested.find((i) => i.ordinal === a.ordinal);
+          return entry ? { ...a, ingestionState: "ingested", mediaId: entry.mediaId } : a;
+        })
+      );
+      return Object.fromEntries(result.ingested.map((i) => [String(i.ordinal), i.mediaId]));
+    },
+    [held, threadIdRef]
+  );
+  return {
+    held,
+    sendable,
+    manifest,
+    filesByOrdinal,
+    limits,
+    error,
+    setError,
+    addFiles,
+    removeOrdinal,
+    clear,
+    ingestOrdinals
+  };
+}
+async function sha256(file) {
+  const buffer = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+const Split = styled.div`
   display: flex;
   height: calc(100vh - 6rem);
   background: ${({ theme }) => theme.colors.neutral0};
 `;
-const Main = styledComponents.styled.div`
+const Main = styled.div`
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
 `;
-const Banner = styledComponents.styled.div`
+const Banner = styled.div`
   margin: 0 auto 1.2rem;
   max-width: 46rem;
   font-size: 1.2rem;
@@ -23837,7 +24009,7 @@ async function filesToUIParts(files) {
   );
 }
 const Chat2 = () => {
-  const { toggleNotification } = admin.useNotification();
+  const { toggleNotification } = useNotification();
   const {
     tokenRef,
     threads,
@@ -23857,28 +24029,33 @@ const Chat2 = () => {
     renameThread,
     deleteThread
   } = useThreads();
-  const transport = React__namespace.useMemo(
+  const manifestRef = React.useRef([]);
+  const transport = React.useMemo(
     () => new DefaultChatTransport({
       api: `${backendURL()}/ai-content-studio/chat`,
       credentials: "same-origin",
       headers: () => ({ Authorization: `Bearer ${tokenRef.current ?? ""}` }),
-      body: () => ({ threadId: threadIdRef.current, mode: modeRef.current })
+      body: () => ({
+        threadId: threadIdRef.current,
+        mode: modeRef.current,
+        attachmentManifest: manifestRef.current
+      })
     }),
     [tokenRef, threadIdRef, modeRef]
   );
   const { messages, sendMessage, setMessages, status, stop, error } = useChat({ transport });
-  const [input, setInput] = React__namespace.useState("");
-  const [attachments, setAttachments] = React__namespace.useState([]);
-  const [preparing, setPreparing] = React__namespace.useState(false);
-  const [condensed, setCondensed] = React__namespace.useState(false);
-  const [expiredOrdinals, setExpiredOrdinals] = React__namespace.useState({});
-  const bottomRef = React__namespace.useRef(null);
+  const attachments = useAttachments(threadIdRef);
+  const [input, setInput] = React.useState("");
+  const [preparing, setPreparing] = React.useState(false);
+  const [condensed, setCondensed] = React.useState(false);
+  const [expiredOrdinals, setExpiredOrdinals] = React.useState({});
+  const bottomRef = React.useRef(null);
   const busy = status === "submitted" || status === "streaming";
-  const canSend = !busy && !preparing && (input.trim() !== "" || attachments.length > 0);
-  React__namespace.useEffect(() => {
+  const canSend = !busy && !preparing && (input.trim() !== "" || attachments.sendable.length > 0);
+  React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, status]);
-  const openThread = React__namespace.useCallback(
+  const openThread = React.useCallback(
     async (threadId) => {
       const history = await loadHistory(threadId);
       if (!history) {
@@ -23895,35 +24072,38 @@ const Chat2 = () => {
       setExpiredOrdinals(
         Object.fromEntries(history.expiredAttachments.map((e) => [e.messageId, e.ordinals]))
       );
-      setAttachments([]);
+      attachments.clear();
+      manifestRef.current = [];
       setInput("");
     },
-    [loadHistory, setMessages]
+    [loadHistory, setMessages, attachments]
   );
-  const startNewThread = React__namespace.useCallback(async () => {
+  const startNewThread = React.useCallback(async () => {
     setMessages([]);
     setCondensed(false);
     setExpiredOrdinals({});
-    setAttachments([]);
+    attachments.clear();
+    manifestRef.current = [];
     setInput("");
     threadIdRef.current = null;
     setCurrentThreadId(null);
     setMode("content");
     modeRef.current = "content";
-  }, [setMessages, threadIdRef, setCurrentThreadId, setMode, modeRef]);
+  }, [setMessages, threadIdRef, setCurrentThreadId, setMode, modeRef, attachments]);
   const onSend = async () => {
     const text2 = input.trim();
-    if (!text2 && attachments.length === 0 || busy || preparing) {
+    if (!text2 && attachments.sendable.length === 0 || busy || preparing) {
       return;
     }
     setPreparing(true);
     try {
       await ensureThread();
-      const fileParts = attachments.length > 0 ? await filesToUIParts(attachments) : [];
+      manifestRef.current = attachments.manifest;
+      const imageFiles = attachments.sendable.filter((a) => a.mimeType.startsWith("image/")).map((a) => a.file);
+      const fileParts = imageFiles.length > 0 ? await filesToUIParts(imageFiles) : [];
       const body = text2 || "Please look at the attached file(s).";
       sendMessage(fileParts.length > 0 ? { text: body, files: fileParts } : { text: body });
       setInput("");
-      setAttachments([]);
     } catch (err) {
       toggleNotification({
         type: "danger",
@@ -23933,7 +24113,7 @@ const Chat2 = () => {
       setPreparing(false);
     }
   };
-  const onApplied = React__namespace.useCallback(
+  const onApplied = React.useCallback(
     (report) => {
       setMessages((current) => [
         ...current,
@@ -23946,8 +24126,8 @@ const Chat2 = () => {
     },
     [setMessages]
   );
-  return /* @__PURE__ */ jsxRuntime.jsx(admin.Page.Main, { children: /* @__PURE__ */ jsxRuntime.jsxs(Split, { children: [
-    /* @__PURE__ */ jsxRuntime.jsx(
+  return /* @__PURE__ */ jsx(Page.Main, { children: /* @__PURE__ */ jsxs(Split, { children: [
+    /* @__PURE__ */ jsx(
       ThreadSidebar,
       {
         threads,
@@ -23965,34 +24145,42 @@ const Chat2 = () => {
           });
         },
         onLoadMore: () => void loadMore(),
-        header: /* @__PURE__ */ jsxRuntime.jsx(ModeSelect, { mode, onChange: (next) => void changeMode(next), disabled: busy })
+        header: /* @__PURE__ */ jsx(ModeSelect, { mode, onChange: (next) => void changeMode(next), disabled: busy })
       }
     ),
-    /* @__PURE__ */ jsxRuntime.jsx(Main, { children: /* @__PURE__ */ jsxRuntime.jsxs(Shell, { children: [
-      /* @__PURE__ */ jsxRuntime.jsx(Scroll, { children: /* @__PURE__ */ jsxRuntime.jsxs(Column, { children: [
-        condensed ? /* @__PURE__ */ jsxRuntime.jsx(Banner, { children: "Earlier detail in this conversation was condensed into notes so it keeps fitting the model's context. The assistant still has the gist, not every word." }) : null,
-        /* @__PURE__ */ jsxRuntime.jsx(
+    /* @__PURE__ */ jsx(Main, { children: /* @__PURE__ */ jsxs(Shell, { children: [
+      /* @__PURE__ */ jsx(Scroll, { children: /* @__PURE__ */ jsxs(Column, { children: [
+        condensed ? /* @__PURE__ */ jsx(Banner, { children: "Earlier detail in this conversation was condensed into notes so it keeps fitting the model's context. The assistant still has the gist, not every word." }) : null,
+        /* @__PURE__ */ jsx(
           MessageList,
           {
             messages,
             status,
             onPickSuggestion: (text2) => setInput(text2),
             expiredOrdinalsByMessage: expiredOrdinals,
-            renderChangeSet: (changeSetId) => /* @__PURE__ */ jsxRuntime.jsx(ChangePlanCard, { changeSetId, onApplied })
+            renderChangeSet: (changeSetId) => /* @__PURE__ */ jsx(
+              ChangePlanCard,
+              {
+                changeSetId,
+                onApplied,
+                resolveAttachments: attachments.ingestOrdinals,
+                filesByOrdinal: attachments.filesByOrdinal
+              }
+            )
           }
         ),
-        error ? /* @__PURE__ */ jsxRuntime.jsx(ErrorText, { children: error.message }) : null,
-        threadError ? /* @__PURE__ */ jsxRuntime.jsx(ErrorText, { children: threadError }) : null,
-        /* @__PURE__ */ jsxRuntime.jsx("div", { ref: bottomRef })
+        error ? /* @__PURE__ */ jsx(ErrorText, { children: error.message }) : null,
+        threadError ? /* @__PURE__ */ jsx(ErrorText, { children: threadError }) : null,
+        /* @__PURE__ */ jsx("div", { ref: bottomRef })
       ] }) }),
-      /* @__PURE__ */ jsxRuntime.jsx(
+      /* @__PURE__ */ jsx(
         Composer,
         {
           input,
           onInputChange: setInput,
-          attachments,
-          onAddFiles: (files) => setAttachments((a) => [...a, ...files]),
-          onRemoveAttachment: (index2) => setAttachments((a) => a.filter((_, j) => j !== index2)),
+          attachments: attachments.held,
+          onAddFiles: attachments.addFiles,
+          onRemoveAttachment: attachments.removeOrdinal,
           busy,
           disabled: preparing,
           canSend,
@@ -24004,4 +24192,6 @@ const Chat2 = () => {
     ] }) })
   ] }) });
 };
-exports.Chat = Chat2;
+export {
+  Chat2 as Chat
+};

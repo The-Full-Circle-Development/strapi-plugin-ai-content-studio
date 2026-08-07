@@ -1,5 +1,7 @@
 import fs from "node:fs/promises";
 import crypto$1 from "node:crypto";
+import os from "node:os";
+import path from "node:path";
 const register = ({ strapi }) => {
   strapi.plugin("ai-content-studio").service("crypto").assertConfigured();
 };
@@ -907,11 +909,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path, issues) {
+function prefixIssues(path2, issues) {
   return issues.map((iss) => {
     var _a22;
     (_a22 = iss).path ?? (_a22.path = []);
-    iss.path.unshift(path);
+    iss.path.unshift(path2);
     return iss;
   });
 }
@@ -980,16 +982,16 @@ function flattenError(error, mapper = (issue2) => issue2.message) {
 }
 function formatError(error, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error2, path = []) => {
+  const processError = (error2, path2 = []) => {
     for (const issue2 of error2.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path2, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path2, ...issue2.path]);
       } else {
-        const fullpath = [...path, ...issue2.path];
+        const fullpath = [...path2, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -36625,37 +36627,37 @@ function createOpenAI(options2 = {}) {
   );
   const createChatModel = (modelId) => new OpenAIChatLanguageModel(modelId, {
     provider: `${providerName}.chat`,
-    url: ({ path }) => `${baseURL}${path}`,
+    url: ({ path: path2 }) => `${baseURL}${path2}`,
     headers: getHeaders,
     fetch: options2.fetch
   });
   const createCompletionModel = (modelId) => new OpenAICompletionLanguageModel(modelId, {
     provider: `${providerName}.completion`,
-    url: ({ path }) => `${baseURL}${path}`,
+    url: ({ path: path2 }) => `${baseURL}${path2}`,
     headers: getHeaders,
     fetch: options2.fetch
   });
   const createEmbeddingModel = (modelId) => new OpenAIEmbeddingModel(modelId, {
     provider: `${providerName}.embedding`,
-    url: ({ path }) => `${baseURL}${path}`,
+    url: ({ path: path2 }) => `${baseURL}${path2}`,
     headers: getHeaders,
     fetch: options2.fetch
   });
   const createImageModel = (modelId) => new OpenAIImageModel(modelId, {
     provider: `${providerName}.image`,
-    url: ({ path }) => `${baseURL}${path}`,
+    url: ({ path: path2 }) => `${baseURL}${path2}`,
     headers: getHeaders,
     fetch: options2.fetch
   });
   const createTranscriptionModel = (modelId) => new OpenAITranscriptionModel(modelId, {
     provider: `${providerName}.transcription`,
-    url: ({ path }) => `${baseURL}${path}`,
+    url: ({ path: path2 }) => `${baseURL}${path2}`,
     headers: getHeaders,
     fetch: options2.fetch
   });
   const createSpeechModel = (modelId) => new OpenAISpeechModel(modelId, {
     provider: `${providerName}.speech`,
-    url: ({ path }) => `${baseURL}${path}`,
+    url: ({ path: path2 }) => `${baseURL}${path2}`,
     headers: getHeaders,
     fetch: options2.fetch
   });
@@ -36670,7 +36672,7 @@ function createOpenAI(options2 = {}) {
   const createResponsesModel = (modelId) => {
     return new OpenAIResponsesLanguageModel(modelId, {
       provider: `${providerName}.responses`,
-      url: ({ path }) => `${baseURL}${path}`,
+      url: ({ path: path2 }) => `${baseURL}${path2}`,
       headers: getHeaders,
       fetch: options2.fetch,
       fileIdPrefixes: ["file-"]
@@ -42686,7 +42688,12 @@ const CHAT_MODES = ["content", "layout", "audit"];
 const bodySchema = object$1({
   threadId: string().min(1),
   mode: _enum(CHAT_MODES).optional(),
-  messages: array$1(any())
+  messages: array$1(any()),
+  /**
+   * Files the user attached to THIS turn. Metadata only — the bytes stay in the browser until the
+   * user approves ingestion (FR-033). Validated in detail by the attachments service.
+   */
+  attachmentManifest: array$1(unknown()).optional()
 });
 const chatController = ({ strapi }) => ({
   async chat(ctx) {
@@ -42724,24 +42731,44 @@ const chatController = ({ strapi }) => ({
       strapi.log.error("[ai-content-studio] failed to build AI model", err);
       return ctx.internalServerError("AI provider initialization failed.");
     }
+    const manifestResult = plugin.service("attachments").validateManifest(parsed.data.attachmentManifest);
+    if (!manifestResult.ok) {
+      return ctx.badRequest(manifestResult.message);
+    }
+    const manifest = manifestResult.manifest;
     const tools = plugin.service("tools").buildTools({
       userAbility,
       mode,
       threadId,
-      ownerId
+      ownerId,
+      // Placements are validated against the ordinals actually attached to THIS turn.
+      manifestOrdinals: manifest.map((a) => a.ordinal)
     });
     const showErrorDetails = Boolean(
       strapi.config.get("plugin::ai-content-studio.showProviderErrorDetails", false)
     );
     const lastMessage = messages[messages.length - 1];
+    const manifestNote = plugin.service("attachments").describeManifest(manifest, supportsVision);
+    if (manifestNote && lastMessage?.role === "user") {
+      const parts = [...lastMessage.parts ?? []];
+      const lastText = [...parts].reverse().find((part) => part?.type === "text");
+      if (lastText) {
+        lastText.text = `${lastText.text}${manifestNote}`;
+      } else {
+        parts.push({ type: "text", text: manifestNote.trim() });
+      }
+      lastMessage.parts = parts;
+    }
     if (lastMessage?.role === "user") {
       await threads().appendMessage({
         threadId,
         ownerId,
         role: "user",
         // File parts hold base64 data URLs — never persist them (data-model: `parts` stores no
-        // attachment bytes). The text of the turn is what history needs.
+        // attachment bytes). The manifest is stored separately, so a restored thread can say which
+        // held files were never ingested (FR-038).
         parts: (lastMessage.parts ?? []).filter((part) => part?.type !== "file"),
+        attachmentManifest: manifest.length > 0 ? manifest : null,
         modeAtSend: mode
       });
     }
@@ -42767,7 +42794,7 @@ const chatController = ({ strapi }) => ({
       model,
       abortSignal: abort.signal,
       system: [
-        plugin.service("prompt").build({ mode, supportsVision }),
+        plugin.service("prompt").build({ mode, supportsVision, hasAttachments: manifest.length > 0 }),
         context2?.summary ? `## Earlier in this conversation (condensed)
 These notes replace older turns that were summarized to stay inside the model's context. Treat them as fact.
 
@@ -43104,6 +43131,88 @@ const changeSetsController = ({ strapi }) => {
     }
   };
 };
+async function readMultipart(ctx) {
+  const raw = ctx.request?.files ?? {};
+  const body = ctx.request?.body ?? {};
+  const files = [];
+  for (const [field, value] of Object.entries(raw)) {
+    const match = /^attachment\[(\d+)\]$/.exec(field);
+    if (!match) {
+      continue;
+    }
+    const ordinal = Number(match[1]);
+    for (const file of Array.isArray(value) ? value : [value]) {
+      if (!file) {
+        continue;
+      }
+      let bytes = null;
+      if (Buffer.isBuffer(file.buffer)) {
+        bytes = file.buffer;
+      } else if (typeof file.filepath === "string") {
+        bytes = await fs.readFile(file.filepath);
+      } else if (typeof file.path === "string") {
+        bytes = await fs.readFile(file.path);
+      }
+      if (!bytes) {
+        return { files: [], error: `Attachment #${ordinal} could not be read.` };
+      }
+      const key = body[`idempotencyKey[${ordinal}]`];
+      files.push({
+        ordinal,
+        filename: String(file.originalFilename ?? file.name ?? `attachment-${ordinal}`),
+        mimeType: String(file.mimetype ?? file.type ?? "application/octet-stream"),
+        bytes,
+        idempotencyKey: typeof key === "string" && key.trim() !== "" ? key.trim() : void 0
+      });
+    }
+  }
+  return { files };
+}
+const attachmentsController = ({ strapi }) => {
+  const attachments = () => strapi.plugin("ai-content-studio").service("attachments");
+  const threads = () => strapi.plugin("ai-content-studio").service("threads");
+  return {
+    async limits(ctx) {
+      ctx.body = attachments().getLimits();
+      return void 0;
+    },
+    async ingest(ctx) {
+      const ownerId = ctx.state?.user?.id;
+      if (!Number.isInteger(ownerId)) {
+        return ctx.unauthorized("Not authenticated.");
+      }
+      const threadId = (ctx.request.body ?? {}).threadId;
+      if (typeof threadId !== "string" || threadId.trim() === "") {
+        return ctx.badRequest("`threadId` is required.");
+      }
+      const thread = await threads().getOwnedThread(threadId, ownerId);
+      if (!thread) {
+        return ctx.notFound("That conversation does not exist.");
+      }
+      const { files, error } = await readMultipart(ctx);
+      if (error) {
+        return ctx.badRequest(error);
+      }
+      if (files.length === 0) {
+        return ctx.badRequest("No files were attached.");
+      }
+      const result = await attachments().ingest({
+        threadId,
+        // The CALLER's live ability; the Media Library create permission is checked before any
+        // byte is written, so a caller without it writes nothing at all.
+        userAbility: ctx.state.userAbility,
+        files
+      });
+      if (!result.ok) {
+        ctx.status = result.error === "permission_denied" ? 403 : 400;
+        ctx.body = { error: result.error, message: result.message };
+        return void 0;
+      }
+      ctx.body = { ingested: result.ingested };
+      return void 0;
+    }
+  };
+};
 const previewController = ({ strapi }) => ({
   async file(ctx) {
     const plugin = strapi.plugin("ai-content-studio");
@@ -43300,6 +43409,7 @@ const controllers = {
   threads: threadsController,
   // Route handlers reference this as `change-sets.<handler>`.
   "change-sets": changeSetsController,
+  attachments: attachmentsController,
   preview: previewController,
   settings: settingsController
 };
@@ -43316,8 +43426,8 @@ const extractToken = (ctx) => {
   }
   return null;
 };
-const applyPath = (entry, path, value) => {
-  const segments = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+const applyPath = (entry, path2, value) => {
+  const segments = path2.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
   let cursor = entry;
   for (let i = 0; i < segments.length - 1; i += 1) {
     const segment = segments[i];
@@ -43351,8 +43461,8 @@ const overlayEntry = (entry, overlay, uidHint) => {
     return false;
   }
   const target = entry.attributes && typeof entry.attributes === "object" ? entry.attributes : entry;
-  for (const [path, value] of Object.entries(fields)) {
-    applyPath(target, path, value);
+  for (const [path2, value] of Object.entries(fields)) {
+    applyPath(target, path2, value);
   }
   return true;
 };
@@ -43370,8 +43480,8 @@ const overlayBody = (body, overlay, uidHint) => {
   }
   return overlayEntry(data, overlay, uidHint);
 };
-const uidFromPath = (strapi, path) => {
-  const match = /^\/api\/([^/?]+)/.exec(path ?? "");
+const uidFromPath = (strapi, path2) => {
+  const match = /^\/api\/([^/?]+)/.exec(path2 ?? "");
   if (!match) {
     return null;
   }
@@ -43440,9 +43550,9 @@ const CHAT_USE = {
   name: "admin::hasPermissions",
   config: { actions: ["plugin::ai-content-studio.chat.use"] }
 };
-const chatRoute = (method, path, handler) => ({
+const chatRoute = (method, path2, handler) => ({
   method,
-  path,
+  path: path2,
   handler,
   config: {
     policies: ["admin::isAuthenticatedAdmin", CHAT_USE]
@@ -43464,6 +43574,10 @@ const routes = {
       chatRoute("POST", "/change-sets/:id/apply", "change-sets.apply"),
       chatRoute("POST", "/change-sets/:id/reject", "change-sets.reject"),
       chatRoute("POST", "/change-sets/:id/preview", "change-sets.preview"),
+      // Attachments. `ingest` additionally requires the caller's Media Library create permission,
+      // checked in the service before any byte is written.
+      chatRoute("GET", "/attachments/limits", "attachments.limits"),
+      chatRoute("POST", "/attachments/ingest", "attachments.ingest"),
       {
         method: "GET",
         path: "/settings",
@@ -44284,11 +44398,11 @@ const changeSetsService = ({ strapi }) => {
     }
     return value;
   };
-  const readPath = (doc, path) => {
-    if (!path) {
+  const readPath = (doc, path2) => {
+    if (!path2) {
       return void 0;
     }
-    const segments = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+    const segments = path2.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
     let cursor = doc;
     for (const segment of segments) {
       if (cursor === null || cursor === void 0) {
@@ -44298,8 +44412,8 @@ const changeSetsService = ({ strapi }) => {
     }
     return cursor;
   };
-  const writePath = (target, path, value) => {
-    const segments = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+  const writePath = (target, path2, value) => {
+    const segments = path2.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
     let cursor = target;
     for (let i = 0; i < segments.length - 1; i += 1) {
       const segment = segments[i];
@@ -44311,8 +44425,8 @@ const changeSetsService = ({ strapi }) => {
     }
     cursor[segments[segments.length - 1]] = value;
   };
-  const fieldExists = (uid, path) => {
-    const segments = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+  const fieldExists = (uid, path2) => {
+    const segments = path2.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
     let attributes2 = ctOf(uid)?.attributes ?? null;
     for (const segment of segments) {
       if (!attributes2) {
@@ -44925,6 +45039,204 @@ const changeSetsService = ({ strapi }) => {
   };
   return service;
 };
+const UPLOAD_CREATE_ACTION = "plugin::upload.assets.create";
+const ingestLedger = /* @__PURE__ */ new Map();
+const attachmentsService = ({ strapi }) => {
+  const plugin = () => strapi.plugin("ai-content-studio");
+  const service = {
+    /**
+     * The host's effective upload rules plus this plugin's per-conversation budget, so the composer
+     * can reject a file BEFORE the message is sent, with the real reason (FR-032).
+     *
+     * Strapi's Media Library imposes no MIME allow-list by default, so "any type the Media Library
+     * allows" means whatever the host's upload configuration accepts — the plugin adds no list of
+     * its own.
+     */
+    getLimits() {
+      const configured = strapi.config.get("plugin::upload.sizeLimit", void 0);
+      const sizeLimitBytes = typeof configured === "number" && Number.isFinite(configured) && configured > 0 ? Math.trunc(configured) : 200 * 1024 * 1024;
+      return {
+        sizeLimitBytes,
+        totalBudgetBytes: plugin().service("config").getAttachmentOptions().totalBudgetBytes,
+        acceptsAnyMimeType: true,
+        blockedMimeTypes: []
+      };
+    },
+    /** Validate a manifest from the client. Ordinals must be positive, unique, and within budget. */
+    validateManifest(raw) {
+      if (raw === null || raw === void 0) {
+        return { ok: true, manifest: [] };
+      }
+      if (!Array.isArray(raw)) {
+        return { ok: false, message: "attachmentManifest must be an array." };
+      }
+      const limits = service.getLimits();
+      const manifest = [];
+      const seen = /* @__PURE__ */ new Set();
+      let total = 0;
+      for (const item of raw) {
+        const entry = item;
+        const ordinal = Number(entry?.ordinal);
+        if (!Number.isInteger(ordinal) || ordinal < 1) {
+          return { ok: false, message: "Every attachment needs a positive whole-number ordinal." };
+        }
+        if (seen.has(ordinal)) {
+          return { ok: false, message: `Attachment ordinal #${ordinal} appears twice.` };
+        }
+        seen.add(ordinal);
+        const sizeBytes = Number(entry?.sizeBytes ?? 0);
+        if (!Number.isFinite(sizeBytes) || sizeBytes < 0) {
+          return { ok: false, message: `Attachment #${ordinal} has an invalid size.` };
+        }
+        if (sizeBytes > limits.sizeLimitBytes) {
+          return {
+            ok: false,
+            message: `Attachment #${ordinal} is larger than this project's upload limit of ${Math.round(
+              limits.sizeLimitBytes / 1024 / 1024
+            )} MB.`
+          };
+        }
+        total += sizeBytes;
+        manifest.push({
+          ordinal,
+          filename: String(entry?.filename ?? `attachment-${ordinal}`).slice(0, 255),
+          mimeType: String(entry?.mimeType ?? "application/octet-stream").slice(0, 255),
+          sizeBytes
+        });
+      }
+      if (total > limits.totalBudgetBytes) {
+        return {
+          ok: false,
+          message: `These attachments total more than the ${Math.round(
+            limits.totalBudgetBytes / 1024 / 1024
+          )} MB held per conversation. Remove some and try again.`
+        };
+      }
+      return { ok: true, manifest: manifest.sort((a, b) => a.ordinal - b.ordinal) };
+    },
+    /**
+     * Render the manifest into the text the model actually reads.
+     *
+     * This is what makes "image #1 to the hero" resolvable on ANY provider, including one that
+     * cannot see the bytes at all (FR-034, FR-036) — the ordinal, not a library id, is the model's
+     * handle on the file.
+     */
+    describeManifest(manifest, supportsVision) {
+      if (manifest.length === 0) {
+        return "";
+      }
+      const lines = manifest.map(
+        (a) => `#${a.ordinal} ${a.filename} (${a.mimeType}, ${Math.max(1, Math.round(a.sizeBytes / 1024))} KB)`
+      );
+      const note = supportsVision ? "" : "\nThe active model cannot interpret these files. Say so, and place them using their names, types and the instruction.";
+      return `
+
+[Attached, NOT in the Media Library — refer to them by ordinal and place them with "attachmentOrdinal":
+${lines.join(
+        "\n"
+      )}]${note}`;
+    },
+    /** Does the caller hold the Media Library create permission? */
+    canIngest(userAbility) {
+      const ability = userAbility;
+      try {
+        return Boolean(ability?.can?.(UPLOAD_CREATE_ACTION));
+      } catch {
+        return false;
+      }
+    },
+    /**
+     * Add approved files to the Media Library — the ONE moment a held file becomes a library entry.
+     *
+     * Permission is checked before the loop, so a caller without it writes nothing at all rather
+     * than partially succeeding (FR-033, permission-denied path 5).
+     */
+    async ingest({
+      threadId,
+      userAbility,
+      files
+    }) {
+      if (!service.canIngest(userAbility)) {
+        return {
+          ok: false,
+          error: "permission_denied",
+          message: "Your account cannot upload to the Media Library."
+        };
+      }
+      const limits = service.getLimits();
+      const oversized = files.find((f) => f.bytes.length > limits.sizeLimitBytes);
+      if (oversized) {
+        return {
+          ok: false,
+          error: "too_large",
+          message: `"${oversized.filename}" is larger than this project's upload limit of ${Math.round(
+            limits.sizeLimitBytes / 1024 / 1024
+          )} MB.`
+        };
+      }
+      const ingested = [];
+      for (const file of files) {
+        const contentHash = file.idempotencyKey ?? crypto$1.createHash("sha256").update(file.bytes).digest("hex");
+        const key = `${threadId}:${file.ordinal}:${contentHash}`;
+        const previous = ingestLedger.get(key);
+        if (previous) {
+          ingested.push({ ...previous, deduplicated: true });
+          continue;
+        }
+        let tempPath = null;
+        try {
+          tempPath = path.join(
+            os.tmpdir(),
+            `ai-studio-${crypto$1.randomUUID()}-${file.filename.replace(/[^\w.\-]/g, "_")}`
+          );
+          await fs.writeFile(tempPath, file.bytes);
+          const uploaded = await strapi.plugin("upload").service("upload").upload({
+            data: {},
+            files: {
+              filepath: tempPath,
+              originalFilename: file.filename,
+              mimetype: file.mimeType,
+              size: file.bytes.length
+            }
+          });
+          const entry = Array.isArray(uploaded) ? uploaded[0] : uploaded;
+          if (!entry?.id) {
+            return {
+              ok: false,
+              error: "upload_failed",
+              message: `"${file.filename}" could not be added to the Media Library.`
+            };
+          }
+          const record2 = {
+            ordinal: file.ordinal,
+            mediaId: entry.id,
+            name: entry.name ?? file.filename,
+            url: entry.url ?? "",
+            deduplicated: false
+          };
+          ingestLedger.set(key, record2);
+          ingested.push(record2);
+        } catch (err) {
+          strapi.log.error(
+            `[ai-content-studio] attachment ingestion failed: ${plugin().service("redact").describeError(err)}`
+          );
+          return {
+            ok: false,
+            error: "upload_failed",
+            // Actionable, and free of any internal error text (FR-053).
+            message: `"${file.filename}" could not be added to the Media Library. Check that its type and size are allowed.`
+          };
+        } finally {
+          if (tempPath) {
+            await fs.rm(tempPath, { force: true }).catch(() => void 0);
+          }
+        }
+      }
+      return { ok: true, ingested };
+    }
+  };
+  return service;
+};
 const stagedStore = /* @__PURE__ */ new Map();
 const previewService = ({ strapi }) => {
   const docs = (uid) => strapi.documents(uid);
@@ -44964,7 +45276,7 @@ const previewService = ({ strapi }) => {
         };
       }
       const missing = [];
-      const path = pattern.replace(/:([A-Za-z0-9_]+)/g, (_match, key) => {
+      const path2 = pattern.replace(/:([A-Za-z0-9_]+)/g, (_match, key) => {
         const value = doc?.[key];
         if (value === null || value === void 0 || value === "") {
           missing.push(key);
@@ -44978,7 +45290,7 @@ const previewService = ({ strapi }) => {
           message: `The preview path for ${contentTypeUid} needs ${missing.map((m) => `"${m}"`).join(", ")}, which this entry does not have. Showing the field comparison instead.`
         };
       }
-      return { ok: true, url: `${opts.baseUrl}${path.startsWith("/") ? "" : "/"}${path}` };
+      return { ok: true, url: `${opts.baseUrl}${path2.startsWith("/") ? "" : "/"}${path2}` };
     },
     /**
      * Precompute `{ [uid]: { [documentId]: { [dottedField]: value } } }` so the middleware applies
@@ -45399,23 +45711,23 @@ const toolsService = ({ strapi }) => ({
         const slotsOf = (attributes22, prefix, value) => {
           const slots = [];
           for (const [name22, attribute] of Object.entries(attributes22)) {
-            const path = prefix ? `${prefix}.${name22}` : name22;
+            const path2 = prefix ? `${prefix}.${name22}` : name22;
             const current = value?.[name22];
             if (attribute.type === "component") {
               if (attribute.repeatable) {
                 const list = Array.isArray(current) ? current : [];
                 slots.push({
-                  field: path,
+                  field: path2,
                   type: "component-list",
                   component: attribute.component,
                   repeatable: true,
                   entries: list.length
                 });
                 list.forEach((entry, i) => {
-                  slots.push(...slotsOf(componentAttributes(attribute.component), `${path}[${i}]`, entry));
+                  slots.push(...slotsOf(componentAttributes(attribute.component), `${path2}[${i}]`, entry));
                 });
               } else {
-                slots.push(...slotsOf(componentAttributes(attribute.component), path, current));
+                slots.push(...slotsOf(componentAttributes(attribute.component), path2, current));
               }
               continue;
             }
@@ -45425,12 +45737,12 @@ const toolsService = ({ strapi }) => ({
                 const component = entry?.__component;
                 if (component) {
                   slots.push({
-                    field: `${path}[${i}]`,
+                    field: `${path2}[${i}]`,
                     type: "dynamic-zone-entry",
                     component,
                     repeatable: true
                   });
-                  slots.push(...slotsOf(componentAttributes(component), `${path}[${i}]`, entry));
+                  slots.push(...slotsOf(componentAttributes(component), `${path2}[${i}]`, entry));
                 }
               });
               continue;
@@ -45439,7 +45751,7 @@ const toolsService = ({ strapi }) => ({
               continue;
             }
             slots.push({
-              field: path,
+              field: path2,
               type: attribute.type,
               ...attribute.type === "media" ? { multiple: attribute.multiple === true } : {},
               ...attribute.type === "enumeration" ? { enum: attribute.enum } : {},
@@ -45514,6 +45826,7 @@ const services = {
   threads: threadsService,
   // Referenced as service('change-sets').
   "change-sets": changeSetsService,
+  attachments: attachmentsService,
   preview: previewService,
   tools: toolsService
 };

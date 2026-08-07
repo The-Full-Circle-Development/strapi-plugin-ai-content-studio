@@ -29,13 +29,27 @@ const Thumbs = styled.div`
   padding: 0.2rem 0.4rem 0.6rem;
 `;
 
-const Thumb = styled.div`
+const Chip = styled.div<{ $invalid?: boolean }>`
   position: relative;
-  width: 4.4rem;
-  height: 4.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 22rem;
+  padding: 0.4rem 2rem 0.4rem 0.4rem;
   border-radius: 0.6rem;
+  border: 1px solid
+    ${({ theme, $invalid }) => ($invalid ? theme.colors.danger500 : theme.colors.neutral200)};
+  background: ${({ theme, $invalid }) =>
+    $invalid ? theme.colors.danger100 : theme.colors.neutral100};
+`;
+
+const Thumb = styled.div`
+  flex: 0 0 auto;
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 0.4rem;
   overflow: hidden;
-  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  background: ${({ theme }) => theme.colors.neutral150};
   img {
     width: 100%;
     height: 100%;
@@ -43,6 +57,46 @@ const Thumb = styled.div`
     display: block;
   }
 `;
+
+const FileGlyph = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: ${({ theme }) => theme.colors.neutral600};
+`;
+
+const ChipText = styled.div`
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+`;
+
+const ChipName = styled.span`
+  font-size: 1.15rem;
+  color: ${({ theme }) => theme.colors.neutral800};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const ChipMeta = styled.span<{ $invalid?: boolean }>`
+  font-size: 1.05rem;
+  color: ${({ theme, $invalid }) => ($invalid ? theme.colors.danger600 : theme.colors.neutral600)};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const extensionOf = (filename: string): string => {
+  const dot = filename.lastIndexOf('.');
+  return dot > 0 ? filename.slice(dot + 1).slice(0, 4) : 'file';
+};
 
 const ThumbRemove = styled.button`
   position: absolute;
@@ -113,12 +167,22 @@ const Hint = styled.div`
   margin-top: 0.6rem;
 `;
 
+export interface ComposerAttachment {
+  ordinal: number;
+  file: File;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  validation: 'ok' | 'too-large' | 'over-budget' | 'rejected';
+  validationMessage?: string;
+}
+
 export interface ComposerProps {
   input: string;
   onInputChange: (value: string) => void;
-  attachments: File[];
+  attachments: ComposerAttachment[];
   onAddFiles: (files: File[]) => void;
-  onRemoveAttachment: (index: number) => void;
+  onRemoveAttachment: (ordinal: number) => void;
   busy: boolean;
   disabled?: boolean;
   canSend: boolean;
@@ -143,12 +207,18 @@ export const Composer = ({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const editorRef = React.useRef<HTMLTextAreaElement>(null);
 
-  // Object-URL thumbnails for composer chips (revoked on change/unmount).
-  const [previews, setPreviews] = React.useState<string[]>([]);
+  // Object-URL thumbnails for image chips (revoked on change/unmount). Non-images get no preview,
+  // which is fine — a PDF is identified by its ordinal and name, which is what placement uses.
+  const [previews, setPreviews] = React.useState<Record<number, string>>({});
   React.useEffect(() => {
-    const urls = attachments.map((file) => URL.createObjectURL(file));
+    const urls: Record<number, string> = {};
+    for (const attachment of attachments) {
+      if (attachment.mimeType.startsWith('image/')) {
+        urls[attachment.ordinal] = URL.createObjectURL(attachment.file);
+      }
+    }
     setPreviews(urls);
-    return () => urls.forEach((url) => URL.revokeObjectURL(url));
+    return () => Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
   }, [attachments]);
 
   const autoGrow = React.useCallback(() => {
@@ -191,19 +261,40 @@ export const Composer = ({
     <ComposerWrap>
       <Column>
         <Box>
+          {/*
+            Held files, with the ordinal, the filename and any rejection reason shown BEFORE the
+            message is sent (FR-032). Nothing is uploaded here: the bytes stay in the browser until
+            the user approves a plan that ingests them (FR-033).
+          */}
           {attachments.length > 0 ? (
             <Thumbs>
-              {attachments.map((file, i) => (
-                <Thumb key={`${file.name}-${i}`}>
-                  {previews[i] ? <img src={previews[i]} alt={file.name} /> : null}
+              {attachments.map((attachment) => (
+                <Chip key={attachment.ordinal} $invalid={attachment.validation !== 'ok'}>
+                  <Thumb>
+                    {previews[attachment.ordinal] ? (
+                      <img src={previews[attachment.ordinal]} alt={attachment.filename} />
+                    ) : (
+                      <FileGlyph>{extensionOf(attachment.filename)}</FileGlyph>
+                    )}
+                  </Thumb>
+                  <ChipText>
+                    <ChipName title={attachment.filename}>
+                      #{attachment.ordinal} {attachment.filename}
+                    </ChipName>
+                    <ChipMeta $invalid={attachment.validation !== 'ok'}>
+                      {attachment.validation === 'ok'
+                        ? `${Math.max(1, Math.round(attachment.sizeBytes / 1024))} KB · not uploaded yet`
+                        : (attachment.validationMessage ?? 'This file cannot be attached.')}
+                    </ChipMeta>
+                  </ChipText>
                   <ThumbRemove
                     type="button"
-                    aria-label={`Remove ${file.name}`}
-                    onClick={() => onRemoveAttachment(i)}
+                    aria-label={`Remove ${attachment.filename}`}
+                    onClick={() => onRemoveAttachment(attachment.ordinal)}
                   >
                     <Cross />
                   </ThumbRemove>
-                </Thumb>
+                </Chip>
               ))}
             </Thumbs>
           ) : null}
@@ -227,8 +318,8 @@ export const Composer = ({
           <Bar>
             <IconButton
               type="button"
-              aria-label="Attach image"
-              title="Attach image"
+              aria-label="Attach file"
+              title="Attach a file — it is held here, not uploaded"
               disabled={busy || disabled}
               onClick={() => fileInputRef.current?.click()}
             >
@@ -252,10 +343,10 @@ export const Composer = ({
             )}
           </Bar>
 
+          {/* Any type the host's Media Library accepts (FR-032) — not just images. */}
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
             multiple
             style={{ display: 'none' }}
             onChange={(event) => {

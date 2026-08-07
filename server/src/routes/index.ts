@@ -46,6 +46,11 @@ export default {
       chatRoute('POST', '/change-sets/:id/reject', 'change-sets.reject'),
       chatRoute('POST', '/change-sets/:id/preview', 'change-sets.preview'),
 
+      // Attachments. `ingest` additionally requires the caller's Media Library create permission,
+      // checked in the service before any byte is written.
+      chatRoute('GET', '/attachments/limits', 'attachments.limits'),
+      chatRoute('POST', '/attachments/ingest', 'attachments.ingest'),
+
       {
         method: 'GET',
         path: '/settings',

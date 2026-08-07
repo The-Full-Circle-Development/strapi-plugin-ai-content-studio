@@ -13,6 +13,11 @@ const bodySchema = z.object({
   threadId: z.string().min(1),
   mode: z.enum(CHAT_MODES).optional(),
   messages: z.array(z.any()),
+  /**
+   * Files the user attached to THIS turn. Metadata only — the bytes stay in the browser until the
+   * user approves ingestion (FR-033). Validated in detail by the attachments service.
+   */
+  attachmentManifest: z.array(z.unknown()).optional(),
 });
 
 const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
@@ -66,6 +71,14 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       return ctx.internalServerError('AI provider initialization failed.');
     }
 
+    // Held attachments: metadata only, validated against the host's real upload rules so a bad
+    // file is refused with the actual reason rather than failing later (FR-032).
+    const manifestResult = plugin.service('attachments').validateManifest(parsed.data.attachmentManifest);
+    if (!manifestResult.ok) {
+      return ctx.badRequest(manifestResult.message);
+    }
+    const manifest = manifestResult.manifest;
+
     // Tool set is derived per request from (caller ability, mode). `audit` mode never builds
     // proposeChanges, so read-only is structural rather than a refusal at runtime (FR-029).
     const tools = plugin.service('tools').buildTools({
@@ -73,6 +86,8 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       mode,
       threadId,
       ownerId,
+      // Placements are validated against the ordinals actually attached to THIS turn.
+      manifestOrdinals: manifest.map((a: { ordinal: number }) => a.ordinal),
     });
 
     // Debug flag: surface the real (redacted) provider error to the UI instead of a generic one.
@@ -83,14 +98,36 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     // Persist the user's turn BEFORE streaming, so a crash or a disconnect mid-generation still
     // leaves an honest record of what was asked.
     const lastMessage = messages[messages.length - 1];
+
+    /**
+     * The manifest reaches the model as TEXT on every provider, which is what makes
+     * "image #1 to the hero" resolvable even on a model that cannot see the bytes (FR-034, FR-036).
+     * The ordinal — never a Media Library id, which does not exist yet — is the model's handle.
+     */
+    const manifestNote = plugin.service('attachments').describeManifest(manifest, supportsVision);
+    if (manifestNote && lastMessage?.role === 'user') {
+      const parts = [...(lastMessage.parts ?? [])];
+      const lastText = [...parts].reverse().find((part: any) => part?.type === 'text') as
+        | { type: 'text'; text: string }
+        | undefined;
+      if (lastText) {
+        lastText.text = `${lastText.text}${manifestNote}`;
+      } else {
+        parts.push({ type: 'text', text: manifestNote.trim() } as never);
+      }
+      lastMessage.parts = parts;
+    }
+
     if (lastMessage?.role === 'user') {
       await threads().appendMessage({
         threadId,
         ownerId,
         role: 'user',
         // File parts hold base64 data URLs — never persist them (data-model: `parts` stores no
-        // attachment bytes). The text of the turn is what history needs.
+        // attachment bytes). The manifest is stored separately, so a restored thread can say which
+        // held files were never ingested (FR-038).
         parts: (lastMessage.parts ?? []).filter((part: any) => part?.type !== 'file'),
+        attachmentManifest: manifest.length > 0 ? manifest : null,
         modeAtSend: mode,
       });
     }
@@ -153,7 +190,7 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       model,
       abortSignal: abort.signal,
       system: [
-        plugin.service('prompt').build({ mode, supportsVision }),
+        plugin.service('prompt').build({ mode, supportsVision, hasAttachments: manifest.length > 0 }),
         context?.summary
           ? `## Earlier in this conversation (condensed)\nThese notes replace older turns that were summarized to stay inside the model's context. Treat them as fact.\n\n${context.summary}`
           : null,

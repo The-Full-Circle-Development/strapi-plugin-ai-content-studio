@@ -9,6 +9,7 @@ import { ThreadSidebar } from '../components/ThreadSidebar';
 import { ModeSelect } from '../components/ModeSelect';
 import { Column, ErrorText, Scroll, Shell } from '../components/styles';
 import { backendURL, useThreads } from '../hooks/useThreads';
+import { useAttachments } from '../hooks/useAttachments';
 import { styled } from 'styled-components';
 
 /**
@@ -89,27 +90,35 @@ export const Chat = () => {
 
   // The transport reads the freshest token AND the current thread id per request, so a thread
   // created lazily on the first send is already in the body.
+  // The manifest must be whatever is held at SEND time, so a ref keeps the transport's body
+  // callback reading the current value rather than a closed-over snapshot.
+  const manifestRef = React.useRef<unknown[]>([]);
+
   const transport = React.useMemo(
     () =>
       new DefaultChatTransport<UIMessage>({
         api: `${backendURL()}/ai-content-studio/chat`,
         credentials: 'same-origin',
         headers: () => ({ Authorization: `Bearer ${tokenRef.current ?? ''}` }),
-        body: () => ({ threadId: threadIdRef.current, mode: modeRef.current }),
+        body: () => ({
+          threadId: threadIdRef.current,
+          mode: modeRef.current,
+          attachmentManifest: manifestRef.current,
+        }),
       }),
     [tokenRef, threadIdRef, modeRef]
   );
 
   const { messages, sendMessage, setMessages, status, stop, error } = useChat({ transport });
+  const attachments = useAttachments(threadIdRef);
   const [input, setInput] = React.useState('');
-  const [attachments, setAttachments] = React.useState<File[]>([]);
   const [preparing, setPreparing] = React.useState(false);
   const [condensed, setCondensed] = React.useState(false);
   const [expiredOrdinals, setExpiredOrdinals] = React.useState<Record<string, number[]>>({});
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
   const busy = status === 'submitted' || status === 'streaming';
-  const canSend = !busy && !preparing && (input.trim() !== '' || attachments.length > 0);
+  const canSend = !busy && !preparing && (input.trim() !== '' || attachments.sendable.length > 0);
 
   // Auto-scroll to the latest content.
   React.useEffect(() => {
@@ -134,17 +143,20 @@ export const Chat = () => {
       setExpiredOrdinals(
         Object.fromEntries(history.expiredAttachments.map((e) => [e.messageId, e.ordinals]))
       );
-      setAttachments([]);
+      // Held files belong to the conversation being left, not the one being opened.
+      attachments.clear();
+      manifestRef.current = [];
       setInput('');
     },
-    [loadHistory, setMessages]
+    [loadHistory, setMessages, attachments]
   );
 
   const startNewThread = React.useCallback(async () => {
     setMessages([]);
     setCondensed(false);
     setExpiredOrdinals({});
-    setAttachments([]);
+    attachments.clear();
+    manifestRef.current = [];
     setInput('');
     threadIdRef.current = null;
     setCurrentThreadId(null);
@@ -153,11 +165,11 @@ export const Chat = () => {
     modeRef.current = 'content';
     // The thread row itself is created lazily on the first send, so opening the panel and not
     // typing leaves no empty conversation behind.
-  }, [setMessages, threadIdRef, setCurrentThreadId, setMode, modeRef]);
+  }, [setMessages, threadIdRef, setCurrentThreadId, setMode, modeRef, attachments]);
 
   const onSend = async () => {
     const text = input.trim();
-    if ((!text && attachments.length === 0) || busy || preparing) {
+    if ((!text && attachments.sendable.length === 0) || busy || preparing) {
       return;
     }
 
@@ -165,11 +177,19 @@ export const Chat = () => {
     try {
       // A thread must exist before the request goes out — the server requires threadId.
       await ensureThread();
-      const fileParts = attachments.length > 0 ? await filesToUIParts(attachments) : [];
+      // The manifest is how the model learns about files it may not be able to see (FR-034).
+      manifestRef.current = attachments.manifest;
+      // Image bytes ride along only for a vision model; the server strips them otherwise. Nothing
+      // is uploaded here — the files stay held until an approval ingests them (FR-033).
+      const imageFiles = attachments.sendable
+        .filter((a) => a.mimeType.startsWith('image/'))
+        .map((a) => a.file);
+      const fileParts = imageFiles.length > 0 ? await filesToUIParts(imageFiles) : [];
       const body = text || 'Please look at the attached file(s).';
       sendMessage(fileParts.length > 0 ? { text: body, files: fileParts } : { text: body });
       setInput('');
-      setAttachments([]);
+      // Held files are deliberately NOT cleared: the plan that places them is still to come, and
+      // ingestion needs the bytes at approval time.
     } catch (err) {
       toggleNotification({
         type: 'danger',
@@ -238,7 +258,14 @@ export const Chat = () => {
                   onPickSuggestion={(text) => setInput(text)}
                   expiredOrdinalsByMessage={expiredOrdinals}
                   renderChangeSet={(changeSetId) => (
-                    <ChangePlanCard changeSetId={changeSetId} onApplied={onApplied} />
+                    <ChangePlanCard
+                      changeSetId={changeSetId}
+                      onApplied={onApplied}
+                      // Approval is the moment of ingestion: the card ingests the ordinals it needs
+                      // and only then applies, with the resulting media ids (FR-033, FR-037).
+                      resolveAttachments={attachments.ingestOrdinals}
+                      filesByOrdinal={attachments.filesByOrdinal}
+                    />
                   )}
                 />
                 {error ? <ErrorText>{error.message}</ErrorText> : null}
@@ -250,9 +277,9 @@ export const Chat = () => {
             <Composer
               input={input}
               onInputChange={setInput}
-              attachments={attachments}
-              onAddFiles={(files) => setAttachments((a) => [...a, ...files])}
-              onRemoveAttachment={(index) => setAttachments((a) => a.filter((_, j) => j !== index))}
+              attachments={attachments.held}
+              onAddFiles={attachments.addFiles}
+              onRemoveAttachment={attachments.removeOrdinal}
               busy={busy}
               disabled={preparing}
               canSend={canSend}
