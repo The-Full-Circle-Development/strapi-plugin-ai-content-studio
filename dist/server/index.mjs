@@ -42750,8 +42750,19 @@ const chatController = ({ strapi }) => ({
       role: message.role,
       parts: index2 === history.length - 1 && incomingFileParts.length > 0 ? [...message.parts, ...incomingFileParts] : message.parts
     }));
+    const abort = new AbortController();
+    let streamFinished = false;
+    const turnStartedAt = (/* @__PURE__ */ new Date()).toISOString();
+    const onClientGone = () => {
+      if (!streamFinished && !abort.signal.aborted) {
+        abort.abort();
+      }
+    };
+    ctx.req.once("close", onClientGone);
+    ctx.req.once("aborted", onClientGone);
     const result = streamText({
       model,
+      abortSignal: abort.signal,
       system: [
         plugin.service("prompt").build({ mode, supportsVision }),
         context2?.summary ? `## Earlier in this conversation (condensed)
@@ -42764,6 +42775,11 @@ ${context2.summary}` : null
       stopWhen: stepCountIs(8),
       onError({ error }) {
         strapi.log.error(`[ai-content-studio] stream error: ${redact().describeError(error)}`);
+      },
+      onAbort({ steps }) {
+        strapi.log.info(
+          `[ai-content-studio] generation stopped by the user after ${steps.length} step(s); no further step will run`
+        );
       }
     });
     ctx.respond = false;
@@ -42772,12 +42788,21 @@ ${context2.summary}` : null
       // the UI-part shape the chat replays, which is exactly what `chat-message.parts` stores.
       originalMessages: messages,
       async onFinish({ responseMessage, isAborted }) {
+        streamFinished = true;
         try {
+          const parts = [...responseMessage?.parts ?? []];
+          if (isAborted) {
+            const applied = await plugin.service("change-sets").appliedSince({ threadId, ownerId, since: turnStartedAt });
+            parts.push({
+              type: "data-interrupted",
+              data: { at: (/* @__PURE__ */ new Date()).toISOString(), applied }
+            });
+          }
           await threads().appendMessage({
             threadId,
             ownerId,
             role: "assistant",
-            parts: responseMessage?.parts ?? [],
+            parts,
             modeAtSend: mode,
             interrupted: isAborted
           });
@@ -44828,6 +44853,43 @@ const changeSetsService = ({ strapi }) => {
       if (preview2?.revokeForChangeSet) {
         await preview2.revokeForChangeSet(changeSetId);
       }
+    },
+    /**
+     * Items of this thread that actually reached content since `since` (FR-026).
+     *
+     * Used when a turn is interrupted: the assistant cannot apply anything itself, but the user may
+     * have approved a plan while the turn was still streaming, and the stopped turn must say which
+     * changes did land rather than leaving it ambiguous.
+     */
+    async appliedSince({
+      threadId,
+      ownerId,
+      since
+    }) {
+      const rows = await docs(UID.changeSet).findMany({
+        filters: {
+          thread: { documentId: threadId },
+          ownerId,
+          status: { $in: ["applied", "partially_applied"] },
+          resolvedAt: { $gte: since }
+        },
+        fields: ["items"],
+        limit: -1
+      });
+      const out = [];
+      for (const row of Array.isArray(rows) ? rows : []) {
+        for (const item of Array.isArray(row.items) ? row.items : []) {
+          if (item.outcome?.state === "applied") {
+            out.push({
+              field: item.field,
+              documentLabel: item.documentLabel,
+              contentTypeUid: item.contentTypeUid,
+              newValue: forDisplay(item.outcome.newValue)
+            });
+          }
+        }
+      }
+      return out;
     },
     /** Pending sets of a thread — used when a thread is deleted (FR-022). */
     async listByThread(threadId) {

@@ -799,6 +799,48 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
       }
     },
 
+    /**
+     * Items of this thread that actually reached content since `since` (FR-026).
+     *
+     * Used when a turn is interrupted: the assistant cannot apply anything itself, but the user may
+     * have approved a plan while the turn was still streaming, and the stopped turn must say which
+     * changes did land rather than leaving it ambiguous.
+     */
+    async appliedSince({
+      threadId,
+      ownerId,
+      since,
+    }: {
+      threadId: string;
+      ownerId: number;
+      since: string;
+    }): Promise<Array<{ field: string | null; documentLabel: string; contentTypeUid: string; newValue: unknown }>> {
+      const rows = await docs(UID.changeSet).findMany({
+        filters: {
+          thread: { documentId: threadId },
+          ownerId,
+          status: { $in: ['applied', 'partially_applied'] },
+          resolvedAt: { $gte: since },
+        },
+        fields: ['items'],
+        limit: -1,
+      });
+      const out: Array<{ field: string | null; documentLabel: string; contentTypeUid: string; newValue: unknown }> = [];
+      for (const row of Array.isArray(rows) ? rows : []) {
+        for (const item of (Array.isArray(row.items) ? row.items : []) as ChangeItem[]) {
+          if (item.outcome?.state === 'applied') {
+            out.push({
+              field: item.field,
+              documentLabel: item.documentLabel,
+              contentTypeUid: item.contentTypeUid,
+              newValue: forDisplay(item.outcome.newValue),
+            });
+          }
+        }
+      }
+      return out;
+    },
+
     /** Pending sets of a thread — used when a thread is deleted (FR-022). */
     async listByThread(threadId: string): Promise<any[]> {
       const rows = await docs(UID.changeSet).findMany({

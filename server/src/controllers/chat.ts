@@ -118,8 +118,31 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
           : message.parts,
     })) as UIMessage[];
 
+    /**
+     * Stop must release the SERVER's work, not just the client's view (FR-025).
+     *
+     * The chat hook's `stop()` aborts the underlying fetch, which closes this request. Wiring an
+     * AbortController to the Koa request lifecycle turns that into a real `abortSignal`, so the
+     * provider call ends and no further tool step begins. Without it the server keeps working
+     * unobserved: with the write tools gone a stray step can no longer touch content, but it can
+     * still burn provider tokens and run reads.
+     */
+    const abort = new AbortController();
+    let streamFinished = false;
+    const turnStartedAt = new Date().toISOString();
+    const onClientGone = () => {
+      // `close` also fires after a NORMAL completion, so only a close before the stream finished
+      // is a real stop.
+      if (!streamFinished && !abort.signal.aborted) {
+        abort.abort();
+      }
+    };
+    ctx.req.once('close', onClientGone);
+    ctx.req.once('aborted', onClientGone);
+
     const result = streamText({
       model,
+      abortSignal: abort.signal,
       system: [
         plugin.service('prompt').build({ mode, supportsVision }),
         context?.summary
@@ -135,6 +158,11 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
         // Server-side only — redacted so a provider error that echoes a key/url can't leak it.
         strapi.log.error(`[ai-content-studio] stream error: ${redact().describeError(error)}`);
       },
+      onAbort({ steps }) {
+        strapi.log.info(
+          `[ai-content-studio] generation stopped by the user after ${steps.length} step(s); no further step will run`
+        );
+      },
     });
 
     // Take over the response so Koa does not serialize its own (empty) body and close the socket.
@@ -144,12 +172,32 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       // the UI-part shape the chat replays, which is exactly what `chat-message.parts` stores.
       originalMessages: messages,
       async onFinish({ responseMessage, isAborted }) {
+        streamFinished = true;
         try {
+          const parts = [...(responseMessage?.parts ?? [])];
+
+          if (isAborted) {
+            /**
+             * A stopped turn keeps its partial output, marked interrupted, and the thread stays
+             * usable (FR-024). It must also say which changes had ALREADY been applied earlier in
+             * the turn (FR-026) — the assistant cannot apply anything itself, but the user may
+             * have approved a plan while this turn was still streaming, and silence about that
+             * would be the one dishonest outcome here.
+             */
+            const applied = await plugin
+              .service('change-sets')
+              .appliedSince({ threadId, ownerId, since: turnStartedAt });
+            parts.push({
+              type: 'data-interrupted',
+              data: { at: new Date().toISOString(), applied },
+            } as never);
+          }
+
           await threads().appendMessage({
             threadId,
             ownerId,
             role: 'assistant',
-            parts: responseMessage?.parts ?? [],
+            parts,
             modeAtSend: mode,
             interrupted: isAborted,
           });

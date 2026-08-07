@@ -39,6 +39,17 @@ const ToolPill = styled.div<{ $danger?: boolean }>`
   }
 `;
 
+/** An interrupted turn reads as interrupted, not as a reply that simply trailed off (FR-024). */
+const Interrupted = styled.div`
+  align-self: stretch;
+  font-size: 1.2rem;
+  color: ${({ theme }) => theme.colors.warning700};
+  background: ${({ theme }) => theme.colors.warning100};
+  border: 1px solid ${({ theme }) => theme.colors.warning200};
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.8rem;
+`;
+
 const Expired = styled.div`
   font-size: 1.15rem;
   font-style: italic;
@@ -323,6 +334,23 @@ export const MessageList = ({
                 }
                 if (part.type === 'data-apply-report') {
                   return <ApplyReport key={index} report={(part as any).data as ApplyReportPart} />;
+                }
+                if (part.type === 'data-interrupted') {
+                  const data = (part as any).data as {
+                    applied?: Array<{ field: string | null; documentLabel: string; newValue: unknown }>;
+                  };
+                  return (
+                    <Interrupted key={index}>
+                      <strong>Stopped.</strong>{' '}
+                      {data.applied?.length
+                        ? `${data.applied.length} change${
+                            data.applied.length === 1 ? '' : 's'
+                          } had already been applied in this turn: ${data.applied
+                            .map((a) => `${a.field ?? 'entry'} on ${a.documentLabel}`)
+                            .join('; ')}.`
+                        : 'Nothing was applied in this turn.'}
+                    </Interrupted>
+                  );
                 }
                 if (isToolUIPart(part)) {
                   const name = String(getToolName(part));
