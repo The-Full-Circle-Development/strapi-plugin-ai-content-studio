@@ -87,20 +87,20 @@ listed fields and nothing else.
 
 ### Implementation for User Story 1
 
-- [ ] T020 [US1] Implement `createPending` â€” validate `contentTypeUid` against the live `api::*` allow-list and the field path, RBAC-check the caller per item, read `currentValue`, compute `baseFingerprint` `{updatedAt, fieldHash}`, derive `destructive` and `resultingState`, persist `status:'pending'` with `expiresAt` â€” and export the service from server/src/services/index.ts, in server/src/services/change-sets.ts
-- [ ] T021 [US1] Implement `apply` with the six-step gate in order (owned + `pending` + not expired â†’ item exists and not `denied` â†’ live per-item RBAC re-check â†’ `baseFingerprint` re-check â‡’ `stale` â†’ destructive confirmation â†’ attachment resolutions present), then per-item outcomes and the `applied` / `partially_applied` transition, in server/src/services/change-sets.ts
-- [ ] T022 [US1] Implement `reject` and `expirePending` (both set `resolvedAt` and leave content, media, and configuration untouched) in server/src/services/change-sets.ts
-- [ ] T023 [US1] Move `SYSTEM_PROMPT` out of server/src/controllers/chat.ts into server/src/services/prompt.ts and rewrite it around proposing â€” remove the write instructions, remove the hardcoded project field map and the "Concept Bath" identity, keep the permission-denied and Markdown rules
-- [ ] T024 [US1] Remove the `createEntry`, `updateEntry`, and `publishEntry` tools in server/src/services/tools.ts
-- [ ] T025 [US1] Add the `proposeChanges` tool â€” zod input, `blocked[]` for items the caller may not perform, `nextStep`, `empty_plan` on an empty items array, `unresolved_placement` with candidates rather than a guess â€” in server/src/services/tools.ts
-- [ ] T026 [US1] Create `findOne`, `apply`, and `reject` handlers and export them from server/src/controllers/index.ts, in server/src/controllers/change-sets.ts
-- [ ] T027 [US1] Add `GET /change-sets/:id`, `POST /change-sets/:id/apply`, and `POST /change-sets/:id/reject` in server/src/routes/index.ts
-- [ ] T028 [US1] Link the produced change set to its `chat-message` and append the approving user, time, and applied items to the thread (FR-008) in server/src/services/threads.ts
-- [ ] T029 [P] [US1] Create the change-set hook (fetch, per-item selection, apply, reject) in admin/src/hooks/useChangeSet.ts
-- [ ] T030 [P] [US1] Create the plan card â€” per-item rows showing target type, document label, field, current â†’ proposed value, resulting draft/published state, blocked reason â€” in admin/src/components/ChangePlanCard.tsx
-- [ ] T031 [US1] Render `ChangePlanCard` for `proposeChanges` tool parts in admin/src/components/MessageList.tsx
-- [ ] T032 [US1] Add approve-all / approve-selected / reject actions and the separate explicit confirmation for destructive items in admin/src/components/ChangePlanCard.tsx
-- [ ] T033 [US1] Append the per-item apply report (field, old value, new value, draft/published state, blocked and failed reasons) to the conversation in admin/src/pages/Chat.tsx
+- [X] T020 [US1] Implement `createPending` â€” validate `contentTypeUid` against the live `api::*` allow-list and the field path, RBAC-check the caller per item, read `currentValue`, compute `baseFingerprint` `{updatedAt, fieldHash}`, derive `destructive` and `resultingState`, persist `status:'pending'` with `expiresAt` â€” and export the service from server/src/services/index.ts, in server/src/services/change-sets.ts
+- [X] T021 [US1] Implement `apply` with the six-step gate in order (owned + `pending` + not expired â†’ item exists and not `denied` â†’ live per-item RBAC re-check â†’ `baseFingerprint` re-check â‡’ `stale` â†’ destructive confirmation â†’ attachment resolutions present), then per-item outcomes and the `applied` / `partially_applied` transition, in server/src/services/change-sets.ts
+- [X] T022 [US1] Implement `reject` and `expirePending` (both set `resolvedAt` and leave content, media, and configuration untouched) in server/src/services/change-sets.ts
+- [X] T023 [US1] Move `SYSTEM_PROMPT` out of server/src/controllers/chat.ts into server/src/services/prompt.ts and rewrite it around proposing â€” remove the write instructions, remove the hardcoded project field map and the "Concept Bath" identity, keep the permission-denied and Markdown rules
+- [X] T024 [US1] Remove the `createEntry`, `updateEntry`, and `publishEntry` tools in server/src/services/tools.ts
+- [X] T025 [US1] Add the `proposeChanges` tool â€” zod input, `blocked[]` for items the caller may not perform, `nextStep`, `empty_plan` on an empty items array, `unresolved_placement` with candidates rather than a guess â€” in server/src/services/tools.ts
+- [X] T026 [US1] Create `findOne`, `apply`, and `reject` handlers and export them from server/src/controllers/index.ts, in server/src/controllers/change-sets.ts
+- [X] T027 [US1] Add `GET /change-sets/:id`, `POST /change-sets/:id/apply`, and `POST /change-sets/:id/reject` in server/src/routes/index.ts
+- [X] T028 [US1] Link the produced change set to its `chat-message` and append the approving user, time, and applied items to the thread (FR-008) in server/src/services/threads.ts
+- [X] T029 [P] [US1] Create the change-set hook (fetch, per-item selection, apply, reject) in admin/src/hooks/useChangeSet.ts
+- [X] T030 [P] [US1] Create the plan card â€” per-item rows showing target type, document label, field, current â†’ proposed value, resulting draft/published state, blocked reason â€” in admin/src/components/ChangePlanCard.tsx
+- [X] T031 [US1] Render `ChangePlanCard` for `proposeChanges` tool parts in admin/src/components/MessageList.tsx
+- [X] T032 [US1] Add approve-all / approve-selected / reject actions and the separate explicit confirmation for destructive items in admin/src/components/ChangePlanCard.tsx
+- [X] T033 [US1] Append the per-item apply report (field, old value, new value, draft/published state, blocked and failed reasons) to the conversation in admin/src/pages/Chat.tsx
 - [ ] T034 [US1] Verify US1 in a real admin panel â€” quickstart scenarios 1 and 2, plus permission-denied paths 1, 2, and 4 from contracts/permissions.md
 
 **Checkpoint**: US1 is fully functional and independently testable. This is the MVP â€” no content can be
@@ -121,15 +121,15 @@ still sees the old content; the preview stops working after it expires.
 
 ### Implementation for User Story 2
 
-- [ ] T035 [US2] Create the preview service â€” session create / lookup / revoke, precomputed `overlay` payload keyed by `contentTypeUid` + `documentId`, and the in-memory staged-file store bounded by `attachments.totalBudgetMb` â€” and export it from server/src/services/index.ts, in server/src/services/preview.ts
-- [ ] T036 [US2] Resolve `previewUrl` from `preview.baseUrl` + the `preview.paths` pattern, and return `409 preview_not_configured` with `fallback:'field-diff'` when preview is disabled, the base URL is missing, or the type has no path (FR-014), in server/src/services/preview.ts
-- [ ] T037 [US2] Implement the read-only overlay middleware â€” extract the token from `x-ai-studio-preview` or `?aiStudioPreview`, verify HMAC and `exp` before any database access, ignore an invalid token rather than erroring, load the session, require the change set still `pending`, `await next()`, walk `ctx.body.data` (array, object, `attributes`-shaped, and flattened v5 payloads) applying dotted-path overlays, rewrite attachment-fed media to a media-shaped object with a **negative `id`** and a staged-file URL, then set `Cache-Control: no-store` and `x-ai-studio-preview: applied` â€” in server/src/middlewares/preview-overlay.ts
-- [ ] T038 [US2] Create server/src/middlewares/index.ts and register `middlewares` on the plugin in server/src/index.ts
-- [ ] T039 [US2] Create the staged-file handler for `GET /preview/:sessionId/file/:fileId?token=` (token must match the session; `Content-Disposition: inline`, `Cache-Control: no-store`; 404 on unknown/revoked/expired/resolved/other-instance so a miss degrades to the current image) and export it from server/src/controllers/index.ts, in server/src/controllers/preview.ts
-- [ ] T040 [US2] Add the single token-gated non-admin route in server/src/routes/preview.ts and mount it alongside the `admin` route set in server/src/routes/index.ts
-- [ ] T041 [US2] Add the multipart `POST /change-sets/:id/preview` handler (optional `attachment[<ordinal>]` staging, returns `sessionId`, `token`, `previewUrl`, `expiresAt`, `stagedFiles`) in server/src/controllers/change-sets.ts and register the route in server/src/routes/index.ts
-- [ ] T042 [US2] Revoke preview sessions and drop their staged bytes on apply, reject, expiry, and thread deletion in server/src/services/change-sets.ts
-- [ ] T043 [US2] Create the preview panel â€” Preview action that opens `previewUrl`, expiry messaging, and the in-panel field-level before/after comparison shown on `409` without blocking approval â€” in admin/src/components/PreviewPanel.tsx
+- [X] T035 [US2] Create the preview service â€” session create / lookup / revoke, precomputed `overlay` payload keyed by `contentTypeUid` + `documentId`, and the in-memory staged-file store bounded by `attachments.totalBudgetMb` â€” and export it from server/src/services/index.ts, in server/src/services/preview.ts
+- [X] T036 [US2] Resolve `previewUrl` from `preview.baseUrl` + the `preview.paths` pattern, and return `409 preview_not_configured` with `fallback:'field-diff'` when preview is disabled, the base URL is missing, or the type has no path (FR-014), in server/src/services/preview.ts
+- [X] T037 [US2] Implement the read-only overlay middleware â€” extract the token from `x-ai-studio-preview` or `?aiStudioPreview`, verify HMAC and `exp` before any database access, ignore an invalid token rather than erroring, load the session, require the change set still `pending`, `await next()`, walk `ctx.body.data` (array, object, `attributes`-shaped, and flattened v5 payloads) applying dotted-path overlays, rewrite attachment-fed media to a media-shaped object with a **negative `id`** and a staged-file URL, then set `Cache-Control: no-store` and `x-ai-studio-preview: applied` â€” in server/src/middlewares/preview-overlay.ts
+- [X] T038 [US2] Create server/src/middlewares/index.ts and register `middlewares` on the plugin in server/src/index.ts
+- [X] T039 [US2] Create the staged-file handler for `GET /preview/:sessionId/file/:fileId?token=` (token must match the session; `Content-Disposition: inline`, `Cache-Control: no-store`; 404 on unknown/revoked/expired/resolved/other-instance so a miss degrades to the current image) and export it from server/src/controllers/index.ts, in server/src/controllers/preview.ts
+- [X] T040 [US2] Add the single token-gated non-admin route in server/src/routes/preview.ts and mount it alongside the `admin` route set in server/src/routes/index.ts
+- [X] T041 [US2] Add the multipart `POST /change-sets/:id/preview` handler (optional `attachment[<ordinal>]` staging, returns `sessionId`, `token`, `previewUrl`, `expiresAt`, `stagedFiles`) in server/src/controllers/change-sets.ts and register the route in server/src/routes/index.ts
+- [X] T042 [US2] Revoke preview sessions and drop their staged bytes on apply, reject, expiry, and thread deletion in server/src/services/change-sets.ts
+- [X] T043 [US2] Create the preview panel â€” Preview action that opens `previewUrl`, expiry messaging, and the in-panel field-level before/after comparison shown on `409` without blocking approval â€” in admin/src/components/PreviewPanel.tsx
 - [ ] T044 [US2] Verify US2 in a real admin panel â€” quickstart scenario 3, plus permission-denied paths 9 and 10 from contracts/permissions.md
 
 **Checkpoint**: US1 and US2 both work independently. Proposed values render on the real front-end with

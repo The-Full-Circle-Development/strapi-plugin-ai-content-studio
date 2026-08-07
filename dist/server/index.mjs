@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import crypto$1 from "node:crypto";
 const register = ({ strapi }) => {
   strapi.plugin("ai-content-studio").service("crypto").assertConfigured();
@@ -124,7 +125,8 @@ const contentTypes = {
 const UID = {
   thread: "plugin::ai-content-studio.chat-thread",
   message: "plugin::ai-content-studio.chat-message",
-  changeSet: "plugin::ai-content-studio.change-set"
+  changeSet: "plugin::ai-content-studio.change-set",
+  previewSession: "plugin::ai-content-studio.preview-session"
 };
 var marker$3 = "vercel.ai.error";
 var symbol$3 = Symbol.for(marker$3);
@@ -36436,8 +36438,43 @@ const STATUS_FOR = {
   destructive_confirmation_required: 409,
   attachment_not_resolved: 409
 };
+async function readOrdinalFiles(ctx) {
+  const files = ctx.request?.files ?? {};
+  const out = [];
+  for (const [field, value] of Object.entries(files)) {
+    const match = /^attachment\[(\d+)\]$/.exec(field);
+    if (!match) {
+      continue;
+    }
+    const ordinal = Number(match[1]);
+    for (const file of Array.isArray(value) ? value : [value]) {
+      if (!file) {
+        continue;
+      }
+      let bytes = null;
+      if (Buffer.isBuffer(file.buffer)) {
+        bytes = file.buffer;
+      } else if (typeof file.filepath === "string") {
+        bytes = await fs.readFile(file.filepath);
+      } else if (typeof file.path === "string") {
+        bytes = await fs.readFile(file.path);
+      }
+      if (!bytes) {
+        continue;
+      }
+      out.push({
+        ordinal,
+        filename: String(file.originalFilename ?? file.name ?? `attachment-${ordinal}`),
+        mimeType: String(file.mimetype ?? file.type ?? "application/octet-stream"),
+        bytes
+      });
+    }
+  }
+  return out;
+}
 const changeSetsController = ({ strapi }) => {
   const changeSets = () => strapi.plugin("ai-content-studio").service("change-sets");
+  const preview2 = () => strapi.plugin("ai-content-studio").service("preview");
   const ownerOf = (ctx) => {
     const id = ctx.state?.user?.id;
     return Number.isInteger(id) ? id : null;
@@ -36486,6 +36523,63 @@ const changeSetsController = ({ strapi }) => {
       ctx.body = result;
       return void 0;
     },
+    /**
+     * Create a preview session — multipart, so held attachment bytes can be staged and the
+     * proposed image renders (FR-013). Creating a preview writes NO content (FR-015).
+     *
+     * A missing preview target answers 409 `preview_not_configured` with `fallback: 'field-diff'`,
+     * which is the contracted way the panel learns to show the in-panel comparison instead. It
+     * never blocks approval (FR-014).
+     */
+    async preview(ctx) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized("Not authenticated.");
+      }
+      const set = await changeSets().getOwned(String(ctx.params.id), ownerId);
+      if (!set) {
+        return ctx.notFound(NOT_FOUND);
+      }
+      if (set.status !== "pending") {
+        ctx.status = 409;
+        ctx.body = {
+          error: "not_pending",
+          message: `This plan was already ${String(set.status).replace("_", " ")}, so it cannot be previewed.`
+        };
+        return void 0;
+      }
+      const body = ctx.request.body ?? {};
+      let files = [];
+      try {
+        files = await readOrdinalFiles(ctx);
+      } catch {
+        return ctx.badRequest("Could not read the attached files.");
+      }
+      const result = await preview2().createSession({
+        changeSet: set,
+        ownerId,
+        targetContentTypeUid: typeof body.targetContentTypeUid === "string" ? body.targetContentTypeUid : null,
+        targetDocumentId: typeof body.targetDocumentId === "string" ? body.targetDocumentId : null,
+        files
+      });
+      if (!result.ok) {
+        ctx.status = 409;
+        ctx.body = {
+          error: result.error ?? "preview_not_configured",
+          message: result.message ?? "Preview is unavailable. Showing the field comparison instead.",
+          fallback: result.fallback ?? "field-diff"
+        };
+        return void 0;
+      }
+      ctx.body = {
+        sessionId: result.sessionId,
+        token: result.token,
+        previewUrl: result.previewUrl,
+        expiresAt: result.expiresAt,
+        stagedFiles: result.stagedFiles
+      };
+      return void 0;
+    },
     async reject(ctx) {
       const ownerId = ownerOf(ctx);
       if (ownerId === null) {
@@ -36503,6 +36597,28 @@ const changeSetsController = ({ strapi }) => {
     }
   };
 };
+const previewController = ({ strapi }) => ({
+  async file(ctx) {
+    const plugin = strapi.plugin("ai-content-studio");
+    if (!plugin.service("config").getPreviewOptions().enabled) {
+      return ctx.notFound();
+    }
+    const token = typeof ctx.request.query?.token === "string" ? ctx.request.query.token : null;
+    const payload = plugin.service("crypto").verifyPreviewToken(token);
+    if (!payload || payload.sessionId !== String(ctx.params.sessionId)) {
+      return ctx.notFound();
+    }
+    const staged = await plugin.service("preview").getStagedFile(payload, String(ctx.params.fileId));
+    if (!staged) {
+      return ctx.notFound();
+    }
+    ctx.set("Cache-Control", "no-store");
+    ctx.set("Content-Disposition", "inline");
+    ctx.type = staged.mimeType;
+    ctx.body = staged.bytes;
+    return void 0;
+  }
+});
 const PROVIDERS = ["anthropic", "google", "openai"];
 const STORE_PARAMS = { type: "plugin", name: "ai-content-studio", key: "settings" };
 const emptyProvider = () => ({ apiKeyEnc: null, isSet: false, enabled: false });
@@ -36677,7 +36793,141 @@ const controllers = {
   threads: threadsController,
   // Route handlers reference this as `change-sets.<handler>`.
   "change-sets": changeSetsController,
+  preview: previewController,
   settings: settingsController
+};
+const HEADER = "x-ai-studio-preview";
+const QUERY_PARAM = "aiStudioPreview";
+const extractToken = (ctx) => {
+  const header = ctx.request?.header?.[HEADER];
+  if (typeof header === "string" && header.trim() !== "") {
+    return header.trim();
+  }
+  const query = ctx.request?.query?.[QUERY_PARAM];
+  if (typeof query === "string" && query.trim() !== "") {
+    return query.trim();
+  }
+  return null;
+};
+const applyPath = (entry, path, value) => {
+  const segments = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+  let cursor = entry;
+  for (let i = 0; i < segments.length - 1; i += 1) {
+    const segment = segments[i];
+    if (cursor[segment] === null || cursor[segment] === void 0 || typeof cursor[segment] !== "object") {
+      return;
+    }
+    cursor = cursor[segment];
+  }
+  cursor[segments[segments.length - 1]] = value;
+};
+const overlayEntry = (entry, overlay, uidHint) => {
+  if (!entry || typeof entry !== "object") {
+    return false;
+  }
+  const documentId = entry.documentId ?? entry.attributes?.documentId;
+  if (typeof documentId !== "string") {
+    return false;
+  }
+  let fields = null;
+  if (uidHint && overlay[uidHint]?.[documentId]) {
+    fields = overlay[uidHint][documentId];
+  } else {
+    for (const byDocument of Object.values(overlay)) {
+      if (byDocument[documentId]) {
+        fields = byDocument[documentId];
+        break;
+      }
+    }
+  }
+  if (!fields) {
+    return false;
+  }
+  const target = entry.attributes && typeof entry.attributes === "object" ? entry.attributes : entry;
+  for (const [path, value] of Object.entries(fields)) {
+    applyPath(target, path, value);
+  }
+  return true;
+};
+const overlayBody = (body, overlay, uidHint) => {
+  if (!body || typeof body !== "object") {
+    return false;
+  }
+  const data = body.data;
+  if (Array.isArray(data)) {
+    let applied = false;
+    for (const entry of data) {
+      applied = overlayEntry(entry, overlay, uidHint) || applied;
+    }
+    return applied;
+  }
+  return overlayEntry(data, overlay, uidHint);
+};
+const uidFromPath = (strapi, path) => {
+  const match = /^\/api\/([^/?]+)/.exec(path ?? "");
+  if (!match) {
+    return null;
+  }
+  const plural = match[1];
+  for (const [uid, ct] of Object.entries(strapi.contentTypes)) {
+    if (uid.startsWith("api::") && ct?.info?.pluralName === plural) {
+      return uid;
+    }
+  }
+  return null;
+};
+const previewOverlayMiddleware = (_config, { strapi }) => {
+  return async (ctx, next) => {
+    const token = extractToken(ctx);
+    if (!token) {
+      return next();
+    }
+    if (typeof ctx.request?.path !== "string" || !ctx.request.path.startsWith("/api/")) {
+      return next();
+    }
+    const plugin = strapi.plugin("ai-content-studio");
+    if (!plugin?.service("config").getPreviewOptions().enabled) {
+      return next();
+    }
+    const payload = plugin.service("crypto").verifyPreviewToken(token);
+    if (!payload) {
+      return next();
+    }
+    const session = await plugin.service("preview").resolveSession(payload);
+    if (!session) {
+      return next();
+    }
+    await next();
+    try {
+      const uidHint = uidFromPath(strapi, ctx.request.path);
+      const applied = overlayBody(ctx.body, session.overlay, uidHint);
+      ctx.set("Cache-Control", "no-store");
+      ctx.set(HEADER, applied ? "applied" : "no-match");
+    } catch (err) {
+      strapi.log.warn(
+        `[ai-content-studio] preview overlay skipped: ${plugin.service("redact").describeError(err)}`
+      );
+    }
+    return void 0;
+  };
+};
+const middlewares = {
+  "preview-overlay": previewOverlayMiddleware
+};
+const preview = {
+  type: "content-api",
+  routes: [
+    {
+      method: "GET",
+      path: "/preview/:sessionId/file/:fileId",
+      handler: "preview.file",
+      config: {
+        // Auth is the HMAC-signed token, verified in the handler before any database access.
+        auth: false,
+        policies: []
+      }
+    }
+  ]
 };
 const CHAT_USE = {
   name: "admin::hasPermissions",
@@ -36703,6 +36953,7 @@ const routes = {
       chatRoute("GET", "/change-sets/:id", "change-sets.findOne"),
       chatRoute("POST", "/change-sets/:id/apply", "change-sets.apply"),
       chatRoute("POST", "/change-sets/:id/reject", "change-sets.reject"),
+      chatRoute("POST", "/change-sets/:id/preview", "change-sets.preview"),
       {
         method: "GET",
         path: "/settings",
@@ -36720,7 +36971,9 @@ const routes = {
         }
       }
     ]
-  }
+  },
+  // The single token-gated non-admin surface. Exposes no chat, no tools, no settings.
+  preview
 };
 const ALGO = "aes-256-gcm";
 const IV_BYTES = 12;
@@ -37930,14 +38183,14 @@ const changeSetsService = ({ strapi }) => {
      * reject, expiry, and thread deletion — any transition out of `pending`.
      */
     async revokePreviews(changeSetId) {
-      let preview = null;
+      let preview2 = null;
       try {
-        preview = plugin().service("preview");
+        preview2 = plugin().service("preview");
       } catch {
-        preview = null;
+        preview2 = null;
       }
-      if (preview?.revokeForChangeSet) {
-        await preview.revokeForChangeSet(changeSetId);
+      if (preview2?.revokeForChangeSet) {
+        await preview2.revokeForChangeSet(changeSetId);
       }
     },
     /** Pending sets of a thread — used when a thread is deleted (FR-022). */
@@ -37949,11 +38202,321 @@ const changeSetsService = ({ strapi }) => {
       });
       return Array.isArray(rows) ? rows : [];
     },
+    /**
+     * Delete every plan of a thread, its preview sessions, and their staged bytes (FR-022).
+     * Content and Media Library entries an applied plan already produced are left alone — deleting
+     * a conversation must not undo work the user approved.
+     */
     async deleteForThread(threadId) {
+      let preview2 = null;
+      try {
+        preview2 = plugin().service("preview");
+      } catch {
+        preview2 = null;
+      }
       for (const row of await service.listByThread(threadId)) {
-        await service.revokePreviews(row.documentId);
+        if (preview2?.deleteForChangeSet) {
+          await preview2.deleteForChangeSet(row.documentId);
+        }
         await docs(UID.changeSet).delete({ documentId: row.documentId });
       }
+    }
+  };
+  return service;
+};
+const stagedStore = /* @__PURE__ */ new Map();
+const previewService = ({ strapi }) => {
+  const docs = (uid) => strapi.documents(uid);
+  const plugin = () => strapi.plugin("ai-content-studio");
+  const options2 = () => plugin().service("config").getPreviewOptions();
+  const stagedKey = (sessionId, fileId) => `${sessionId}:${fileId}`;
+  const stagedBytesFor = (sessionId) => {
+    let total = 0;
+    for (const entry of stagedStore.values()) {
+      if (entry.sessionId === sessionId) {
+        total += entry.bytes.length;
+      }
+    }
+    return total;
+  };
+  const service = {
+    /**
+     * Resolve the front-end URL for a target document (T036).
+     *
+     * Answers `preview_not_configured` with `fallback: 'field-diff'` when preview is disabled, the
+     * base URL is missing, or the type has no path pattern — approval is NEVER blocked by a
+     * missing preview target (FR-014).
+     */
+    resolvePreviewUrl(contentTypeUid, doc) {
+      const opts = options2();
+      if (!opts.enabled) {
+        return {
+          ok: false,
+          message: "Front-end preview is not enabled for this project. Showing the field comparison instead."
+        };
+      }
+      const pattern = opts.paths[contentTypeUid];
+      if (!pattern) {
+        return {
+          ok: false,
+          message: `No preview target is configured for ${contentTypeUid}. Showing the field comparison instead.`
+        };
+      }
+      const missing = [];
+      const path = pattern.replace(/:([A-Za-z0-9_]+)/g, (_match, key) => {
+        const value = doc?.[key];
+        if (value === null || value === void 0 || value === "") {
+          missing.push(key);
+          return "";
+        }
+        return encodeURIComponent(String(value));
+      });
+      if (missing.length > 0) {
+        return {
+          ok: false,
+          message: `The preview path for ${contentTypeUid} needs ${missing.map((m) => `"${m}"`).join(", ")}, which this entry does not have. Showing the field comparison instead.`
+        };
+      }
+      return { ok: true, url: `${opts.baseUrl}${path.startsWith("/") ? "" : "/"}${path}` };
+    },
+    /**
+     * Precompute `{ [uid]: { [documentId]: { [dottedField]: value } } }` so the middleware applies
+     * the overlay with one lookup and no per-request logic.
+     *
+     * A media field fed by an attachment becomes a media-shaped object with a NEGATIVE id and a
+     * staged-file URL, so nothing downstream can mistake it for a library entry (R2).
+     */
+    buildOverlay(items, { sessionId, token, stagedByOrdinal }) {
+      const overlay = {};
+      for (const item of items) {
+        if (!item.field || !item.documentId || item.permissionVerdict === "denied") {
+          continue;
+        }
+        if (item.operation === "publish") {
+          continue;
+        }
+        let value = item.proposedValue;
+        if (typeof item.attachmentOrdinal === "number") {
+          const staged = stagedByOrdinal.get(item.attachmentOrdinal);
+          if (!staged) {
+            continue;
+          }
+          value = {
+            // Negative on purpose — an id no Media Library entry can have.
+            id: -staged.ordinal,
+            documentId: `staged-${staged.fileId}`,
+            name: staged.filename,
+            mime: staged.mimeType,
+            size: Math.round(staged.sizeBytes / 1024),
+            url: `/ai-content-studio/preview/${sessionId}/file/${staged.fileId}?token=${encodeURIComponent(token)}`,
+            provider: "ai-content-studio-preview",
+            alternativeText: staged.filename,
+            formats: null
+          };
+        }
+        overlay[item.contentTypeUid] ??= {};
+        overlay[item.contentTypeUid][item.documentId] ??= {};
+        overlay[item.contentTypeUid][item.documentId][item.field] = value;
+      }
+      return overlay;
+    },
+    /**
+     * Create a session for a pending change set. Optionally stages held attachment bytes so
+     * proposed media renders. Writes NO content.
+     */
+    async createSession({
+      changeSet,
+      ownerId,
+      targetContentTypeUid,
+      targetDocumentId,
+      files = []
+    }) {
+      const items = Array.isArray(changeSet.items) ? changeSet.items : [];
+      const previewable = items.filter((i) => i.field && i.documentId && i.permissionVerdict === "allowed");
+      const target = previewable.find(
+        (i) => (!targetContentTypeUid || i.contentTypeUid === targetContentTypeUid) && (!targetDocumentId || i.documentId === targetDocumentId)
+      );
+      if (!target) {
+        return {
+          ok: false,
+          error: "preview_not_configured",
+          fallback: "field-diff",
+          message: "This plan has nothing a front-end page could render. Showing the field comparison instead."
+        };
+      }
+      let doc = null;
+      try {
+        doc = await docs(target.contentTypeUid).findOne({ documentId: target.documentId });
+      } catch {
+        doc = null;
+      }
+      const resolved = service.resolvePreviewUrl(target.contentTypeUid, doc);
+      if (!resolved.ok) {
+        return {
+          ok: false,
+          error: "preview_not_configured",
+          fallback: "field-diff",
+          message: resolved.message
+        };
+      }
+      const opts = options2();
+      const sessionId = crypto$1.randomUUID();
+      const expiresAtMs = Date.now() + opts.ttlMinutes * 6e4;
+      const payload = {
+        sessionId,
+        ownerId,
+        changeSetId: changeSet.documentId,
+        exp: Math.floor(expiresAtMs / 1e3)
+      };
+      const token = plugin().service("crypto").signPreviewToken(payload);
+      const budget = plugin().service("config").getAttachmentOptions().totalBudgetBytes;
+      const stagedMeta = [];
+      const stagedByOrdinal = /* @__PURE__ */ new Map();
+      let used = 0;
+      for (const file of files) {
+        if (used + file.bytes.length > budget) {
+          strapi.log.warn(
+            `[ai-content-studio] preview staging skipped attachment #${file.ordinal}: over the ${opts.ttlMinutes}-minute session's size budget`
+          );
+          continue;
+        }
+        const fileId = crypto$1.randomUUID();
+        const meta = {
+          fileId,
+          ordinal: file.ordinal,
+          filename: file.filename,
+          mimeType: file.mimeType,
+          sizeBytes: file.bytes.length
+        };
+        stagedStore.set(stagedKey(sessionId, fileId), {
+          sessionId,
+          fileId,
+          ordinal: file.ordinal,
+          filename: file.filename,
+          mimeType: file.mimeType,
+          bytes: file.bytes
+        });
+        stagedMeta.push(meta);
+        stagedByOrdinal.set(file.ordinal, meta);
+        used += file.bytes.length;
+      }
+      const overlay = service.buildOverlay(items, { sessionId, token, stagedByOrdinal });
+      const expiresAt = new Date(expiresAtMs).toISOString();
+      const previewUrl = `${resolved.url}${resolved.url.includes("?") ? "&" : "?"}aiStudioPreview=${encodeURIComponent(token)}`;
+      await docs(UID.previewSession).create({
+        data: {
+          changeSet: changeSet.documentId,
+          ownerId,
+          sessionId,
+          overlay,
+          stagedFiles: stagedMeta,
+          expiresAt,
+          targetUrl: resolved.url
+        }
+      });
+      return {
+        ok: true,
+        sessionId,
+        token,
+        previewUrl,
+        expiresAt,
+        stagedFiles: stagedMeta.map(({ ordinal, fileId }) => ({ ordinal, fileId }))
+      };
+    },
+    /**
+     * Look up a session for a VERIFIED token. Returns null unless the session exists, is not
+     * revoked, has not expired, and its change set is still `pending`.
+     */
+    async resolveSession(payload) {
+      const rows = await docs(UID.previewSession).findMany({
+        filters: { sessionId: payload.sessionId },
+        populate: { changeSet: { fields: ["documentId", "status"] } },
+        limit: 1
+      });
+      const session = Array.isArray(rows) ? rows[0] : null;
+      if (!session || session.revokedAt) {
+        return null;
+      }
+      if (session.ownerId !== payload.ownerId) {
+        return null;
+      }
+      if (new Date(session.expiresAt).getTime() <= Date.now()) {
+        return null;
+      }
+      if (session.changeSet?.status !== "pending" || session.changeSet?.documentId !== payload.changeSetId) {
+        return null;
+      }
+      return { overlay: session.overlay ?? {} };
+    },
+    /** Staged bytes for a verified token. Null on any miss — a miss degrades, never breaks. */
+    async getStagedFile(payload, fileId) {
+      const session = await service.resolveSession(payload);
+      if (!session) {
+        return null;
+      }
+      const entry = stagedStore.get(stagedKey(payload.sessionId, fileId));
+      if (!entry) {
+        return null;
+      }
+      return { bytes: entry.bytes, mimeType: entry.mimeType, filename: entry.filename };
+    },
+    /** Drop every staged byte of a session. */
+    dropStagedFiles(sessionId) {
+      for (const key of [...stagedStore.keys()]) {
+        if (stagedStore.get(key)?.sessionId === sessionId) {
+          stagedStore.delete(key);
+        }
+      }
+    },
+    /** Revoke every session of a change set and drop their bytes (apply / reject / expiry). */
+    async revokeForChangeSet(changeSetId) {
+      const rows = await docs(UID.previewSession).findMany({
+        filters: { changeSet: { documentId: changeSetId }, revokedAt: { $null: true } },
+        fields: ["documentId", "sessionId"],
+        limit: -1
+      });
+      const now2 = (/* @__PURE__ */ new Date()).toISOString();
+      for (const row of Array.isArray(rows) ? rows : []) {
+        service.dropStagedFiles(row.sessionId);
+        await docs(UID.previewSession).update({
+          documentId: row.documentId,
+          data: { revokedAt: now2 }
+        });
+      }
+    },
+    /** Delete sessions belonging to a deleted thread's change sets (FR-022). */
+    async deleteForChangeSet(changeSetId) {
+      const rows = await docs(UID.previewSession).findMany({
+        filters: { changeSet: { documentId: changeSetId } },
+        fields: ["documentId", "sessionId"],
+        limit: -1
+      });
+      for (const row of Array.isArray(rows) ? rows : []) {
+        service.dropStagedFiles(row.sessionId);
+        await docs(UID.previewSession).delete({ documentId: row.documentId });
+      }
+    },
+    /**
+     * Sweep overdue sessions and free their memory (T091). Without this, staged bytes of a preview
+     * nobody resolved would sit in the heap until restart.
+     */
+    async revokeExpired() {
+      const rows = await docs(UID.previewSession).findMany({
+        filters: { revokedAt: { $null: true }, expiresAt: { $lt: (/* @__PURE__ */ new Date()).toISOString() } },
+        fields: ["documentId", "sessionId"],
+        limit: 200
+      });
+      const list = Array.isArray(rows) ? rows : [];
+      const now2 = (/* @__PURE__ */ new Date()).toISOString();
+      for (const row of list) {
+        service.dropStagedFiles(row.sessionId);
+        await docs(UID.previewSession).update({ documentId: row.documentId, data: { revokedAt: now2 } });
+      }
+      return list.length;
+    },
+    /** Bytes currently staged for a session — used by tests and diagnostics. */
+    stagedSizeFor(sessionId) {
+      return stagedBytesFor(sessionId);
     }
   };
   return service;
@@ -38138,6 +38701,7 @@ const services = {
   threads: threadsService,
   // Referenced as service('change-sets').
   "change-sets": changeSetsService,
+  preview: previewService,
   tools: toolsService
 };
 const SUPER_ADMIN_CODE = "strapi-super-admin";
@@ -38160,6 +38724,7 @@ const index = {
   config: config$1,
   contentTypes,
   controllers,
+  middlewares,
   routes,
   services,
   policies

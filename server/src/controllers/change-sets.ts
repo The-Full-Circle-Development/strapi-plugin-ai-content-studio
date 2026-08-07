@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises';
 import { z } from 'zod';
 import type { Core } from '@strapi/strapi';
 
@@ -29,8 +30,52 @@ const STATUS_FOR: Record<string, number> = {
   attachment_not_resolved: 409,
 };
 
+/**
+ * Read `attachment[<ordinal>]` parts out of a multipart request.
+ *
+ * Koa-body hands over either one file or an array per field, and either a temp path or an in-memory
+ * buffer depending on the host's upload configuration — handle all four.
+ */
+async function readOrdinalFiles(
+  ctx: any
+): Promise<Array<{ ordinal: number; filename: string; mimeType: string; bytes: Buffer }>> {
+  const files = ctx.request?.files ?? {};
+  const out: Array<{ ordinal: number; filename: string; mimeType: string; bytes: Buffer }> = [];
+  for (const [field, value] of Object.entries(files)) {
+    const match = /^attachment\[(\d+)\]$/.exec(field);
+    if (!match) {
+      continue;
+    }
+    const ordinal = Number(match[1]);
+    for (const file of (Array.isArray(value) ? value : [value]) as any[]) {
+      if (!file) {
+        continue;
+      }
+      let bytes: Buffer | null = null;
+      if (Buffer.isBuffer(file.buffer)) {
+        bytes = file.buffer;
+      } else if (typeof file.filepath === 'string') {
+        bytes = await fs.readFile(file.filepath);
+      } else if (typeof file.path === 'string') {
+        bytes = await fs.readFile(file.path);
+      }
+      if (!bytes) {
+        continue;
+      }
+      out.push({
+        ordinal,
+        filename: String(file.originalFilename ?? file.name ?? `attachment-${ordinal}`),
+        mimeType: String(file.mimetype ?? file.type ?? 'application/octet-stream'),
+        bytes,
+      });
+    }
+  }
+  return out;
+}
+
 const changeSetsController = ({ strapi }: { strapi: Core.Strapi }) => {
   const changeSets = () => strapi.plugin('ai-content-studio').service('change-sets');
+  const preview = () => strapi.plugin('ai-content-studio').service('preview');
 
   const ownerOf = (ctx: any): number | null => {
     const id = ctx.state?.user?.id;
@@ -81,6 +126,68 @@ const changeSetsController = ({ strapi }: { strapi: Core.Strapi }) => {
         return fail(ctx, result);
       }
       ctx.body = result;
+      return undefined;
+    },
+
+    /**
+     * Create a preview session — multipart, so held attachment bytes can be staged and the
+     * proposed image renders (FR-013). Creating a preview writes NO content (FR-015).
+     *
+     * A missing preview target answers 409 `preview_not_configured` with `fallback: 'field-diff'`,
+     * which is the contracted way the panel learns to show the in-panel comparison instead. It
+     * never blocks approval (FR-014).
+     */
+    async preview(ctx: any) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized('Not authenticated.');
+      }
+      const set = await changeSets().getOwned(String(ctx.params.id), ownerId);
+      if (!set) {
+        return ctx.notFound(NOT_FOUND);
+      }
+      if (set.status !== 'pending') {
+        ctx.status = 409;
+        ctx.body = {
+          error: 'not_pending',
+          message: `This plan was already ${String(set.status).replace('_', ' ')}, so it cannot be previewed.`,
+        };
+        return undefined;
+      }
+
+      const body = ctx.request.body ?? {};
+      let files: Array<{ ordinal: number; filename: string; mimeType: string; bytes: Buffer }> = [];
+      try {
+        files = await readOrdinalFiles(ctx);
+      } catch {
+        return ctx.badRequest('Could not read the attached files.');
+      }
+
+      const result = await preview().createSession({
+        changeSet: set,
+        ownerId,
+        targetContentTypeUid:
+          typeof body.targetContentTypeUid === 'string' ? body.targetContentTypeUid : null,
+        targetDocumentId: typeof body.targetDocumentId === 'string' ? body.targetDocumentId : null,
+        files,
+      });
+
+      if (!result.ok) {
+        ctx.status = 409;
+        ctx.body = {
+          error: result.error ?? 'preview_not_configured',
+          message: result.message ?? 'Preview is unavailable. Showing the field comparison instead.',
+          fallback: result.fallback ?? 'field-diff',
+        };
+        return undefined;
+      }
+      ctx.body = {
+        sessionId: result.sessionId,
+        token: result.token,
+        previewUrl: result.previewUrl,
+        expiresAt: result.expiresAt,
+        stagedFiles: result.stagedFiles,
+      };
       return undefined;
     },
 

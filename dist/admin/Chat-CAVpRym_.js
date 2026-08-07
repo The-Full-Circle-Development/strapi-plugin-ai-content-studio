@@ -23006,6 +23006,151 @@ function useChangeSet(changeSetId) {
     error
   };
 }
+const Wrap = styledComponents.styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem 1.2rem;
+  border-top: 1px solid ${({ theme }) => theme.colors.neutral150};
+`;
+const Row$1 = styledComponents.styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+`;
+const Note$1 = styledComponents.styled.div`
+  font-size: 1.15rem;
+  color: ${({ theme }) => theme.colors.neutral600};
+`;
+const DiffTable = styledComponents.styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+`;
+const DiffRow = styledComponents.styled.div`
+  font-size: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.neutral150};
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+const Field = styledComponents.styled.span`
+  color: ${({ theme }) => theme.colors.neutral800};
+  font-weight: 600;
+`;
+const Old$1 = styledComponents.styled.span`
+  color: ${({ theme }) => theme.colors.neutral600};
+  text-decoration: line-through;
+  word-break: break-word;
+`;
+const New$1 = styledComponents.styled.span`
+  color: ${({ theme }) => theme.colors.success600};
+  word-break: break-word;
+`;
+const show$1 = (value) => {
+  if (value === null || value === void 0 || value === "") {
+    return "(empty)";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+const PreviewPanel = ({ changeSetId, items, disabled = false, filesByOrdinal }) => {
+  const token = admin.useAuth("AiContentStudioPreview", (state) => state.token);
+  const tokenRef = React__namespace.useRef(token);
+  React__namespace.useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+  const [busy, setBusy] = React__namespace.useState(false);
+  const [session, setSession] = React__namespace.useState(null);
+  const [fallback, setFallback] = React__namespace.useState(null);
+  const [error, setError] = React__namespace.useState(null);
+  const previewable = items.filter(
+    (i) => i.field && i.documentId && i.permissionVerdict === "allowed" && i.operation !== "publish"
+  );
+  const openPreview = async () => {
+    setBusy(true);
+    setError(null);
+    setFallback(null);
+    try {
+      const form = new FormData();
+      const target = previewable[0];
+      if (target?.contentTypeUid) {
+        form.append("targetContentTypeUid", target.contentTypeUid);
+      }
+      if (target?.documentId) {
+        form.append("targetDocumentId", target.documentId);
+      }
+      for (const item of previewable) {
+        const ordinal = item.attachmentOrdinal;
+        const file = ordinal !== null && filesByOrdinal ? filesByOrdinal[ordinal] : void 0;
+        if (ordinal !== null && file) {
+          form.append(`attachment[${ordinal}]`, file, file.name);
+        }
+      }
+      const result = await adminFetch(
+        `/change-sets/${changeSetId}/preview`,
+        tokenRef.current,
+        { method: "POST", body: form }
+      );
+      setSession(result);
+      window.open(result.previewUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      const payload = err.payload;
+      if (payload?.fallback === "field-diff") {
+        setFallback(payload.message ?? "Preview is unavailable for this project.");
+      } else {
+        setError(err instanceof Error ? err.message : "Could not open the preview.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+  return /* @__PURE__ */ jsxRuntime.jsxs(Wrap, { children: [
+    /* @__PURE__ */ jsxRuntime.jsxs(Row$1, { children: [
+      /* @__PURE__ */ jsxRuntime.jsx(
+        designSystem.Button,
+        {
+          variant: "secondary",
+          onClick: () => void openPreview(),
+          disabled: disabled || busy || previewable.length === 0,
+          loading: busy,
+          children: "Preview on the site"
+        }
+      ),
+      session ? /* @__PURE__ */ jsxRuntime.jsxs(Note$1, { children: [
+        "Preview open — it expires at ",
+        new Date(session.expiresAt).toLocaleTimeString(),
+        " and stops working as soon as this plan is approved or rejected."
+      ] }) : null,
+      error ? /* @__PURE__ */ jsxRuntime.jsx(Note$1, { children: error }) : null
+    ] }),
+    fallback ? /* @__PURE__ */ jsxRuntime.jsxs(jsxRuntime.Fragment, { children: [
+      /* @__PURE__ */ jsxRuntime.jsx(Note$1, { children: fallback }),
+      /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", fontWeight: "bold", children: "Before / after" }),
+      /* @__PURE__ */ jsxRuntime.jsx(DiffTable, { children: previewable.map((item) => /* @__PURE__ */ jsxRuntime.jsxs(DiffRow, { children: [
+        /* @__PURE__ */ jsxRuntime.jsxs(Field, { children: [
+          item.field,
+          " — ",
+          item.documentLabel
+        ] }),
+        /* @__PURE__ */ jsxRuntime.jsx(Old$1, { children: show$1(item.currentValue) }),
+        /* @__PURE__ */ jsxRuntime.jsx(New$1, { children: item.attachmentOrdinal !== null ? `attachment #${item.attachmentOrdinal}` : show$1(item.proposedValue) })
+      ] }, item.id)) })
+    ] }) : null
+  ] });
+};
 const Card = styledComponents.styled.div`
   border: 1px solid ${({ theme }) => theme.colors.neutral200};
   border-radius: 0.8rem;
@@ -23137,6 +23282,7 @@ const ChangePlanCard = ({
   onApplied,
   onRejected,
   resolveAttachments,
+  filesByOrdinal,
   footer: footer2
 }) => {
   const {
@@ -23316,7 +23462,15 @@ const ChangePlanCard = ({
       ),
       selected.length !== allowedIds.length ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { variant: "ghost", onClick: () => setSelected(allowedIds), disabled: busy, children: "Select all" }) : null
     ] }) : null,
-    footer2,
+    footer2 ?? /* @__PURE__ */ jsxRuntime.jsx(
+      PreviewPanel,
+      {
+        changeSetId: changeSet.id,
+        items: changeSet.items,
+        disabled: resolved || expired,
+        filesByOrdinal
+      }
+    ),
     localError ?? error ? /* @__PURE__ */ jsxRuntime.jsx(Note, { children: localError ?? error }) : null
   ] });
 };

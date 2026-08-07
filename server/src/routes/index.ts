@@ -1,3 +1,5 @@
+import preview from './preview';
+
 /**
  * Admin-API routes, mounted under `/ai-content-studio/*`.
  *
@@ -39,6 +41,7 @@ export default {
       chatRoute('GET', '/change-sets/:id', 'change-sets.findOne'),
       chatRoute('POST', '/change-sets/:id/apply', 'change-sets.apply'),
       chatRoute('POST', '/change-sets/:id/reject', 'change-sets.reject'),
+      chatRoute('POST', '/change-sets/:id/preview', 'change-sets.preview'),
 
       {
         method: 'GET',
@@ -58,4 +61,7 @@ export default {
       },
     ],
   },
+
+  // The single token-gated non-admin surface. Exposes no chat, no tools, no settings.
+  preview,
 };

@@ -809,9 +809,22 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
       return Array.isArray(rows) ? rows : [];
     },
 
+    /**
+     * Delete every plan of a thread, its preview sessions, and their staged bytes (FR-022).
+     * Content and Media Library entries an applied plan already produced are left alone — deleting
+     * a conversation must not undo work the user approved.
+     */
     async deleteForThread(threadId: string): Promise<void> {
+      let preview: any = null;
+      try {
+        preview = plugin().service('preview');
+      } catch {
+        preview = null;
+      }
       for (const row of await service.listByThread(threadId)) {
-        await service.revokePreviews(row.documentId);
+        if (preview?.deleteForChangeSet) {
+          await preview.deleteForChangeSet(row.documentId);
+        }
         await docs(UID.changeSet).delete({ documentId: row.documentId });
       }
     },

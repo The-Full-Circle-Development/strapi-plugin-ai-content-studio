@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Button, Checkbox, Typography } from '@strapi/design-system';
 import { styled } from 'styled-components';
 import { useChangeSet, type ChangeItemView } from '../hooks/useChangeSet';
+import { PreviewPanel } from './PreviewPanel';
 
 /**
  * The change plan, rendered per item so approval is a deliberate act (FR-002, FR-003).
@@ -193,7 +194,9 @@ export interface ChangePlanCardProps {
   onRejected?: (changeSetId: string) => void;
   /** Resolves the ordinals an approved plan needs into Media Library ids (US6). */
   resolveAttachments?: (ordinals: number[]) => Promise<Record<string, number>>;
-  /** Rendered under the actions — the preview affordance (US2). */
+  /** Held files by ordinal, so a preview can stage proposed media (US2 + US6). */
+  filesByOrdinal?: Record<number, File>;
+  /** Rendered under the actions, in place of the built-in preview panel. */
   footer?: React.ReactNode;
 }
 
@@ -202,6 +205,7 @@ export const ChangePlanCard = ({
   onApplied,
   onRejected,
   resolveAttachments,
+  filesByOrdinal,
   footer,
 }: ChangePlanCardProps) => {
   const {
@@ -417,7 +421,14 @@ export const ChangePlanCard = ({
         </Actions>
       ) : null}
 
-      {footer}
+      {footer ?? (
+        <PreviewPanel
+          changeSetId={changeSet.id}
+          items={changeSet.items}
+          disabled={resolved || expired}
+          filesByOrdinal={filesByOrdinal}
+        />
+      )}
       {localError ?? error ? <Note>{localError ?? error}</Note> : null}
     </Card>
   );

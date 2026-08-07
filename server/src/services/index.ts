@@ -5,6 +5,7 @@ import registry from './registry';
 import prompt from './prompt';
 import threads from './threads';
 import changeSets from './change-sets';
+import preview from './preview';
 import tools from './tools';
 
 export default {
@@ -16,5 +17,6 @@ export default {
   threads,
   // Referenced as service('change-sets').
   'change-sets': changeSets,
+  preview,
   tools,
 };
