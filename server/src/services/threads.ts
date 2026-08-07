@@ -302,6 +302,63 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
       });
     },
 
+    /**
+     * Append the approving user, the time, and the applied items to the thread, so the exchange
+     * stays auditable in the history (FR-008) rather than living only in a transient HTTP reply.
+     *
+     * Stored as an ordinary assistant turn whose parts carry a typed apply report, which is what
+     * lets a reload replay the outcome exactly as the user first saw it.
+     */
+    async recordApproval({
+      threadId,
+      ownerId,
+      changeSetId,
+      appliedAt,
+      items,
+    }: {
+      threadId: string;
+      ownerId: number;
+      changeSetId: string;
+      appliedAt: string;
+      items: Array<{
+        id: string;
+        field: string | null;
+        documentLabel: string;
+        contentTypeUid: string;
+        resultingState: string;
+        outcome: { state: string; message?: string; oldValue?: unknown; newValue?: unknown } | null;
+      }>;
+    }): Promise<void> {
+      await service.appendMessage({
+        threadId,
+        ownerId,
+        role: 'assistant',
+        modeAtSend: 'content',
+        changeSetId,
+        parts: [
+          {
+            type: 'data-apply-report',
+            data: {
+              changeSetId,
+              approvedByUserId: ownerId,
+              appliedAt,
+              items: items.map((i) => ({
+                id: i.id,
+                field: i.field,
+                documentLabel: i.documentLabel,
+                contentTypeUid: i.contentTypeUid,
+                resultingState: i.resultingState,
+                state: i.outcome?.state ?? 'skipped',
+                message: i.outcome?.message ?? null,
+                oldValue: i.outcome?.oldValue ?? null,
+                newValue: i.outcome?.newValue ?? null,
+              })),
+            },
+          },
+        ],
+      });
+    },
+
     /** Attach a produced plan to the message that produced it, so history replays the plan card. */
     async linkChangeSetToMessage(messageId: string, changeSetId: string): Promise<void> {
       if (!messageId || !changeSetId) {

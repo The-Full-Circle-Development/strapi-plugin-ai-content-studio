@@ -36270,46 +36270,6 @@ const registryService = ({ strapi }) => ({
   }
 });
 const CHAT_MODES = ["content", "layout", "audit"];
-const SYSTEM_PROMPT = `You are the Concept Bath content assistant, embedded in the Strapi admin panel.
-
-You can inspect and edit the website's content using the provided tools.
-
-## Tools & discovery
-- Use listContentTypes to discover valid content-type uids before guessing them.
-- Tools return structured results. If a tool returns "permission_denied", tell the user plainly that
-  their account lacks that permission and do NOT retry the same operation.
-
-## Keep the user in the loop — never act silently
-- For any multi-step task, first state a short plan of what you will do.
-- Before a write (createEntry / updateEntry / publishEntry), say in one line what you are about to
-  change. Ask for explicit confirmation when the request is ambiguous or potentially destructive.
-- As you work, narrate each step ("Looking up the homepage…", "Updating the hero headline…") so the
-  user can follow along — don't jump straight to the result with no context.
-- After EACH write, report the outcome in plain language: the content type, the document (title +
-  documentId), exactly which fields changed (old → new value), and whether the entry is a draft or
-  published. If a write fails, say what failed and why.
-- Never apply a change without telling the user what you did. Summarize every mutation, even small ones.
-
-## Working with images the user attaches
-- When the user attaches an image you can SEE it — describe or analyze it if asked.
-- Each attached image is also uploaded to the media library; the user's message lists its media id,
-  name, and url (e.g. "id 42: ..."). To set or REPLACE a content field's image, call updateEntry
-  with that media id:
-    - single media field (featuredImage, logo, avatar, afterImage, beforeImage): data: { <field>: <id> }
-    - multiple media field (gallery, additionalImages): data: { <field>: [<id>, ...] }
-  Easy / top-level media: blog-post.featuredImage, blog-author.avatar, contact-info.logo,
-  header.logo, service.featuredImage & gallery, project.afterImage/beforeImage/additionalImages.
-  Harder — media nested in a component (e.g. homepage or page hero.slides[].image): getEntry first,
-  rebuild the whole component with the new image id, and send it WITHOUT component ids (Strapi
-  recreates them). Tell the user this rebuilds the component.
-- You may or may not be able to SEE the image (depends on the active model). If you cannot see it,
-  you can still set/replace media fields using the provided media id — just tell the user you can't
-  visually analyze the image with the current model.
-- Always confirm the target field and document before replacing, then report what changed.
-
-## Style
-- Use Markdown (bold, lists, inline code) — it is rendered in the chat.
-- Be concise. Reference entries by their title and documentId.`;
 const bodySchema = object$1({
   threadId: string().min(1),
   mode: _enum(CHAT_MODES).optional(),
@@ -36348,7 +36308,12 @@ const chatController = ({ strapi }) => ({
       strapi.log.error("[ai-content-studio] failed to build AI model", err);
       return ctx.internalServerError("AI provider initialization failed.");
     }
-    const tools = plugin.service("tools").buildTools({ userAbility });
+    const tools = plugin.service("tools").buildTools({
+      userAbility,
+      mode,
+      threadId,
+      ownerId
+    });
     const showErrorDetails = Boolean(
       strapi.config.get("plugin::ai-content-studio.showProviderErrorDetails", false)
     );
@@ -36370,7 +36335,7 @@ const chatController = ({ strapi }) => ({
     });
     const result = streamText({
       model,
-      system: SYSTEM_PROMPT,
+      system: plugin.service("prompt").build({ mode, supportsVision }),
       messages: await convertToModelMessages(trimmed),
       tools,
       stopWhen: stepCountIs(8),
@@ -36419,7 +36384,7 @@ const chatController = ({ strapi }) => ({
 const createSchema = object$1({
   mode: _enum(CHAT_MODES).optional()
 });
-const NOT_FOUND = "That conversation does not exist.";
+const NOT_FOUND$1 = "That conversation does not exist.";
 const threadsController = ({ strapi }) => {
   const threads = () => strapi.plugin("ai-content-studio").service("threads");
   const ownerOf = (ctx) => {
@@ -36448,9 +36413,92 @@ const threadsController = ({ strapi }) => {
       }
       const history = await threads().loadHistory(String(ctx.params.id), ownerId);
       if (!history) {
-        return ctx.notFound(NOT_FOUND);
+        return ctx.notFound(NOT_FOUND$1);
       }
       ctx.body = history;
+      return void 0;
+    }
+  };
+};
+const applySchema = object$1({
+  itemIds: array$1(string().min(1)).min(1),
+  confirmDestructive: boolean().optional(),
+  attachmentResolutions: record(string(), number$1().int()).optional()
+});
+const NOT_FOUND = "That change plan does not exist.";
+const STATUS_FOR = {
+  not_found: 404,
+  not_pending: 409,
+  expired: 409,
+  no_items: 400,
+  unknown_item: 400,
+  permission_denied: 403,
+  destructive_confirmation_required: 409,
+  attachment_not_resolved: 409
+};
+const changeSetsController = ({ strapi }) => {
+  const changeSets = () => strapi.plugin("ai-content-studio").service("change-sets");
+  const ownerOf = (ctx) => {
+    const id = ctx.state?.user?.id;
+    return Number.isInteger(id) ? id : null;
+  };
+  const fail = (ctx, result) => {
+    ctx.status = STATUS_FOR[result.error ?? ""] ?? 400;
+    ctx.body = { error: result.error ?? "bad_request", message: result.message ?? "Request failed." };
+  };
+  return {
+    async findOne(ctx) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized("Not authenticated.");
+      }
+      const set = await changeSets().getOwned(String(ctx.params.id), ownerId);
+      if (!set) {
+        return ctx.notFound(NOT_FOUND);
+      }
+      ctx.body = changeSets().present(set);
+      return void 0;
+    },
+    async apply(ctx) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized("Not authenticated.");
+      }
+      const parsed = applySchema.safeParse(ctx.request.body ?? {});
+      if (!parsed.success) {
+        return ctx.badRequest("Request body must be { itemIds: string[], confirmDestructive?: boolean }.");
+      }
+      const result = await changeSets().apply({
+        changeSetId: String(ctx.params.id),
+        ownerId,
+        // The CALLER's live ability — re-derived per request, never cached (Constitution II).
+        userAbility: ctx.state.userAbility,
+        itemIds: parsed.data.itemIds,
+        confirmDestructive: parsed.data.confirmDestructive ?? false,
+        attachmentResolutions: parsed.data.attachmentResolutions ?? {}
+      });
+      if (!result.ok) {
+        if (result.error === "not_found") {
+          return ctx.notFound(NOT_FOUND);
+        }
+        return fail(ctx, result);
+      }
+      ctx.body = result;
+      return void 0;
+    },
+    async reject(ctx) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized("Not authenticated.");
+      }
+      const result = await changeSets().reject({ changeSetId: String(ctx.params.id), ownerId });
+      if (!result.ok) {
+        if (result.error === "not_found") {
+          return ctx.notFound(NOT_FOUND);
+        }
+        return fail(ctx, result);
+      }
+      ctx.status = 204;
       return void 0;
     }
   };
@@ -36627,6 +36675,8 @@ const settingsController = ({ strapi }) => {
 const controllers = {
   chat: chatController,
   threads: threadsController,
+  // Route handlers reference this as `change-sets.<handler>`.
+  "change-sets": changeSetsController,
   settings: settingsController
 };
 const CHAT_USE = {
@@ -36649,6 +36699,10 @@ const routes = {
       // Threads — the caller's own conversations only.
       chatRoute("POST", "/threads", "threads.create"),
       chatRoute("GET", "/threads/:id", "threads.findOne"),
+      // Change plans. `apply` is the only route in this plugin that mutates content.
+      chatRoute("GET", "/change-sets/:id", "change-sets.findOne"),
+      chatRoute("POST", "/change-sets/:id/apply", "change-sets.apply"),
+      chatRoute("POST", "/change-sets/:id/reject", "change-sets.reject"),
       {
         method: "GET",
         path: "/settings",
@@ -36921,6 +36975,88 @@ const redactService = ({ strapi: _strapi }) => ({
     return this.redactSecrets(parts.join(" — ") || "unknown error");
   }
 });
+const BASE = `You are the content assistant embedded in this project's Strapi admin panel.
+
+You inspect content with read tools and PROPOSE changes for the user to approve. You never write
+content yourself.
+
+## Tools & discovery
+- Call listContentTypes first to discover valid content-type uids — never guess one.
+- Use describePageStructure (when available) to find where media, links and sections actually live
+  in this project. Do not assume field names from other projects.
+- Tools return structured results. If a tool returns "permission_denied", tell the user plainly that
+  their account lacks that permission and do NOT retry the same operation.
+- If a tool returns "unresolved_placement", ASK the user which target they meant, listing the
+  candidates the tool returned. Never pick one on their behalf.
+
+## Proposing changes — nothing you do writes anything
+- Gather what you need with read tools, then call proposeChanges ONCE with every field you intend to
+  change. One plan per request; do not split a single request into several plans.
+- After proposeChanges returns, state plainly that NOTHING HAS CHANGED YET and that the plan is
+  waiting for the user's approval in the panel. Never say "done", "updated", "I've changed" or
+  "published" about a proposal.
+- Summarize the plan in one short paragraph: which documents and fields it touches, and anything
+  the user should look at closely. The panel already renders the per-field before/after, so do not
+  repeat every value in prose.
+- If items come back under "blocked", say which ones and why — the user's own permissions are the
+  boundary, and they may need to ask an admin.
+- If the right answer is that no change is needed, say so. Do not propose an empty or cosmetic plan.
+- You cannot approve, apply, or preview a plan. Only the user can, from the panel.
+
+## Style
+- Use Markdown (bold, lists, inline code) — it is rendered in the chat.
+- Be concise. Reference entries by their title and documentId.`;
+const CONTENT_MODE = `## Mode: Content Editing
+Full content work, within the caller's permissions. Propose text, media and publish changes with
+proposeChanges.`;
+const LAYOUT_MODE = `## Mode: Layout Mapping
+You are arranging page structure and placing media. Call describePageStructure before proposing a
+placement so you target a slot that actually exists. When a page has several slots that could match
+what the user described ("the hero image"), list them and ask — do not choose.`;
+const AUDIT_MODE = `## Mode: Code Audit — READ-ONLY
+- This mode has NO content-modifying capability. proposeChanges does not exist here. If the user
+  asks for a change, say the mode is read-only and that they can switch to Content Editing in the
+  mode selector, then stop.
+- Report findings exactly as the audit tools return them: location, severity, why it breaks, and the
+  suggested fix. Group them by severity.
+- ALWAYS repeat the tool's coverage statement. A pass that ran out of time or skipped types for
+  permissions is NOT a clean bill of health, and must never be presented as one.
+- NEVER invent a finding. If a scan returns no findings, say the project looks clean for the checks
+  that ran.
+- NEVER reproduce a secret value. The tools mask them before you see them; report the mask and its
+  location and nothing more.
+- Remediations are ADVICE. If the user asks you to apply one, explain that it goes through the
+  normal change plan and their normal permission checks — which are unavailable in this mode.`;
+const MODE_SECTION = {
+  content: CONTENT_MODE,
+  layout: LAYOUT_MODE,
+  audit: AUDIT_MODE
+};
+const promptService = ({ strapi: _strapi }) => ({
+  /** Compose the prompt for one request. */
+  build({
+    mode = "content",
+    supportsVision = true,
+    hasAttachments = false
+  } = {}) {
+    const sections = [BASE, MODE_SECTION[mode] ?? CONTENT_MODE];
+    if (hasAttachments) {
+      sections.push(
+        `## Attachments — refer to them by ordinal, never by a library id
+- The user's message lists each attached file as "#1 name (type, size)". Those ordinals are stable
+  for the whole conversation.
+- The files are NOT in the Media Library and must not be. To place one, add a proposeChanges item
+  with "attachmentOrdinal": <n> for the target field — never a media library id, which does not
+  exist yet. Ingestion happens only when the user approves the plan.
+- Map each attachment to the field the user's instruction names. If an instruction cannot be mapped
+  to a real slot, say which one and ask — do not guess.${supportsVision ? "" : `
+- The active model CANNOT interpret file contents. Say so plainly, then place the files using their
+  names, types and the user's instructions — placement still works.`}`
+      );
+    }
+    return sections.join("\n\n");
+  }
+});
 const DEFAULT_TITLE = "New conversation";
 const MAX_TITLE_CHARS = 60;
 const threadsService = ({ strapi }) => {
@@ -37119,6 +37255,49 @@ const threadsService = ({ strapi }) => {
         data: { lastActivityAt: (/* @__PURE__ */ new Date()).toISOString() }
       });
     },
+    /**
+     * Append the approving user, the time, and the applied items to the thread, so the exchange
+     * stays auditable in the history (FR-008) rather than living only in a transient HTTP reply.
+     *
+     * Stored as an ordinary assistant turn whose parts carry a typed apply report, which is what
+     * lets a reload replay the outcome exactly as the user first saw it.
+     */
+    async recordApproval({
+      threadId,
+      ownerId,
+      changeSetId,
+      appliedAt,
+      items
+    }) {
+      await service.appendMessage({
+        threadId,
+        ownerId,
+        role: "assistant",
+        modeAtSend: "content",
+        changeSetId,
+        parts: [
+          {
+            type: "data-apply-report",
+            data: {
+              changeSetId,
+              approvedByUserId: ownerId,
+              appliedAt,
+              items: items.map((i) => ({
+                id: i.id,
+                field: i.field,
+                documentLabel: i.documentLabel,
+                contentTypeUid: i.contentTypeUid,
+                resultingState: i.resultingState,
+                state: i.outcome?.state ?? "skipped",
+                message: i.outcome?.message ?? null,
+                oldValue: i.outcome?.oldValue ?? null,
+                newValue: i.outcome?.newValue ?? null
+              }))
+            }
+          }
+        ]
+      });
+    },
     /** Attach a produced plan to the message that produced it, so history replays the plan card. */
     async linkChangeSetToMessage(messageId, changeSetId) {
       if (!messageId || !changeSetId) {
@@ -37147,10 +37326,649 @@ const threadsService = ({ strapi }) => {
   };
   return service;
 };
+const ACTION_FOR = {
+  create: "create",
+  update: "update",
+  publish: "publish",
+  // Ingestion writes to the Media Library, not to a content type; the upload permission is
+  // checked separately by the attachments service before any byte is written.
+  ingestAttachment: "update"
+};
+const MAX_VALUE_CHARS = 600;
+const MAX_ITEMS = 50;
+const changeSetsService = ({ strapi }) => {
+  const docs = (uid) => strapi.documents(uid);
+  const plugin = () => strapi.plugin("ai-content-studio");
+  const allowedUids = () => Object.keys(strapi.contentTypes).filter((uid) => uid.startsWith("api::"));
+  const ctOf = (uid) => strapi.contentTypes[uid];
+  const isSingle = (uid) => ctOf(uid)?.kind === "singleType";
+  const usesDraftAndPublish = (uid) => Boolean(ctOf(uid)?.options?.draftAndPublish);
+  const checkerFor = (uid, userAbility) => strapi.plugin("content-manager").service("permission-checker").create({ userAbility, model: uid });
+  const can = (uid, action, userAbility) => {
+    try {
+      return Boolean(checkerFor(uid, userAbility).can[action]());
+    } catch {
+      return false;
+    }
+  };
+  const forDisplay = (value) => {
+    if (typeof value === "string" && value.length > MAX_VALUE_CHARS) {
+      return `${value.slice(0, MAX_VALUE_CHARS)}… [truncated ${value.length - MAX_VALUE_CHARS} chars]`;
+    }
+    if (value && typeof value === "object") {
+      try {
+        const json2 = JSON.stringify(value);
+        if (json2.length > MAX_VALUE_CHARS) {
+          return `${json2.slice(0, MAX_VALUE_CHARS)}… [truncated]`;
+        }
+      } catch {
+        return "[unserializable]";
+      }
+    }
+    return value;
+  };
+  const readPath = (doc, path) => {
+    if (!path) {
+      return void 0;
+    }
+    const segments = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+    let cursor = doc;
+    for (const segment of segments) {
+      if (cursor === null || cursor === void 0) {
+        return void 0;
+      }
+      cursor = cursor[segment];
+    }
+    return cursor;
+  };
+  const writePath = (target, path, value) => {
+    const segments = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+    let cursor = target;
+    for (let i = 0; i < segments.length - 1; i += 1) {
+      const segment = segments[i];
+      const nextIsIndex = /^\d+$/.test(segments[i + 1]);
+      if (cursor[segment] === void 0 || cursor[segment] === null || typeof cursor[segment] !== "object") {
+        cursor[segment] = nextIsIndex ? [] : {};
+      }
+      cursor = cursor[segment];
+    }
+    cursor[segments[segments.length - 1]] = value;
+  };
+  const fieldExists = (uid, path) => {
+    const segments = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+    let attributes2 = ctOf(uid)?.attributes ?? null;
+    for (const segment of segments) {
+      if (!attributes2) {
+        return false;
+      }
+      if (/^\d+$/.test(segment)) {
+        continue;
+      }
+      const attribute = attributes2[segment];
+      if (!attribute) {
+        return false;
+      }
+      if (attribute.type === "component") {
+        attributes2 = strapi.components[attribute.component]?.attributes ?? null;
+      } else if (attribute.type === "dynamiczone") {
+        return true;
+      } else {
+        attributes2 = null;
+      }
+    }
+    return true;
+  };
+  const hashValue = (value) => {
+    let serialized;
+    try {
+      serialized = JSON.stringify(value ?? null);
+    } catch {
+      serialized = String(value);
+    }
+    return crypto$1.createHash("sha256").update(serialized).digest("hex").slice(0, 32);
+  };
+  const fingerprint = (doc, field) => ({
+    updatedAt: doc?.updatedAt ? String(doc.updatedAt) : null,
+    fieldHash: hashValue(field ? readPath(doc, field) : null)
+  });
+  const labelOf = (doc, uid) => {
+    const candidates = ["title", "name", "heading", "label", "slug"];
+    for (const key of candidates) {
+      if (typeof doc?.[key] === "string" && doc[key].trim() !== "") {
+        return doc[key];
+      }
+    }
+    const displayName = ctOf(uid)?.info?.displayName ?? uid;
+    return doc?.documentId ? `${displayName} ${doc.documentId}` : displayName;
+  };
+  const isDestructive = (currentValue, proposedValue, operation) => {
+    if (operation === "publish" || operation === "create" || operation === "ingestAttachment") {
+      return false;
+    }
+    const clearing = proposedValue === null || proposedValue === void 0 || proposedValue === "" || Array.isArray(proposedValue) && proposedValue.length === 0;
+    const hadValue = currentValue !== null && currentValue !== void 0 && currentValue !== "" && !(Array.isArray(currentValue) && currentValue.length === 0);
+    if (clearing && hadValue) {
+      return true;
+    }
+    return Array.isArray(currentValue) && Array.isArray(proposedValue) && proposedValue.length < currentValue.length;
+  };
+  const resultingStateOf = (uid, operation) => {
+    if (operation === "publish") {
+      return "published";
+    }
+    if (operation === "ingestAttachment") {
+      return "unchanged";
+    }
+    return usesDraftAndPublish(uid) ? "draft" : "published";
+  };
+  const service = {
+    /** Minutes a pending plan stays applicable, from the shared preview TTL. */
+    ttlMinutes() {
+      return plugin().service("config").getPreviewOptions().ttlMinutes;
+    },
+    /**
+     * Persist a pending plan (T020). Validates every item against the live schema and the
+     * CALLER's ability, reads current values, and captures a per-field fingerprint.
+     *
+     * Items the caller may not perform come back under `blocked` — never silently dropped
+     * (FR-004) — and cannot be approved later.
+     */
+    async createPending({
+      threadId,
+      ownerId,
+      userAbility,
+      summary,
+      items,
+      manifestOrdinals = []
+    }) {
+      if (!Array.isArray(items) || items.length === 0) {
+        return {
+          ok: false,
+          error: "empty_plan",
+          message: "No change is needed — say so plainly instead of showing an empty plan."
+        };
+      }
+      if (items.length > MAX_ITEMS) {
+        return {
+          ok: false,
+          error: "plan_too_large",
+          message: `A plan may contain at most ${MAX_ITEMS} items. Split the work into smaller plans.`
+        };
+      }
+      const accepted = [];
+      const blocked = [];
+      let index2 = 0;
+      for (const raw of items) {
+        index2 += 1;
+        const uid = String(raw.contentTypeUid ?? "");
+        const field = raw.field ?? null;
+        if (!allowedUids().includes(uid)) {
+          return {
+            ok: false,
+            error: "invalid_content_type",
+            message: `Unknown or disallowed content type "${uid}". Call listContentTypes for valid uids.`
+          };
+        }
+        if (raw.operation === "publish" && !usesDraftAndPublish(uid)) {
+          return {
+            ok: false,
+            error: "not_publishable",
+            message: `${uid} does not use draft & publish, so it cannot be published.`
+          };
+        }
+        if (raw.operation === "update" && !field) {
+          return {
+            ok: false,
+            error: "unresolved_placement",
+            message: `An update to ${uid} names no field. Ask which field to change rather than guessing.`,
+            candidates: Object.keys(ctOf(uid)?.attributes ?? {})
+          };
+        }
+        if (field && !fieldExists(uid, field)) {
+          return {
+            ok: false,
+            error: "unresolved_placement",
+            message: `"${field}" is not a field on ${uid}. Ask the user which target you should use.`,
+            candidates: Object.keys(ctOf(uid)?.attributes ?? {})
+          };
+        }
+        if (typeof raw.attachmentOrdinal === "number" && !manifestOrdinals.includes(raw.attachmentOrdinal)) {
+          return {
+            ok: false,
+            error: "unresolved_placement",
+            message: `Attachment #${raw.attachmentOrdinal} is not attached to this message. Ask the user to re-attach it.`,
+            candidates: manifestOrdinals.map((o) => `#${o}`)
+          };
+        }
+        const action = ACTION_FOR[raw.operation];
+        const permitted = can(uid, action, userAbility);
+        let doc = null;
+        let documentId = raw.documentId ?? null;
+        if (raw.operation !== "create") {
+          try {
+            if (isSingle(uid)) {
+              doc = await docs(uid).findFirst({ populate: "*" });
+              documentId = doc?.documentId ?? null;
+            } else if (documentId) {
+              doc = await docs(uid).findOne({ documentId, populate: "*" });
+            }
+          } catch {
+            doc = null;
+          }
+          if (!doc) {
+            return {
+              ok: false,
+              error: "not_found",
+              message: documentId ? `No ${uid} with documentId "${documentId}" exists.` : `${uid} has not been created yet, so there is nothing to change.`
+            };
+          }
+        }
+        if (!permitted) {
+          blocked.push({
+            field,
+            contentTypeUid: uid,
+            reason: "permission_denied",
+            message: `Your account cannot ${action} ${uid}.`
+          });
+          accepted.push({
+            id: `i${index2}`,
+            operation: raw.operation,
+            contentTypeUid: uid,
+            documentId,
+            documentLabel: doc ? labelOf(doc, uid) : ctOf(uid)?.info?.displayName ?? uid,
+            field,
+            currentValue: doc ? forDisplay(readPath(doc, field)) : null,
+            proposedValue: forDisplay(raw.proposedValue),
+            resultingState: resultingStateOf(uid, raw.operation),
+            destructive: false,
+            attachmentOrdinal: raw.attachmentOrdinal ?? null,
+            permissionVerdict: "denied",
+            permissionReason: `Your account cannot ${action} ${uid}.`,
+            baseFingerprint: null,
+            outcome: null
+          });
+          continue;
+        }
+        const currentValue = doc ? readPath(doc, field) : null;
+        accepted.push({
+          id: `i${index2}`,
+          operation: raw.operation,
+          contentTypeUid: uid,
+          documentId,
+          documentLabel: doc ? labelOf(doc, uid) : ctOf(uid)?.info?.displayName ?? uid,
+          field,
+          currentValue: forDisplay(currentValue),
+          // Stored untruncated: this is what apply writes.
+          proposedValue: raw.proposedValue ?? null,
+          resultingState: resultingStateOf(uid, raw.operation),
+          destructive: isDestructive(currentValue, raw.proposedValue, raw.operation),
+          attachmentOrdinal: raw.attachmentOrdinal ?? null,
+          permissionVerdict: "allowed",
+          baseFingerprint: doc ? fingerprint(doc, field) : null,
+          outcome: null
+        });
+      }
+      const now2 = /* @__PURE__ */ new Date();
+      const expiresAt = new Date(now2.getTime() + service.ttlMinutes() * 6e4).toISOString();
+      const created = await docs(UID.changeSet).create({
+        data: {
+          thread: threadId,
+          ownerId,
+          status: "pending",
+          items: accepted,
+          summary: summary ?? null,
+          proposedAt: now2.toISOString(),
+          expiresAt
+        }
+      });
+      return {
+        ok: true,
+        changeSetId: created.documentId,
+        status: "pending",
+        expiresAt,
+        requiresDestructiveConfirmation: accepted.some((i) => i.destructive && i.permissionVerdict === "allowed"),
+        items: accepted.map((i) => ({
+          id: i.id,
+          operation: i.operation,
+          contentTypeUid: i.contentTypeUid,
+          documentId: i.documentId,
+          documentLabel: i.documentLabel,
+          field: i.field,
+          currentValue: i.currentValue,
+          proposedValue: forDisplay(i.proposedValue),
+          resultingState: i.resultingState,
+          destructive: i.destructive,
+          attachmentOrdinal: i.attachmentOrdinal,
+          permissionVerdict: i.permissionVerdict
+        })),
+        blocked,
+        nextStep: "The user reviews this plan in the panel and approves or rejects it. You cannot apply it. Say plainly that nothing has changed yet."
+      };
+    },
+    /** Owner-scoped read. Returns null for another user's set so callers answer 404. */
+    async getOwned(changeSetId, ownerId) {
+      if (!changeSetId || typeof changeSetId !== "string" || !Number.isInteger(ownerId)) {
+        return null;
+      }
+      const set = await docs(UID.changeSet).findOne({
+        documentId: changeSetId,
+        populate: { thread: { fields: ["documentId"] } }
+      });
+      if (!set || set.ownerId !== ownerId) {
+        return null;
+      }
+      return set;
+    },
+    /** Client-facing shape. Untruncated proposed values never leave the server verbatim. */
+    present(set) {
+      const items = Array.isArray(set.items) ? set.items : [];
+      return {
+        id: set.documentId,
+        threadId: set.thread?.documentId ?? null,
+        status: set.status,
+        summary: set.summary ?? null,
+        proposedAt: set.proposedAt,
+        expiresAt: set.expiresAt,
+        resolvedAt: set.resolvedAt ?? null,
+        hasDestructive: items.some((i) => i.destructive && i.permissionVerdict === "allowed"),
+        destructiveConfirmed: Boolean(set.destructiveConfirmed),
+        items: items.map((i) => ({ ...i, proposedValue: forDisplay(i.proposedValue) }))
+      };
+    },
+    /**
+     * The ONLY write path (T021). Six-step gate, in order:
+     *   1. owned + `pending` + not expired,
+     *   2. every itemId exists in the set and is not `denied`,
+     *   3. per-item RBAC re-check against the caller's LIVE ability (FR-004),
+     *   4. baseFingerprint re-check => `stale`, applying nothing for that item (FR-005),
+     *   5. destructive items require explicit confirmation (FR-007),
+     *   6. every attachment-fed item has a resolution (an ingested Media Library id).
+     */
+    async apply({
+      changeSetId,
+      ownerId,
+      userAbility,
+      itemIds,
+      confirmDestructive = false,
+      attachmentResolutions = {}
+    }) {
+      const set = await service.getOwned(changeSetId, ownerId);
+      if (!set) {
+        return { ok: false, error: "not_found", message: "That change plan does not exist." };
+      }
+      if (set.status !== "pending") {
+        return {
+          ok: false,
+          error: "not_pending",
+          message: `This plan was already ${set.status.replace("_", " ")} and cannot be applied again.`,
+          status: set.status
+        };
+      }
+      if (set.expiresAt && new Date(set.expiresAt).getTime() <= Date.now()) {
+        await service.expire(changeSetId);
+        return {
+          ok: false,
+          error: "expired",
+          message: "This plan expired before it was approved. Ask for a fresh plan.",
+          status: "expired"
+        };
+      }
+      const allItems = Array.isArray(set.items) ? set.items : [];
+      if (!Array.isArray(itemIds) || itemIds.length === 0) {
+        return { ok: false, error: "no_items", message: "Select at least one item to apply." };
+      }
+      const selected = [];
+      for (const id of itemIds) {
+        const item = allItems.find((i) => i.id === id);
+        if (!item) {
+          return { ok: false, error: "unknown_item", message: `This plan has no item "${id}".` };
+        }
+        if (item.permissionVerdict === "denied") {
+          return {
+            ok: false,
+            error: "permission_denied",
+            message: `Item "${id}" was blocked when the plan was generated and cannot be approved.`
+          };
+        }
+        selected.push(item);
+      }
+      const destructive = selected.filter((i) => i.destructive);
+      if (destructive.length > 0 && !confirmDestructive) {
+        return {
+          ok: false,
+          error: "destructive_confirmation_required",
+          message: `${destructive.length} of the approved items remove content. Confirm those explicitly before they can be applied.`
+        };
+      }
+      const missingResolution = selected.filter(
+        (i) => typeof i.attachmentOrdinal === "number" && attachmentResolutions[String(i.attachmentOrdinal)] === void 0
+      );
+      if (missingResolution.length > 0) {
+        return {
+          ok: false,
+          error: "attachment_not_resolved",
+          message: `Attachment${missingResolution.length > 1 ? "s" : ""} ${missingResolution.map((i) => `#${i.attachmentOrdinal}`).join(", ")} must be ingested before this plan can be applied.`
+        };
+      }
+      const outcomes = /* @__PURE__ */ new Map();
+      for (const item of selected) {
+        const action = ACTION_FOR[item.operation];
+        if (!can(item.contentTypeUid, action, userAbility)) {
+          outcomes.set(item.id, {
+            state: "blocked",
+            message: `Your account can no longer ${action} ${item.contentTypeUid}.`
+          });
+          continue;
+        }
+        try {
+          if (item.operation === "create") {
+            const data2 = {};
+            if (item.field) {
+              writePath(data2, item.field, item.proposedValue);
+            } else if (item.proposedValue && typeof item.proposedValue === "object") {
+              Object.assign(data2, item.proposedValue);
+            }
+            const created = await docs(item.contentTypeUid).create({ data: data2 });
+            outcomes.set(item.id, {
+              state: "applied",
+              oldValue: null,
+              newValue: forDisplay(item.proposedValue),
+              message: `Created ${item.contentTypeUid} ${created?.documentId ?? ""}`.trim()
+            });
+            continue;
+          }
+          const live = isSingle(item.contentTypeUid) ? await docs(item.contentTypeUid).findFirst({ populate: "*" }) : await docs(item.contentTypeUid).findOne({ documentId: item.documentId, populate: "*" });
+          if (!live) {
+            outcomes.set(item.id, {
+              state: "failed",
+              message: `${item.documentLabel} no longer exists.`
+            });
+            continue;
+          }
+          if (item.baseFingerprint) {
+            const now2 = fingerprint(live, item.field);
+            if (now2.fieldHash !== item.baseFingerprint.fieldHash) {
+              outcomes.set(item.id, {
+                state: "stale",
+                message: `${item.documentLabel} changed since the plan was generated. Nothing was written — ask for a fresh plan.`,
+                oldValue: forDisplay(readPath(live, item.field))
+              });
+              continue;
+            }
+          }
+          if (item.operation === "publish") {
+            await docs(item.contentTypeUid).publish({ documentId: live.documentId });
+            outcomes.set(item.id, {
+              state: "applied",
+              message: `Published ${item.documentLabel}.`,
+              oldValue: "draft",
+              newValue: "published"
+            });
+            continue;
+          }
+          const value = typeof item.attachmentOrdinal === "number" ? attachmentResolutions[String(item.attachmentOrdinal)] : item.proposedValue;
+          if (item.operation === "ingestAttachment") {
+            outcomes.set(item.id, {
+              state: "applied",
+              message: `Attachment #${item.attachmentOrdinal} is in the Media Library (id ${String(value)}).`,
+              oldValue: null,
+              newValue: value
+            });
+            if (!item.field) {
+              continue;
+            }
+          }
+          const oldValue = readPath(live, item.field);
+          const data = {};
+          writePath(data, item.field, value);
+          await docs(item.contentTypeUid).update({ documentId: live.documentId, data });
+          outcomes.set(item.id, {
+            state: "applied",
+            oldValue: forDisplay(oldValue),
+            newValue: forDisplay(value),
+            message: `${item.field} on ${item.documentLabel} is now ${item.resultingState === "published" ? "live" : "a draft change"}.`
+          });
+        } catch (err) {
+          outcomes.set(item.id, {
+            state: "failed",
+            message: `Could not apply this change to ${item.documentLabel}. The value may not fit the field's rules.`
+          });
+          strapi.log.error(
+            `[ai-content-studio] apply failed for ${item.contentTypeUid} ${item.id}: ${plugin().service("redact").describeError(err)}`
+          );
+        }
+      }
+      const applied = [...outcomes.values()].filter((o) => o.state === "applied").length;
+      const status = applied === selected.length ? "applied" : "partially_applied";
+      const appliedAt = (/* @__PURE__ */ new Date()).toISOString();
+      const mergedItems = allItems.map(
+        (i) => outcomes.has(i.id) ? { ...i, outcome: outcomes.get(i.id) } : i
+      );
+      await docs(UID.changeSet).update({
+        documentId: changeSetId,
+        data: {
+          status,
+          items: mergedItems,
+          resolvedAt: appliedAt,
+          approvedByUserId: ownerId,
+          approvedItemIds: itemIds,
+          destructiveConfirmed: destructive.length > 0 ? true : Boolean(set.destructiveConfirmed)
+        }
+      });
+      await service.revokePreviews(changeSetId);
+      const threadId = set.thread?.documentId ?? null;
+      if (threadId) {
+        await plugin().service("threads").recordApproval({
+          threadId,
+          ownerId,
+          changeSetId,
+          appliedAt,
+          items: mergedItems.filter((i) => outcomes.has(i.id))
+        });
+      }
+      return {
+        ok: true,
+        status,
+        approvedByUserId: ownerId,
+        appliedAt,
+        items: itemIds.map((id) => ({ id, outcome: outcomes.get(id) }))
+      };
+    },
+    /**
+     * Reject (T022). Leaves content, media, and configuration untouched — the only effect is the
+     * status transition and the revocation of any preview of this set.
+     */
+    async reject({ changeSetId, ownerId }) {
+      const set = await service.getOwned(changeSetId, ownerId);
+      if (!set) {
+        return { ok: false, error: "not_found", message: "That change plan does not exist." };
+      }
+      if (set.status !== "pending") {
+        return {
+          ok: false,
+          error: "not_pending",
+          message: `This plan was already ${String(set.status).replace("_", " ")}.`
+        };
+      }
+      await docs(UID.changeSet).update({
+        documentId: changeSetId,
+        data: { status: "rejected", resolvedAt: (/* @__PURE__ */ new Date()).toISOString() }
+      });
+      await service.revokePreviews(changeSetId);
+      const threadId = set.thread?.documentId ?? null;
+      if (threadId) {
+        await plugin().service("threads").touchLastActivity(threadId, ownerId);
+      }
+      return { ok: true };
+    },
+    /** Mark one overdue pending set expired. Writes no content. */
+    async expire(changeSetId) {
+      await docs(UID.changeSet).update({
+        documentId: changeSetId,
+        data: { status: "expired", resolvedAt: (/* @__PURE__ */ new Date()).toISOString() }
+      });
+      await service.revokePreviews(changeSetId);
+    },
+    /**
+     * Sweep overdue pending sets (T091). Called opportunistically, so storage does not grow with
+     * plans nobody resolved. Content is never touched.
+     */
+    async expirePending() {
+      const overdue = await docs(UID.changeSet).findMany({
+        filters: { status: "pending", expiresAt: { $lt: (/* @__PURE__ */ new Date()).toISOString() } },
+        fields: ["documentId"],
+        limit: 100
+      });
+      const rows = Array.isArray(overdue) ? overdue : [];
+      for (const row of rows) {
+        await service.expire(row.documentId);
+      }
+      return rows.length;
+    },
+    /**
+     * Revoke every preview session of a set and drop its staged bytes (FR-012). Called on apply,
+     * reject, expiry, and thread deletion — any transition out of `pending`.
+     */
+    async revokePreviews(changeSetId) {
+      let preview = null;
+      try {
+        preview = plugin().service("preview");
+      } catch {
+        preview = null;
+      }
+      if (preview?.revokeForChangeSet) {
+        await preview.revokeForChangeSet(changeSetId);
+      }
+    },
+    /** Pending sets of a thread — used when a thread is deleted (FR-022). */
+    async listByThread(threadId) {
+      const rows = await docs(UID.changeSet).findMany({
+        filters: { thread: { documentId: threadId } },
+        fields: ["documentId", "status"],
+        limit: -1
+      });
+      return Array.isArray(rows) ? rows : [];
+    },
+    async deleteForThread(threadId) {
+      for (const row of await service.listByThread(threadId)) {
+        await service.revokePreviews(row.documentId);
+        await docs(UID.changeSet).delete({ documentId: row.documentId });
+      }
+    }
+  };
+  return service;
+};
 const MAX_FIELD_CHARS = 600;
 const MAX_PAGE_SIZE = 50;
 const toolsService = ({ strapi }) => ({
-  buildTools({ userAbility }) {
+  buildTools({
+    userAbility,
+    mode = "content",
+    threadId = null,
+    ownerId = null,
+    manifestOrdinals = []
+  }) {
+    const changeSets = () => strapi.plugin("ai-content-studio").service("change-sets");
     const allowedUids = () => Object.keys(strapi.contentTypes).filter((uid) => uid.startsWith("api::"));
     const ctOf = (uid) => strapi.contentTypes[uid];
     const isSingle = (uid) => ctOf(uid)?.kind === "singleType";
@@ -37271,84 +38089,44 @@ const toolsService = ({ strapi }) => ({
         return { ok: true, entry: compact(doc) };
       }
     });
-    const createEntry = tool({
-      description: "Create a new entry (saved as a draft for draft&publish content types). Provide the fields in `data`.",
+    const proposeChanges = tool({
+      description: "Propose content changes for the user to approve. This writes NOTHING — it records a pending plan and returns it for review. Call it ONCE per request with every field you intend to change. Items the caller may not perform come back under `blocked`. After it returns, tell the user plainly that nothing has changed yet and that the plan is waiting for their approval in the panel.",
       inputSchema: object$1({
-        contentType: string(),
-        data: record(string(), any())
+        summary: string().describe("One short line describing the whole plan."),
+        items: array$1(
+          object$1({
+            operation: _enum(["create", "update", "publish", "ingestAttachment"]).describe("What this item does to the target."),
+            contentTypeUid: string().describe('Content-type uid, e.g. "api::page.page".'),
+            documentId: string().optional().describe("Target document. Omit for `create` and for single types."),
+            field: string().optional().describe('Dotted field path, e.g. "hero.headline". Omit for `publish`.'),
+            proposedValue: any().optional().describe("The new value. Omit when using attachmentOrdinal."),
+            attachmentOrdinal: number$1().int().optional().describe("For a media field fed by an attached file: its ordinal (#1 => 1). NEVER a media library id.")
+          })
+        ).describe("Every change this plan should contain.")
       }),
-      execute: async ({ contentType, data }) => {
-        const bad = ensureAllowed(contentType);
-        if (bad) return bad;
-        if (!can(contentType, "create")) return denied("create", contentType);
-        const created = await docs(contentType).create({ data });
-        return { ok: true, entry: compact(created) };
-      }
-    });
-    const updateEntry = tool({
-      description: "Update an entry. Collection types: pass documentId. Single types: omit documentId (the sole document is updated).",
-      inputSchema: object$1({
-        contentType: string(),
-        documentId: string().optional(),
-        data: record(string(), any())
-      }),
-      execute: async ({ contentType, documentId, data }) => {
-        const bad = ensureAllowed(contentType);
-        if (bad) return bad;
-        if (!can(contentType, "update")) return denied("update", contentType);
-        let targetId = documentId;
-        if (isSingle(contentType)) {
-          const sole = await docs(contentType).findFirst({});
-          targetId = sole?.documentId;
-        }
-        if (!targetId) {
+      execute: async ({ summary, items }) => {
+        if (!threadId || !Number.isInteger(ownerId)) {
           return {
             ok: false,
-            error: "missing_documentId",
-            message: "documentId is required (or the single type has not been created yet)."
+            error: "no_thread",
+            message: "This conversation has no thread, so a plan cannot be recorded."
           };
         }
-        const updated = await docs(contentType).update({ documentId: targetId, data });
-        return { ok: true, entry: compact(updated) };
+        return changeSets().createPending({
+          threadId,
+          ownerId,
+          userAbility,
+          summary,
+          items,
+          manifestOrdinals
+        });
       }
     });
-    const publishEntry = tool({
-      description: "Publish an entry (only for content types that use draft & publish).",
-      inputSchema: object$1({
-        contentType: string(),
-        documentId: string().optional()
-      }),
-      execute: async ({ contentType, documentId }) => {
-        const bad = ensureAllowed(contentType);
-        if (bad) return bad;
-        if (!ctOf(contentType).options?.draftAndPublish) {
-          return {
-            ok: false,
-            error: "not_publishable",
-            message: `${contentType} does not use draft & publish, so it cannot be published.`
-          };
-        }
-        if (!can(contentType, "publish")) return denied("publish", contentType);
-        let targetId = documentId;
-        if (isSingle(contentType)) {
-          const sole = await docs(contentType).findFirst({});
-          targetId = sole?.documentId;
-        }
-        if (!targetId) {
-          return { ok: false, error: "missing_documentId", message: "documentId is required." };
-        }
-        const published = await docs(contentType).publish({ documentId: targetId });
-        return { ok: true, published: compact(published) };
-      }
-    });
-    return {
-      listContentTypes,
-      searchEntries,
-      getEntry,
-      createEntry,
-      updateEntry,
-      publishEntry
-    };
+    const readTools = { listContentTypes, searchEntries, getEntry };
+    if (mode === "audit") {
+      return readTools;
+    }
+    return { ...readTools, proposeChanges };
   }
 });
 const services = {
@@ -37356,7 +38134,10 @@ const services = {
   redact: redactService,
   config: configService,
   registry: registryService,
+  prompt: promptService,
   threads: threadsService,
+  // Referenced as service('change-sets').
+  "change-sets": changeSetsService,
   tools: toolsService
 };
 const SUPER_ADMIN_CODE = "strapi-super-admin";

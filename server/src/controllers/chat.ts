@@ -4,47 +4,6 @@ import type { Core } from '@strapi/strapi';
 import { ProviderConfigError } from '../services/registry';
 import { CHAT_MODES } from '../types';
 
-const SYSTEM_PROMPT = `You are the Concept Bath content assistant, embedded in the Strapi admin panel.
-
-You can inspect and edit the website's content using the provided tools.
-
-## Tools & discovery
-- Use listContentTypes to discover valid content-type uids before guessing them.
-- Tools return structured results. If a tool returns "permission_denied", tell the user plainly that
-  their account lacks that permission and do NOT retry the same operation.
-
-## Keep the user in the loop — never act silently
-- For any multi-step task, first state a short plan of what you will do.
-- Before a write (createEntry / updateEntry / publishEntry), say in one line what you are about to
-  change. Ask for explicit confirmation when the request is ambiguous or potentially destructive.
-- As you work, narrate each step ("Looking up the homepage…", "Updating the hero headline…") so the
-  user can follow along — don't jump straight to the result with no context.
-- After EACH write, report the outcome in plain language: the content type, the document (title +
-  documentId), exactly which fields changed (old → new value), and whether the entry is a draft or
-  published. If a write fails, say what failed and why.
-- Never apply a change without telling the user what you did. Summarize every mutation, even small ones.
-
-## Working with images the user attaches
-- When the user attaches an image you can SEE it — describe or analyze it if asked.
-- Each attached image is also uploaded to the media library; the user's message lists its media id,
-  name, and url (e.g. "id 42: ..."). To set or REPLACE a content field's image, call updateEntry
-  with that media id:
-    - single media field (featuredImage, logo, avatar, afterImage, beforeImage): data: { <field>: <id> }
-    - multiple media field (gallery, additionalImages): data: { <field>: [<id>, ...] }
-  Easy / top-level media: blog-post.featuredImage, blog-author.avatar, contact-info.logo,
-  header.logo, service.featuredImage & gallery, project.afterImage/beforeImage/additionalImages.
-  Harder — media nested in a component (e.g. homepage or page hero.slides[].image): getEntry first,
-  rebuild the whole component with the new image id, and send it WITHOUT component ids (Strapi
-  recreates them). Tell the user this rebuilds the component.
-- You may or may not be able to SEE the image (depends on the active model). If you cannot see it,
-  you can still set/replace media fields using the provided media id — just tell the user you can't
-  visually analyze the image with the current model.
-- Always confirm the target field and document before replacing, then report what changed.
-
-## Style
-- Use Markdown (bold, lists, inline code) — it is rendered in the chat.
-- Be concise. Reference entries by their title and documentId.`;
-
 /**
  * Request body. `threadId` is REQUIRED: every turn belongs to a durable, owner-scoped conversation
  * (FR-016), and the thread is what makes the reply persist across a reload or a restart.
@@ -98,7 +57,14 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       return ctx.internalServerError('AI provider initialization failed.');
     }
 
-    const tools = plugin.service('tools').buildTools({ userAbility });
+    // Tool set is derived per request from (caller ability, mode). `audit` mode never builds
+    // proposeChanges, so read-only is structural rather than a refusal at runtime (FR-029).
+    const tools = plugin.service('tools').buildTools({
+      userAbility,
+      mode,
+      threadId,
+      ownerId,
+    });
 
     // Debug flag: surface the real (redacted) provider error to the UI instead of a generic one.
     const showErrorDetails = Boolean(
@@ -134,7 +100,7 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
 
     const result = streamText({
       model,
-      system: SYSTEM_PROMPT,
+      system: plugin.service('prompt').build({ mode, supportsVision }),
       messages: await convertToModelMessages(trimmed),
       tools,
       stopWhen: stepCountIs(8),

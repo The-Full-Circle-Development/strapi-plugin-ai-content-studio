@@ -1,15 +1,19 @@
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
 import type { Core } from '@strapi/strapi';
+import type { ChatMode } from '../types';
 
 /**
- * Content tools passed to `streamText`. Every tool:
+ * Tools passed to `streamText`, rebuilt per request from (caller ability, mode). Every tool:
  *   1. validates the content-type uid against a live `api::*` allow-list,
  *   2. RBAC-checks the CALLER's ability via the content-manager permission-checker
  *      BEFORE touching the Document Service (which itself bypasses RBAC),
  *   3. returns compact JSON with long fields truncated, and
  *   4. returns STRUCTURED errors instead of throwing, so the model relays a clear
  *      message and does not blindly retry.
+ *
+ * NO tool in any mode modifies content. The write tools were removed; `proposeChanges` records a
+ * pending plan and the user applies it from the panel (R1, FR-001).
  */
 
 const MAX_FIELD_CHARS = 600;
@@ -17,8 +21,26 @@ const MAX_PAGE_SIZE = 50;
 
 type Action = 'read' | 'create' | 'update' | 'delete' | 'publish';
 
+export interface BuildToolsOptions {
+  /** The CALLER's CASL ability. Never cached across requests or users. */
+  userAbility: unknown;
+  mode?: ChatMode;
+  /** The conversation a produced plan belongs to. */
+  threadId?: string | null;
+  ownerId?: number | null;
+  /** Ordinals the user actually attached to THIS turn, for validating placements. */
+  manifestOrdinals?: number[];
+}
+
 const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
-  buildTools({ userAbility }: { userAbility: unknown }): ToolSet {
+  buildTools({
+    userAbility,
+    mode = 'content',
+    threadId = null,
+    ownerId = null,
+    manifestOrdinals = [],
+  }: BuildToolsOptions): ToolSet {
+    const changeSets = () => strapi.plugin('ai-content-studio').service('change-sets');
     const allowedUids = (): string[] =>
       Object.keys(strapi.contentTypes).filter((uid) => uid.startsWith('api::'));
 
@@ -165,89 +187,74 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
       },
     });
 
-    const createEntry = tool({
+    /**
+     * The ONLY tool that can affect content — and it affects nothing until the user approves.
+     *
+     * `createEntry`, `updateEntry` and `publishEntry` were REMOVED (R1). They executed inside the
+     * model's step loop, so "nothing is written without approval" depended on the model behaving.
+     * Now the model can only persist a pending plan in the plugin's own table; the sole write path
+     * is `POST /change-sets/:id/apply`, driven by the user's click.
+     */
+    const proposeChanges = tool({
       description:
-        'Create a new entry (saved as a draft for draft&publish content types). Provide the fields in `data`.',
+        'Propose content changes for the user to approve. This writes NOTHING — it records a pending plan and returns it for review. Call it ONCE per request with every field you intend to change. Items the caller may not perform come back under `blocked`. After it returns, tell the user plainly that nothing has changed yet and that the plan is waiting for their approval in the panel.',
       inputSchema: z.object({
-        contentType: z.string(),
-        data: z.record(z.string(), z.any()),
+        summary: z.string().describe('One short line describing the whole plan.'),
+        items: z
+          .array(
+            z.object({
+              operation: z
+                .enum(['create', 'update', 'publish', 'ingestAttachment'])
+                .describe('What this item does to the target.'),
+              contentTypeUid: z.string().describe('Content-type uid, e.g. "api::page.page".'),
+              documentId: z
+                .string()
+                .optional()
+                .describe('Target document. Omit for `create` and for single types.'),
+              field: z
+                .string()
+                .optional()
+                .describe('Dotted field path, e.g. "hero.headline". Omit for `publish`.'),
+              proposedValue: z
+                .any()
+                .optional()
+                .describe('The new value. Omit when using attachmentOrdinal.'),
+              attachmentOrdinal: z
+                .number()
+                .int()
+                .optional()
+                .describe('For a media field fed by an attached file: its ordinal (#1 => 1). NEVER a media library id.'),
+            })
+          )
+          .describe('Every change this plan should contain.'),
       }),
-      execute: async ({ contentType, data }) => {
-        const bad = ensureAllowed(contentType);
-        if (bad) return bad;
-        if (!can(contentType, 'create')) return denied('create', contentType);
-        const created = await docs(contentType).create({ data });
-        return { ok: true, entry: compact(created) };
-      },
-    });
-
-    const updateEntry = tool({
-      description:
-        'Update an entry. Collection types: pass documentId. Single types: omit documentId (the sole document is updated).',
-      inputSchema: z.object({
-        contentType: z.string(),
-        documentId: z.string().optional(),
-        data: z.record(z.string(), z.any()),
-      }),
-      execute: async ({ contentType, documentId, data }) => {
-        const bad = ensureAllowed(contentType);
-        if (bad) return bad;
-        if (!can(contentType, 'update')) return denied('update', contentType);
-        let targetId = documentId;
-        if (isSingle(contentType)) {
-          const sole = await docs(contentType).findFirst({});
-          targetId = sole?.documentId;
-        }
-        if (!targetId) {
+      execute: async ({ summary, items }) => {
+        if (!threadId || !Number.isInteger(ownerId)) {
           return {
             ok: false,
-            error: 'missing_documentId',
-            message: 'documentId is required (or the single type has not been created yet).',
+            error: 'no_thread',
+            message: 'This conversation has no thread, so a plan cannot be recorded.',
           };
         }
-        const updated = await docs(contentType).update({ documentId: targetId, data });
-        return { ok: true, entry: compact(updated) };
+        return changeSets().createPending({
+          threadId,
+          ownerId: ownerId as number,
+          userAbility,
+          summary,
+          items,
+          manifestOrdinals,
+        });
       },
     });
 
-    const publishEntry = tool({
-      description: 'Publish an entry (only for content types that use draft & publish).',
-      inputSchema: z.object({
-        contentType: z.string(),
-        documentId: z.string().optional(),
-      }),
-      execute: async ({ contentType, documentId }) => {
-        const bad = ensureAllowed(contentType);
-        if (bad) return bad;
-        if (!ctOf(contentType).options?.draftAndPublish) {
-          return {
-            ok: false,
-            error: 'not_publishable',
-            message: `${contentType} does not use draft & publish, so it cannot be published.`,
-          };
-        }
-        if (!can(contentType, 'publish')) return denied('publish', contentType);
-        let targetId = documentId;
-        if (isSingle(contentType)) {
-          const sole = await docs(contentType).findFirst({});
-          targetId = sole?.documentId;
-        }
-        if (!targetId) {
-          return { ok: false, error: 'missing_documentId', message: 'documentId is required.' };
-        }
-        const published = await docs(contentType).publish({ documentId: targetId });
-        return { ok: true, published: compact(published) };
-      },
-    });
+    const readTools: ToolSet = { listContentTypes, searchEntries, getEntry };
 
-    return {
-      listContentTypes,
-      searchEntries,
-      getEntry,
-      createEntry,
-      updateEntry,
-      publishEntry,
-    };
+    // `audit` mode simply never builds proposeChanges, so read-only is STRUCTURAL — there is no
+    // capability to refuse at runtime (FR-029). Modes only ever narrow (FR-031).
+    if (mode === 'audit') {
+      return readTools;
+    }
+    return { ...readTools, proposeChanges };
   },
 });
 

@@ -4,6 +4,7 @@ import { DefaultChatTransport, type UIMessage } from 'ai';
 import { Page, useNotification } from '@strapi/strapi/admin';
 import { MessageList } from '../components/MessageList';
 import { Composer } from '../components/Composer';
+import { ChangePlanCard, type ApplyReport } from '../components/ChangePlanCard';
 import { Column, ErrorText, Scroll, Shell } from '../components/styles';
 import { backendURL, useThreads } from '../hooks/useThreads';
 
@@ -53,7 +54,7 @@ export const Chat = () => {
     [tokenRef, threadIdRef, modeRef]
   );
 
-  const { messages, sendMessage, status, stop, error } = useChat({ transport });
+  const { messages, sendMessage, setMessages, status, stop, error } = useChat({ transport });
   const [input, setInput] = React.useState('');
   const [attachments, setAttachments] = React.useState<File[]>([]);
   const [preparing, setPreparing] = React.useState(false);
@@ -92,6 +93,26 @@ export const Chat = () => {
     }
   };
 
+  /**
+   * The per-item apply report is appended to the conversation as an assistant turn, so the outcome
+   * (field, old value, new value, draft/published state, and every blocked or failed reason) sits
+   * in the transcript rather than in a toast (FR-006, FR-008). The server persists the same report
+   * on the thread, so a reload replays it.
+   */
+  const onApplied = React.useCallback(
+    (report: ApplyReport) => {
+      setMessages((current) => [
+        ...current,
+        {
+          id: `apply-${report.changeSetId}-${current.length}`,
+          role: 'assistant',
+          parts: [{ type: 'data-apply-report', data: report }],
+        } as UIMessage,
+      ]);
+    },
+    [setMessages]
+  );
+
   return (
     <Page.Main>
       <Shell>
@@ -101,6 +122,9 @@ export const Chat = () => {
               messages={messages}
               status={status}
               onPickSuggestion={(text) => setInput(text)}
+              renderChangeSet={(changeSetId) => (
+                <ChangePlanCard changeSetId={changeSetId} onApplied={onApplied} />
+              )}
             />
             {error ? <ErrorText>{error.message}</ErrorText> : null}
             <div ref={bottomRef} />

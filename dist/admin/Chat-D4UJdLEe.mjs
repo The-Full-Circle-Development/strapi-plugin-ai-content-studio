@@ -2,7 +2,7 @@ import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import * as React from "react";
 import { useRef, useCallback, useSyncExternalStore, useEffect } from "react";
 import { useAuth, useNotification, Page } from "@strapi/strapi/admin";
-import { Loader } from "@strapi/design-system";
+import { Loader, Typography, Checkbox, Button } from "@strapi/design-system";
 import { Sparkle, Cross, Paperclip, Stop, ArrowUp } from "@strapi/icons";
 import { styled } from "styled-components";
 var marker = "vercel.ai.error";
@@ -22436,7 +22436,73 @@ function useCyclingWord(active, words, intervalMs = 2500) {
   }, [active, pick2, intervalMs]);
   return word;
 }
-const MessageList = ({ messages, status, onPickSuggestion }) => {
+const changeSetIdOf = (part) => {
+  const output = part.output;
+  return output?.ok && typeof output.changeSetId === "string" ? output.changeSetId : null;
+};
+const ReportBox = styled.div`
+  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  border-radius: 0.8rem;
+  padding: 0.9rem 1.1rem;
+  align-self: stretch;
+  font-size: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+`;
+const ReportRow = styled.div`
+  color: ${({ theme, $tone }) => $tone === "success" ? theme.colors.success600 : $tone === "danger" ? theme.colors.danger600 : $tone === "warning" ? theme.colors.warning600 : theme.colors.neutral600};
+  word-break: break-word;
+`;
+const REPORT_TONE = {
+  applied: "success",
+  blocked: "danger",
+  failed: "danger",
+  stale: "warning",
+  skipped: "neutral"
+};
+const showValue = (value) => {
+  if (value === null || value === void 0 || value === "") {
+    return "(empty)";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+const ApplyReport = ({ report }) => /* @__PURE__ */ jsxs(ReportBox, { children: [
+  /* @__PURE__ */ jsxs(Typography, { variant: "pi", fontWeight: "bold", children: [
+    "Applied ",
+    new Date(report.appliedAt).toLocaleString()
+  ] }),
+  report.items.map((item) => /* @__PURE__ */ jsxs(ReportRow, { $tone: REPORT_TONE[item.state] ?? "neutral", children: [
+    /* @__PURE__ */ jsx("strong", { children: item.state }),
+    " — ",
+    item.field ? `${item.field} on ` : "",
+    item.documentLabel,
+    item.state === "applied" ? /* @__PURE__ */ jsxs(Fragment, { children: [
+      ": ",
+      showValue(item.oldValue),
+      " → ",
+      showValue(item.newValue),
+      item.resultingState === "unchanged" ? "" : ` (${item.resultingState})`
+    ] }) : item.message ? /* @__PURE__ */ jsxs(Fragment, { children: [
+      ": ",
+      item.message
+    ] }) : null
+  ] }, item.id))
+] });
+const MessageList = ({
+  messages,
+  status,
+  onPickSuggestion,
+  renderChangeSet,
+  expiredOrdinalsByMessage
+}) => {
   const busy = status === "submitted" || status === "streaming";
   const loadingWord = useCyclingWord(busy, LOADING_WORDS);
   const renderImageParts = (message) => message.parts.map(
@@ -22465,8 +22531,18 @@ const MessageList = ({ messages, status, onPickSuggestion }) => {
           if (part.type === "reasoning") {
             return /* @__PURE__ */ jsx(Working, { style: { fontStyle: "italic" }, children: part.text }, index2);
           }
+          if (part.type === "data-apply-report") {
+            return /* @__PURE__ */ jsx(ApplyReport, { report: part.data }, index2);
+          }
           if (isToolUIPart(part)) {
-            const { text: text2, danger } = toolLabel(part.state, String(getToolName(part)));
+            const name2 = String(getToolName(part));
+            if (name2 === "proposeChanges" && part.state === "output-available") {
+              const changeSetId = changeSetIdOf(part);
+              if (changeSetId && renderChangeSet) {
+                return /* @__PURE__ */ jsx(React.Fragment, { children: renderChangeSet(changeSetId) }, index2);
+              }
+            }
+            const { text: text2, danger } = toolLabel(part.state, name2);
             return /* @__PURE__ */ jsx(ToolPill, { $danger: danger, children: text2 }, index2);
           }
           if (isFileUIPart(part) && part.mediaType?.startsWith("image/")) {
@@ -22803,6 +22879,428 @@ function useThreads() {
     ensureThread
   };
 }
+function useChangeSet(changeSetId) {
+  const token = useAuth("AiContentStudioChangeSet", (state) => state.token);
+  const tokenRef = React.useRef(token);
+  React.useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+  const [changeSet, setChangeSet] = React.useState(null);
+  const [selected, setSelected] = React.useState([]);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const load = React.useCallback(async (id) => {
+    setError(null);
+    try {
+      const set = await adminFetch(`/change-sets/${id}`, tokenRef.current);
+      setChangeSet(set);
+      setSelected(set.items.filter((i) => i.permissionVerdict === "allowed").map((i) => i.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load the change plan.");
+    }
+  }, []);
+  React.useEffect(() => {
+    if (changeSetId) {
+      void load(changeSetId);
+    } else {
+      setChangeSet(null);
+      setSelected([]);
+    }
+  }, [changeSetId, load]);
+  const toggleItem = React.useCallback(
+    (itemId) => {
+      const item = changeSet?.items.find((i) => i.id === itemId);
+      if (!item || item.permissionVerdict === "denied") {
+        return;
+      }
+      setSelected(
+        (current) => current.includes(itemId) ? current.filter((id) => id !== itemId) : [...current, itemId]
+      );
+    },
+    [changeSet]
+  );
+  const selectedItems = React.useMemo(
+    () => (changeSet?.items ?? []).filter((i) => selected.includes(i.id)),
+    [changeSet, selected]
+  );
+  const selectionHasDestructive = selectedItems.some((i) => i.destructive);
+  const selectedOrdinals = React.useMemo(
+    () => selectedItems.map((i) => i.attachmentOrdinal).filter((ordinal) => typeof ordinal === "number"),
+    [selectedItems]
+  );
+  const apply = React.useCallback(
+    async ({
+      itemIds,
+      confirmDestructive = false,
+      attachmentResolutions = {}
+    }) => {
+      if (!changeSet) {
+        return null;
+      }
+      setBusy(true);
+      setError(null);
+      try {
+        const result = await adminFetch(`/change-sets/${changeSet.id}/apply`, tokenRef.current, {
+          method: "POST",
+          body: JSON.stringify({ itemIds, confirmDestructive, attachmentResolutions })
+        });
+        await load(changeSet.id);
+        return result;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not apply the change plan.");
+        return null;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [changeSet, load]
+  );
+  const reject = React.useCallback(async () => {
+    if (!changeSet) {
+      return false;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await adminFetch(`/change-sets/${changeSet.id}/reject`, tokenRef.current, { method: "POST" });
+      await load(changeSet.id);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not reject the change plan.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [changeSet, load]);
+  return {
+    changeSet,
+    selected,
+    selectedItems,
+    selectionHasDestructive,
+    selectedOrdinals,
+    toggleItem,
+    setSelected,
+    apply,
+    reject,
+    reload: load,
+    busy,
+    error
+  };
+}
+const Card = styled.div`
+  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  border-radius: 0.8rem;
+  background: ${({ theme }) => theme.colors.neutral0};
+  overflow: hidden;
+  align-self: stretch;
+`;
+const Head = styled.div`
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.neutral150};
+  background: ${({ theme }) => theme.colors.neutral100};
+`;
+const StatusChip = styled.span`
+  font-size: 1.1rem;
+  padding: 0.2rem 0.7rem;
+  border-radius: 1rem;
+  white-space: nowrap;
+  color: ${({ theme, $tone }) => $tone === "success" ? theme.colors.success600 : $tone === "danger" ? theme.colors.danger600 : $tone === "warning" ? theme.colors.warning600 : theme.colors.neutral600};
+  background: ${({ theme, $tone }) => $tone === "success" ? theme.colors.success100 : $tone === "danger" ? theme.colors.danger100 : $tone === "warning" ? theme.colors.warning100 : theme.colors.neutral150};
+`;
+const Row = styled.div`
+  display: flex;
+  gap: 0.8rem;
+  padding: 0.9rem 1.2rem;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.neutral150};
+  opacity: ${({ $blocked }) => $blocked ? 0.65 : 1};
+  border-left: 3px solid
+    ${({ theme, $destructive }) => $destructive ? theme.colors.danger500 : "transparent"};
+  &:last-of-type {
+    border-bottom: none;
+  }
+`;
+const RowBody = styled.div`
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+`;
+const Target = styled.div`
+  font-size: 1.3rem;
+  color: ${({ theme }) => theme.colors.neutral800};
+  font-weight: 600;
+  word-break: break-word;
+`;
+const Meta = styled.div`
+  font-size: 1.1rem;
+  color: ${({ theme }) => theme.colors.neutral600};
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+`;
+const Diff = styled.div`
+  font-size: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+`;
+const Old = styled.div`
+  color: ${({ theme }) => theme.colors.neutral600};
+  text-decoration: line-through;
+  word-break: break-word;
+`;
+const New = styled.div`
+  color: ${({ theme }) => theme.colors.success600};
+  word-break: break-word;
+`;
+const Reason = styled.div`
+  font-size: 1.15rem;
+  color: ${({ theme }) => theme.colors.danger600};
+`;
+const Actions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1rem 1.2rem;
+  border-top: 1px solid ${({ theme }) => theme.colors.neutral150};
+`;
+const Confirm = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.8rem 1.2rem;
+  background: ${({ theme }) => theme.colors.danger100};
+  border-top: 1px solid ${({ theme }) => theme.colors.danger200};
+  color: ${({ theme }) => theme.colors.danger700};
+  font-size: 1.2rem;
+`;
+const Note = styled.div`
+  font-size: 1.15rem;
+  color: ${({ theme }) => theme.colors.neutral600};
+  padding: 0.8rem 1.2rem 0;
+`;
+const show = (value) => {
+  if (value === null || value === void 0 || value === "") {
+    return "(empty)";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+const OUTCOME_TONE = {
+  applied: "success",
+  blocked: "danger",
+  failed: "danger",
+  stale: "warning",
+  skipped: "neutral"
+};
+const STATUS_LABEL = {
+  pending: "Awaiting your approval",
+  applied: "Applied",
+  partially_applied: "Partially applied",
+  rejected: "Rejected",
+  expired: "Expired"
+};
+const ChangePlanCard = ({
+  changeSetId,
+  onApplied,
+  onRejected,
+  resolveAttachments,
+  footer: footer2
+}) => {
+  const {
+    changeSet,
+    selected,
+    selectedItems,
+    selectionHasDestructive,
+    toggleItem,
+    setSelected,
+    apply,
+    reject,
+    busy,
+    error
+  } = useChangeSet(changeSetId);
+  const [confirmDestructive, setConfirmDestructive] = React.useState(false);
+  const [localError, setLocalError] = React.useState(null);
+  React.useEffect(() => {
+    if (!selectionHasDestructive) {
+      setConfirmDestructive(false);
+    }
+  }, [selectionHasDestructive]);
+  if (!changeSet) {
+    return error ? /* @__PURE__ */ jsx(Note, { children: error }) : null;
+  }
+  const resolved = changeSet.status !== "pending";
+  const allowedIds = changeSet.items.filter((i) => i.permissionVerdict === "allowed").map((i) => i.id);
+  const expired = new Date(changeSet.expiresAt).getTime() <= Date.now();
+  const runApply = async (itemIds) => {
+    setLocalError(null);
+    if (itemIds.length === 0) {
+      return;
+    }
+    let attachmentResolutions = {};
+    const ordinals = changeSet.items.filter((i) => itemIds.includes(i.id)).map((i) => i.attachmentOrdinal).filter((o) => typeof o === "number");
+    if (ordinals.length > 0) {
+      if (!resolveAttachments) {
+        setLocalError("These files must be ingested first, and this panel cannot do that here.");
+        return;
+      }
+      try {
+        attachmentResolutions = await resolveAttachments(ordinals);
+      } catch (err) {
+        setLocalError(err instanceof Error ? err.message : "Could not add the files to the Media Library.");
+        return;
+      }
+    }
+    const report = await apply({ itemIds, confirmDestructive, attachmentResolutions });
+    if (report) {
+      const byId = new Map(changeSet.items.map((i) => [i.id, i]));
+      onApplied?.({
+        changeSetId: changeSet.id,
+        appliedAt: report.appliedAt,
+        items: report.items.map(({ id, outcome }) => {
+          const item = byId.get(id);
+          return {
+            id,
+            field: item?.field ?? null,
+            documentLabel: item?.documentLabel ?? "the target",
+            resultingState: item?.resultingState ?? "unchanged",
+            state: outcome?.state ?? "skipped",
+            message: outcome?.message ?? null,
+            oldValue: outcome?.oldValue ?? null,
+            newValue: outcome?.newValue ?? null
+          };
+        })
+      });
+    }
+  };
+  return /* @__PURE__ */ jsxs(Card, { children: [
+    /* @__PURE__ */ jsxs(Head, { children: [
+      /* @__PURE__ */ jsx(Typography, { variant: "delta", children: changeSet.summary ?? "Proposed changes" }),
+      /* @__PURE__ */ jsx(
+        StatusChip,
+        {
+          $tone: changeSet.status === "applied" ? "success" : changeSet.status === "partially_applied" ? "warning" : changeSet.status === "pending" ? "neutral" : "danger",
+          children: STATUS_LABEL[changeSet.status] ?? changeSet.status
+        }
+      )
+    ] }),
+    changeSet.status === "pending" ? /* @__PURE__ */ jsxs(Note, { children: [
+      "Nothing has been written yet.",
+      " ",
+      expired ? "This plan has expired — ask for a fresh one." : `This plan expires at ${new Date(changeSet.expiresAt).toLocaleTimeString()}.`
+    ] }) : null,
+    changeSet.items.map((item) => {
+      const blocked = item.permissionVerdict === "denied";
+      return /* @__PURE__ */ jsxs(Row, { $destructive: item.destructive, $blocked: blocked, children: [
+        !resolved ? /* @__PURE__ */ jsx(
+          Checkbox,
+          {
+            checked: selected.includes(item.id),
+            disabled: blocked || busy || expired,
+            onCheckedChange: () => toggleItem(item.id),
+            "aria-label": `Approve ${item.field ?? item.operation} on ${item.documentLabel}`
+          }
+        ) : null,
+        /* @__PURE__ */ jsxs(RowBody, { children: [
+          /* @__PURE__ */ jsx(Target, { children: item.operation === "publish" ? `Publish ${item.documentLabel}` : `${item.field ?? item.operation} — ${item.documentLabel}` }),
+          /* @__PURE__ */ jsxs(Meta, { children: [
+            /* @__PURE__ */ jsx("span", { children: item.contentTypeUid }),
+            /* @__PURE__ */ jsxs("span", { children: [
+              "result:",
+              " ",
+              item.resultingState === "unchanged" ? "no content change" : item.resultingState
+            ] }),
+            item.destructive ? /* @__PURE__ */ jsx(StatusChip, { $tone: "danger", children: "removes content" }) : null,
+            item.attachmentOrdinal !== null ? /* @__PURE__ */ jsxs("span", { children: [
+              "attachment #",
+              item.attachmentOrdinal
+            ] }) : null
+          ] }),
+          item.operation !== "publish" ? /* @__PURE__ */ jsxs(Diff, { children: [
+            /* @__PURE__ */ jsx(Old, { children: show(item.currentValue) }),
+            /* @__PURE__ */ jsx(New, { children: item.attachmentOrdinal !== null ? `attachment #${item.attachmentOrdinal}` : show(item.proposedValue) })
+          ] }) : null,
+          blocked ? /* @__PURE__ */ jsx(Reason, { children: item.permissionReason ?? "You cannot perform this change." }) : null,
+          item.outcome ? /* @__PURE__ */ jsxs(Meta, { children: [
+            /* @__PURE__ */ jsx(StatusChip, { $tone: OUTCOME_TONE[item.outcome.state] ?? "neutral", children: item.outcome.state }),
+            item.outcome.message ? /* @__PURE__ */ jsx("span", { children: item.outcome.message }) : null
+          ] }) : null
+        ] })
+      ] }, item.id);
+    }),
+    !resolved && selectionHasDestructive ? /* @__PURE__ */ jsxs(Confirm, { children: [
+      /* @__PURE__ */ jsx(
+        Checkbox,
+        {
+          checked: confirmDestructive,
+          onCheckedChange: () => setConfirmDestructive((v) => !v),
+          "aria-label": "Confirm the changes that remove content"
+        }
+      ),
+      /* @__PURE__ */ jsxs("span", { children: [
+        selectedItems.filter((i) => i.destructive).length,
+        " selected change",
+        selectedItems.filter((i) => i.destructive).length === 1 ? "" : "s",
+        " will remove content. Confirm explicitly to include them."
+      ] })
+    ] }) : null,
+    !resolved ? /* @__PURE__ */ jsxs(Actions, { children: [
+      /* @__PURE__ */ jsx(
+        Button,
+        {
+          onClick: () => void runApply(allowedIds),
+          disabled: busy || expired || allowedIds.length === 0,
+          loading: busy,
+          children: "Approve all"
+        }
+      ),
+      /* @__PURE__ */ jsxs(
+        Button,
+        {
+          variant: "secondary",
+          onClick: () => void runApply(selected),
+          disabled: busy || expired || selected.length === 0 || selected.length === allowedIds.length,
+          children: [
+            "Approve selected (",
+            selected.length,
+            ")"
+          ]
+        }
+      ),
+      /* @__PURE__ */ jsx(
+        Button,
+        {
+          variant: "tertiary",
+          onClick: () => {
+            void reject().then((ok2) => {
+              if (ok2) {
+                onRejected?.(changeSet.id);
+              }
+            });
+          },
+          disabled: busy,
+          children: "Reject"
+        }
+      ),
+      selected.length !== allowedIds.length ? /* @__PURE__ */ jsx(Button, { variant: "ghost", onClick: () => setSelected(allowedIds), disabled: busy, children: "Select all" }) : null
+    ] }) : null,
+    footer2,
+    localError ?? error ? /* @__PURE__ */ jsx(Note, { children: localError ?? error }) : null
+  ] });
+};
 function fileToDataUrl(file) {
   return new Promise((resolve2, reject) => {
     const reader = new FileReader();
@@ -22833,7 +23331,7 @@ const Chat2 = () => {
     }),
     [tokenRef, threadIdRef, modeRef]
   );
-  const { messages, sendMessage, status, stop, error } = useChat({ transport });
+  const { messages, sendMessage, setMessages, status, stop, error } = useChat({ transport });
   const [input, setInput] = React.useState("");
   const [attachments, setAttachments] = React.useState([]);
   const [preparing, setPreparing] = React.useState(false);
@@ -22865,6 +23363,19 @@ const Chat2 = () => {
       setPreparing(false);
     }
   };
+  const onApplied = React.useCallback(
+    (report) => {
+      setMessages((current) => [
+        ...current,
+        {
+          id: `apply-${report.changeSetId}-${current.length}`,
+          role: "assistant",
+          parts: [{ type: "data-apply-report", data: report }]
+        }
+      ]);
+    },
+    [setMessages]
+  );
   return /* @__PURE__ */ jsx(Page.Main, { children: /* @__PURE__ */ jsxs(Shell, { children: [
     /* @__PURE__ */ jsx(Scroll, { children: /* @__PURE__ */ jsxs(Column, { children: [
       /* @__PURE__ */ jsx(
@@ -22872,7 +23383,8 @@ const Chat2 = () => {
         {
           messages,
           status,
-          onPickSuggestion: (text2) => setInput(text2)
+          onPickSuggestion: (text2) => setInput(text2),
+          renderChangeSet: (changeSetId) => /* @__PURE__ */ jsx(ChangePlanCard, { changeSetId, onApplied })
         }
       ),
       error ? /* @__PURE__ */ jsx(ErrorText, { children: error.message }) : null,

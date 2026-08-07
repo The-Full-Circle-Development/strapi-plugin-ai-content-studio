@@ -35,6 +35,11 @@ export default {
       chatRoute('POST', '/threads', 'threads.create'),
       chatRoute('GET', '/threads/:id', 'threads.findOne'),
 
+      // Change plans. `apply` is the only route in this plugin that mutates content.
+      chatRoute('GET', '/change-sets/:id', 'change-sets.findOne'),
+      chatRoute('POST', '/change-sets/:id/apply', 'change-sets.apply'),
+      chatRoute('POST', '/change-sets/:id/reject', 'change-sets.reject'),
+
       {
         method: 'GET',
         path: '/settings',

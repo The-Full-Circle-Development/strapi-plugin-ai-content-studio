@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { getToolName, isToolUIPart, isFileUIPart, type UIMessage } from 'ai';
-import { Loader } from '@strapi/design-system';
+import { Loader, Typography } from '@strapi/design-system';
 import { Sparkle } from '@strapi/icons';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -132,13 +132,115 @@ function useCyclingWord(active: boolean, words: string[], intervalMs = 2500): st
   return word;
 }
 
+/** A `proposeChanges` tool result carries the id of the pending plan it recorded. */
+const changeSetIdOf = (part: unknown): string | null => {
+  const output = (part as { output?: { ok?: boolean; changeSetId?: string } }).output;
+  return output?.ok && typeof output.changeSetId === 'string' ? output.changeSetId : null;
+};
+
+interface ApplyReportPart {
+  changeSetId: string;
+  appliedAt: string;
+  items: Array<{
+    id: string;
+    field: string | null;
+    documentLabel: string;
+    resultingState: string;
+    state: string;
+    message: string | null;
+    oldValue: unknown;
+    newValue: unknown;
+  }>;
+}
+
+const ReportBox = styled.div`
+  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  border-radius: 0.8rem;
+  padding: 0.9rem 1.1rem;
+  align-self: stretch;
+  font-size: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+`;
+
+const ReportRow = styled.div<{ $tone: 'success' | 'danger' | 'warning' | 'neutral' }>`
+  color: ${({ theme, $tone }) =>
+    $tone === 'success'
+      ? theme.colors.success600
+      : $tone === 'danger'
+        ? theme.colors.danger600
+        : $tone === 'warning'
+          ? theme.colors.warning600
+          : theme.colors.neutral600};
+  word-break: break-word;
+`;
+
+const REPORT_TONE: Record<string, 'success' | 'danger' | 'warning' | 'neutral'> = {
+  applied: 'success',
+  blocked: 'danger',
+  failed: 'danger',
+  stale: 'warning',
+  skipped: 'neutral',
+};
+
+const showValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') {
+    return '(empty)';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+/**
+ * The per-item apply report (FR-006). Rendered from a persisted `data-apply-report` part, so a
+ * reload replays exactly the outcome the user first saw and the history stays auditable (FR-008).
+ */
+const ApplyReport = ({ report }: { report: ApplyReportPart }) => (
+  <ReportBox>
+    <Typography variant="pi" fontWeight="bold">
+      Applied {new Date(report.appliedAt).toLocaleString()}
+    </Typography>
+    {report.items.map((item) => (
+      <ReportRow key={item.id} $tone={REPORT_TONE[item.state] ?? 'neutral'}>
+        <strong>{item.state}</strong> — {item.field ? `${item.field} on ` : ''}
+        {item.documentLabel}
+        {item.state === 'applied' ? (
+          <>
+            : {showValue(item.oldValue)} → {showValue(item.newValue)}
+            {item.resultingState === 'unchanged' ? '' : ` (${item.resultingState})`}
+          </>
+        ) : item.message ? (
+          <>: {item.message}</>
+        ) : null}
+      </ReportRow>
+    ))}
+  </ReportBox>
+);
+
 export interface MessageListProps {
   messages: UIMessage[];
   status: string;
   onPickSuggestion: (text: string) => void;
+  /** Renders the plan card for a `proposeChanges` result. Supplied by the page shell. */
+  renderChangeSet?: (changeSetId: string) => React.ReactNode;
+  /** Ordinals of a restored thread's attachments that were never ingested (FR-038). */
+  expiredOrdinalsByMessage?: Record<string, number[]>;
 }
 
-export const MessageList = ({ messages, status, onPickSuggestion }: MessageListProps) => {
+export const MessageList = ({
+  messages,
+  status,
+  onPickSuggestion,
+  renderChangeSet,
+  expiredOrdinalsByMessage,
+}: MessageListProps) => {
   const busy = status === 'submitted' || status === 'streaming';
   const loadingWord = useCyclingWord(busy, LOADING_WORDS);
 
@@ -200,8 +302,22 @@ export const MessageList = ({ messages, status, onPickSuggestion }: MessageListP
                     </Working>
                   );
                 }
+                if (part.type === 'data-apply-report') {
+                  return <ApplyReport key={index} report={(part as any).data as ApplyReportPart} />;
+                }
                 if (isToolUIPart(part)) {
-                  const { text, danger } = toolLabel(part.state, String(getToolName(part)));
+                  const name = String(getToolName(part));
+                  // A recorded plan renders as the approvable card, not as a bare tool pill —
+                  // the card IS the approval surface (FR-002, FR-003).
+                  if (name === 'proposeChanges' && part.state === 'output-available') {
+                    const changeSetId = changeSetIdOf(part);
+                    if (changeSetId && renderChangeSet) {
+                      return (
+                        <React.Fragment key={index}>{renderChangeSet(changeSetId)}</React.Fragment>
+                      );
+                    }
+                  }
+                  const { text, danger } = toolLabel(part.state, name);
                   return (
                     <ToolPill key={index} $danger={danger}>
                       {text}
