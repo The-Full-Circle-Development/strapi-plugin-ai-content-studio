@@ -6,6 +6,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { styled } from 'styled-components';
 import { LOADING_WORDS } from '../data/loadingWords';
+import { AuditReportCard, type AuditReportView } from './AuditReportCard';
 import {
   AssistantContent,
   AssistantRow,
@@ -153,6 +154,15 @@ function useCyclingWord(active: boolean, words: string[], intervalMs = 2500): st
 const changeSetIdOf = (part: unknown): string | null => {
   const output = (part as { output?: { ok?: boolean; changeSetId?: string } }).output;
   return output?.ok && typeof output.changeSetId === 'string' ? output.changeSetId : null;
+};
+
+/**
+ * An audit tool result carries a report — unless it was refused, in which case there is nothing to
+ * render and the assistant's own text says so with no counts and no partial findings (FR-048).
+ */
+const auditReportOf = (part: unknown): AuditReportView | null => {
+  const output = (part as { output?: { ok?: boolean; report?: AuditReportView } }).output;
+  return output?.ok && output.report?.coverage ? output.report : null;
 };
 
 interface ApplyReportPart {
@@ -362,6 +372,17 @@ export const MessageList = ({
                       return (
                         <React.Fragment key={index}>{renderChangeSet(changeSetId)}</React.Fragment>
                       );
+                    }
+                  }
+                  // An audit report is rendered structurally, so severity grouping and — above all
+                  // — the coverage statement cannot be lost in prose (FR-041, FR-044).
+                  if (
+                    (name === 'runQaScan' || name === 'runSecurityAudit') &&
+                    part.state === 'output-available'
+                  ) {
+                    const report = auditReportOf(part);
+                    if (report) {
+                      return <AuditReportCard key={index} report={report} />;
                     }
                   }
                   const { text, danger } = toolLabel(part.state, name);

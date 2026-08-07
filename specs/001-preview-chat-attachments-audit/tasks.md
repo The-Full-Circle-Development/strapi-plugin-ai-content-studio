@@ -176,10 +176,10 @@ no further tool step runs, and the thread remains usable.
 
 ### Implementation for User Story 4
 
-- [ ] T056 [US4] Wire an `AbortController` to the Koa request lifecycle (`ctx.req` `close` / `aborted`) and pass its signal as `streamText({ abortSignal })` in server/src/controllers/chat.ts
-- [ ] T057 [US4] Persist the partial assistant turn from `onAbort({ steps })` with `interrupted: true` in server/src/controllers/chat.ts
-- [ ] T058 [US4] Report which changes had already been applied earlier in an interrupted turn (FR-026) in server/src/controllers/chat.ts
-- [ ] T059 [US4] Keep Stop wired to the chat hook's `stop()`, free the composer immediately, and render interrupted messages distinctly in admin/src/components/Composer.tsx and admin/src/components/MessageList.tsx
+- [X] T056 [US4] Wire an `AbortController` to the Koa request lifecycle (`ctx.req` `close` / `aborted`) and pass its signal as `streamText({ abortSignal })` in server/src/controllers/chat.ts
+- [X] T057 [US4] Persist the partial assistant turn from `onAbort({ steps })` with `interrupted: true` in server/src/controllers/chat.ts
+- [X] T058 [US4] Report which changes had already been applied earlier in an interrupted turn (FR-026) in server/src/controllers/chat.ts
+- [X] T059 [US4] Keep Stop wired to the chat hook's `stop()`, free the composer immediately, and render interrupted messages distinctly in admin/src/components/Composer.tsx and admin/src/components/MessageList.tsx
 - [ ] T060 [US4] Verify US4 in a real admin panel â€” scenario 5 of specs/001-preview-chat-attachments-audit/quickstart.md (output halts within ~2 s, no tool call in the server log after the press, interrupted marker survives a reload)
 
 **Checkpoint**: Stop releases server-side work and leaves an honest record.
@@ -198,12 +198,12 @@ explains writes are unavailable and makes none. Reopen the thread later and conf
 
 ### Implementation for User Story 5
 
-- [ ] T061 [US5] Zod-validate `mode` on `POST /chat`, persist it on the thread, and record `modeAtSend` on each message so history stays readable after a switch, in server/src/controllers/chat.ts
-- [ ] T062 [US5] Build the tool set per `(caller ability, mode)` per contracts/model-tools.md â€” modes only ever narrow, never grant (FR-031) â€” in server/src/services/tools.ts
-- [ ] T063 [US5] Add the `describePageStructure` tool (RBAC-gated read: section paths, component names, repeatable flags, media and link slots with current values; return all candidates on ambiguity rather than choosing) in server/src/services/tools.ts
-- [ ] T064 [US5] Compose the system prompt from a shared base plus a per-mode section, including the audit section (read-only, never invent findings, never reproduce a secret), in server/src/services/prompt.ts
-- [ ] T065 [P] [US5] Create the mode selector from `@strapi/design-system` v2 in admin/src/components/ModeSelect.tsx
-- [ ] T066 [US5] Display the active mode, default new threads to Content Editing, persist the choice per thread, and send it with every request in admin/src/pages/Chat.tsx and admin/src/hooks/useThreads.ts
+- [X] T061 [US5] Zod-validate `mode` on `POST /chat`, persist it on the thread, and record `modeAtSend` on each message so history stays readable after a switch, in server/src/controllers/chat.ts
+- [X] T062 [US5] Build the tool set per `(caller ability, mode)` per contracts/model-tools.md â€” modes only ever narrow, never grant (FR-031) â€” in server/src/services/tools.ts
+- [X] T063 [US5] Add the `describePageStructure` tool (RBAC-gated read: section paths, component names, repeatable flags, media and link slots with current values; return all candidates on ambiguity rather than choosing) in server/src/services/tools.ts
+- [X] T064 [US5] Compose the system prompt from a shared base plus a per-mode section, including the audit section (read-only, never invent findings, never reproduce a secret), in server/src/services/prompt.ts
+- [X] T065 [P] [US5] Create the mode selector from `@strapi/design-system` v2 in admin/src/components/ModeSelect.tsx
+- [X] T066 [US5] Display the active mode, default new threads to Content Editing, persist the choice per thread, and send it with every request in admin/src/pages/Chat.tsx and admin/src/hooks/useThreads.ts
 - [ ] T067 [US5] Verify US5 in a real admin panel â€” quickstart scenario 6, plus permission-denied path 7 from contracts/permissions.md
 
 **Checkpoint**: Modes narrow capability structurally and persist with the thread.
@@ -223,16 +223,16 @@ approving ingests exactly those files once, and rejecting ingests nothing.
 
 ### Implementation for User Story 6
 
-- [ ] T068 [US6] Create the attachments service â€” effective limits from the host's upload configuration, the per-conversation `totalBudgetMb`, and manifest validation â€” and export it from server/src/services/index.ts, in server/src/services/attachments.ts
-- [ ] T069 [US6] Add ingestion that checks the caller's Media Library create permission **before any byte is written** and is idempotent on `(threadId, ordinal, contentHash)` so a retry returns the existing `mediaId` with `deduplicated: true` (FR-037), in server/src/services/attachments.ts
-- [ ] T070 [US6] Create the `limits` and multipart `ingest` handlers and export them from server/src/controllers/index.ts, in server/src/controllers/attachments.ts
-- [ ] T071 [US6] Add `GET /attachments/limits` and `POST /attachments/ingest` in server/src/routes/index.ts
-- [ ] T072 [US6] Accept and zod-validate `attachmentManifest` on `POST /chat`, render it into the model-visible message text on every provider, and keep image file parts on the last message only when the active model supports vision (FR-036), in server/src/controllers/chat.ts
-- [ ] T073 [US6] Replace the media-id workflow in the system prompt with the ordinal workflow (`#1` â†’ `attachmentOrdinal`, never a library id) in server/src/services/prompt.ts
-- [ ] T074 [US6] Handle `attachmentOrdinal` items in `proposeChanges` (confirm the ordinal exists in this turn's manifest) and `attachmentResolutions` at apply time in server/src/services/tools.ts and server/src/services/change-sets.ts
-- [ ] T075 [P] [US6] Create the attachments hook â€” browser-held `File` objects, 1-based ordinals stable for the conversation and never reused, pre-send validation against `GET /attachments/limits`, total-budget enforcement, ingestion-state tracking â€” in admin/src/hooks/useAttachments.ts
-- [ ] T076 [US6] Hold attachments in memory with no upload on send, and show each file's ordinal, filename, and rejection reason before the message is sent (FR-032), in admin/src/components/Composer.tsx
-- [ ] T077 [US6] Ingest approved files first, then apply with `attachmentResolutions`, and support the ingest-only path with confirmation and no content change (FR-039), in admin/src/hooks/useChangeSet.ts
+- [X] T068 [US6] Create the attachments service â€” effective limits from the host's upload configuration, the per-conversation `totalBudgetMb`, and manifest validation â€” and export it from server/src/services/index.ts, in server/src/services/attachments.ts
+- [X] T069 [US6] Add ingestion that checks the caller's Media Library create permission **before any byte is written** and is idempotent on `(threadId, ordinal, contentHash)` so a retry returns the existing `mediaId` with `deduplicated: true` (FR-037), in server/src/services/attachments.ts
+- [X] T070 [US6] Create the `limits` and multipart `ingest` handlers and export them from server/src/controllers/index.ts, in server/src/controllers/attachments.ts
+- [X] T071 [US6] Add `GET /attachments/limits` and `POST /attachments/ingest` in server/src/routes/index.ts
+- [X] T072 [US6] Accept and zod-validate `attachmentManifest` on `POST /chat`, render it into the model-visible message text on every provider, and keep image file parts on the last message only when the active model supports vision (FR-036), in server/src/controllers/chat.ts
+- [X] T073 [US6] Replace the media-id workflow in the system prompt with the ordinal workflow (`#1` â†’ `attachmentOrdinal`, never a library id) in server/src/services/prompt.ts
+- [X] T074 [US6] Handle `attachmentOrdinal` items in `proposeChanges` (confirm the ordinal exists in this turn's manifest) and `attachmentResolutions` at apply time in server/src/services/tools.ts and server/src/services/change-sets.ts
+- [X] T075 [P] [US6] Create the attachments hook â€” browser-held `File` objects, 1-based ordinals stable for the conversation and never reused, pre-send validation against `GET /attachments/limits`, total-budget enforcement, ingestion-state tracking â€” in admin/src/hooks/useAttachments.ts
+- [X] T076 [US6] Hold attachments in memory with no upload on send, and show each file's ordinal, filename, and rejection reason before the message is sent (FR-032), in admin/src/components/Composer.tsx
+- [X] T077 [US6] Ingest approved files first, then apply with `attachmentResolutions`, and support the ingest-only path with confirmation and no content change (FR-039), in admin/src/hooks/useChangeSet.ts
 - [ ] T078 [US6] Verify US6 in a real admin panel â€” quickstart scenario 7, plus permission-denied path 5 from contracts/permissions.md
 
 **Checkpoint**: The Media Library gains nothing from abandoned conversations, and placement works on

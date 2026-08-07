@@ -384,6 +384,78 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
     });
 
     /**
+     * Read-only functional QA (FR-040..FR-045). Built only in `audit` mode.
+     *
+     * The description forbids speculative findings on purpose: a clean project must come back with
+     * `findings: []` rather than plausible-sounding invention (FR-045).
+     */
+    const runQaScan = tool({
+      description:
+        'Run a READ-ONLY functional QA pass over the running content setup: required fields empty on existing entries, relations pointing at missing documents, media fields referencing missing files, values outside an enumeration, component usage that cannot render, single types never created, and published entries failing their own required fields. Changes nothing. Report ONLY what the result contains — never infer or invent a finding, and if `findings` is empty say the project looks clean for the checks that ran. ALWAYS repeat the `coverage` block: a pass that skipped types for permissions or ran out of budget is not a clean bill of health.',
+      inputSchema: z.object({
+        contentTypeUids: z
+          .array(z.string())
+          .optional()
+          .describe('Limit the pass to these uids. Omit to inspect every type the caller can read.'),
+        maxEntriesPerType: z
+          .number()
+          .int()
+          .min(1)
+          .max(200)
+          .optional()
+          .describe('Sample cap per content type. Default 50, max 200.'),
+      }),
+      execute: async ({ contentTypeUids, maxEntriesPerType }) => {
+        const report = await strapi
+          .plugin('ai-content-studio')
+          .service('audit-qa')
+          .run({ userAbility, contentTypeUids, maxEntriesPerType });
+        return { ok: true, report };
+      },
+    });
+
+    /**
+     * Read-only security audit (FR-046..FR-050). Built only in `audit` mode, and gated inside on the
+     * caller's LIVE `audit.run` ability rather than on a route policy, so the check is re-derived
+     * per request (Constitution II).
+     *
+     * A refusal discloses NOTHING — no counts, no categories, no partial findings — because the
+     * report is itself a map of the project's weak points (FR-048, spec decision D3).
+     */
+    const runSecurityAudit = tool({
+      description:
+        'Run a READ-ONLY security audit of the running configuration: public-role write grants, unauthenticated content-API endpoints, roles holding permissions beyond their stated scope, upload rules accepting executable or script types, unsafe debug settings, and secret-like values stored in content. Changes nothing. Requires the audit.run permission; without it this returns permission_denied and you must relay that refusal WITHOUT speculating about what it would have found. Secret values are already masked — report the mask and its location, never attempt to reconstruct a value. Remediations are advice: applying one goes through proposeChanges and the normal permission checks.',
+      inputSchema: z.object({
+        areas: z
+          .array(z.enum(['permissions', 'endpoints', 'uploads', 'settings', 'content-secrets']))
+          .optional()
+          .describe('Limit the audit to these areas. Omit for all of them.'),
+      }),
+      execute: async ({ areas }) => {
+        const ability = userAbility as { can?: (action: string) => boolean } | null;
+        let permitted = false;
+        try {
+          permitted = Boolean(ability?.can?.('plugin::ai-content-studio.audit.run'));
+        } catch {
+          permitted = false;
+        }
+        if (!permitted) {
+          // Deliberately bare: no counts, no categories, no hint of what exists.
+          return {
+            ok: false as const,
+            error: 'permission_denied',
+            message: 'Your account is not allowed to run the security audit.',
+          };
+        }
+        const report = await strapi
+          .plugin('ai-content-studio')
+          .service('audit-security')
+          .run({ areas, userAbility });
+        return { ok: true, report };
+      },
+    });
+
+    /**
      * The tool set per (caller ability, mode) — contracts/model-tools.md.
      *
      * | tool                  | content | layout | audit |
@@ -407,6 +479,12 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
     }
     if (mode === 'content' || mode === 'layout') {
       tools.proposeChanges = proposeChanges;
+    }
+    if (mode === 'audit') {
+      tools.runQaScan = runQaScan;
+      // Built in audit mode for everyone; the audit.run check lives INSIDE, against the caller's
+      // live ability, so a caller without it gets a refusal that discloses nothing (FR-048).
+      tools.runSecurityAudit = runSecurityAudit;
     }
     return tools;
   },

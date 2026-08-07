@@ -45534,6 +45534,539 @@ const previewService = ({ strapi }) => {
   };
   return service;
 };
+const DEFAULT_SAMPLE = 50;
+const MAX_SAMPLE = 200;
+const SEVERITY$1 = {
+  "published-required-empty": "high",
+  "dangling-relation": "high",
+  "missing-media": "medium",
+  "required-empty": "medium",
+  "enum-out-of-range": "medium",
+  "component-broken": "medium",
+  "single-type-missing": "low"
+};
+const auditQaService = ({ strapi }) => {
+  const docs = (uid) => strapi.documents(uid);
+  const plugin = () => strapi.plugin("ai-content-studio");
+  const ctOf = (uid) => strapi.contentTypes[uid];
+  const componentOf = (name22) => strapi.components[name22];
+  const canRead = (uid, userAbility) => {
+    try {
+      return Boolean(
+        strapi.plugin("content-manager").service("permission-checker").create({ userAbility, model: uid }).can.read()
+      );
+    } catch {
+      return false;
+    }
+  };
+  const isEmpty = (value) => value === null || value === void 0 || value === "" || Array.isArray(value) && value.length === 0;
+  const labelOf = (doc, uid) => {
+    for (const key of ["title", "name", "heading", "label", "slug"]) {
+      if (typeof doc?.[key] === "string" && doc[key].trim() !== "") {
+        return doc[key];
+      }
+    }
+    return doc?.documentId ?? ctOf(uid)?.info?.displayName ?? uid;
+  };
+  const service = {
+    async run({
+      userAbility,
+      contentTypeUids,
+      maxEntriesPerType = DEFAULT_SAMPLE
+    }) {
+      const deadline = Date.now() + plugin().service("config").getAuditOptions().timeBudgetMs;
+      const sample = Math.min(MAX_SAMPLE, Math.max(1, Math.trunc(maxEntriesPerType) || DEFAULT_SAMPLE));
+      const outOfTime = () => Date.now() >= deadline;
+      const allUids = Object.keys(strapi.contentTypes).filter((uid) => uid.startsWith("api::"));
+      const requested = contentTypeUids && contentTypeUids.length > 0 ? allUids.filter((uid) => contentTypeUids.includes(uid)) : allUids;
+      const coverage = { inspected: [], skippedForPermissions: [], skippedForBudget: [] };
+      const findings = [];
+      const add = (category, location, evidence, impact, remediation) => {
+        findings.push({
+          category,
+          severity: SEVERITY$1[category],
+          location,
+          // Content values can contain anything, including something key-shaped a QA finding would
+          // otherwise echo. One shared helper, applied before the result leaves the tool.
+          evidence: plugin().service("redact").redactSecrets(evidence),
+          impact,
+          remediation
+        });
+      };
+      for (const uid of requested) {
+        if (outOfTime()) {
+          coverage.skippedForBudget.push(uid);
+          continue;
+        }
+        if (!canRead(uid, userAbility)) {
+          coverage.skippedForPermissions.push(uid);
+          continue;
+        }
+        const ct = ctOf(uid);
+        const attributes2 = ct?.attributes ?? {};
+        const draftAndPublish = Boolean(ct?.options?.draftAndPublish);
+        coverage.inspected.push(uid);
+        if (ct?.kind === "singleType") {
+          const sole = await docs(uid).findFirst({ populate: "*" });
+          if (!sole) {
+            add(
+              "single-type-missing",
+              { contentTypeUid: uid },
+              `${ct.info?.displayName ?? uid} has no entry`,
+              "Anything on the site that reads this single type renders empty or errors.",
+              `Create the ${ct.info?.displayName ?? uid} entry in the Content Manager and fill its required fields.`
+            );
+            continue;
+          }
+          await service.inspectEntry({ uid, attributes: attributes2, doc: sole, draftAndPublish, add, outOfTime });
+          continue;
+        }
+        let entries = [];
+        try {
+          const result = await docs(uid).findMany({ populate: "*", limit: sample, status: "draft" });
+          entries = Array.isArray(result) ? result : [];
+        } catch {
+          coverage.inspected = coverage.inspected.filter((u) => u !== uid);
+          coverage.skippedForBudget.push(uid);
+          continue;
+        }
+        for (const doc of entries) {
+          if (outOfTime()) {
+            coverage.skippedForBudget.push(`${uid} (after ${entries.indexOf(doc)} of ${entries.length} entries)`);
+            break;
+          }
+          await service.inspectEntry({ uid, attributes: attributes2, doc, draftAndPublish, add, outOfTime });
+        }
+      }
+      const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+      for (const finding of findings) {
+        counts[finding.severity] += 1;
+      }
+      return {
+        kind: "qa",
+        runAt: (/* @__PURE__ */ new Date()).toISOString(),
+        coverage,
+        counts,
+        findings
+      };
+    },
+    /** The per-entry checks from R7. Read-only throughout. */
+    async inspectEntry({
+      uid,
+      attributes: attributes2,
+      doc,
+      draftAndPublish,
+      add,
+      outOfTime,
+      pathPrefix = ""
+    }) {
+      const label = labelOf(doc, uid);
+      const documentId = doc?.documentId;
+      const isPublished = draftAndPublish && Boolean(doc?.publishedAt);
+      for (const [name22, attribute] of Object.entries(attributes2)) {
+        if (outOfTime()) {
+          return;
+        }
+        const path2 = pathPrefix ? `${pathPrefix}.${name22}` : name22;
+        const value = doc?.[name22];
+        if (attribute.required && isEmpty(value)) {
+          if (isPublished) {
+            add(
+              "published-required-empty",
+              { contentTypeUid: uid, documentId, field: path2 },
+              `"${label}" is published with required field "${path2}" empty`,
+              "A live page reads a value that is not there, so it renders blank or throws.",
+              `Fill "${path2}" on "${label}", or unpublish the entry until it is complete.`
+            );
+          } else {
+            add(
+              "required-empty",
+              { contentTypeUid: uid, documentId, field: path2 },
+              `"${label}" has required field "${path2}" empty`,
+              "Saving or publishing this entry will fail validation, and anything reading the field gets nothing.",
+              `Fill "${path2}" on "${label}".`
+            );
+          }
+        }
+        if (attribute.type === "enumeration" && !isEmpty(value)) {
+          const allowed = Array.isArray(attribute.enum) ? attribute.enum : [];
+          if (allowed.length > 0 && !allowed.includes(String(value))) {
+            add(
+              "enum-out-of-range",
+              { contentTypeUid: uid, documentId, field: path2 },
+              `"${label}" has "${path2}" = "${String(value)}", which is not one of ${allowed.join(", ")}`,
+              "Code that switches on this value falls through, so the entry renders with the wrong variant or not at all.",
+              `Set "${path2}" on "${label}" to one of: ${allowed.join(", ")}.`
+            );
+          }
+        }
+        if (attribute.type === "relation" && !isEmpty(value)) {
+          const targets = Array.isArray(value) ? value : [value];
+          const missing = targets.filter((t) => t && typeof t === "object" && !t.documentId && !t.id);
+          if (missing.length > 0) {
+            add(
+              "dangling-relation",
+              { contentTypeUid: uid, documentId, field: path2 },
+              `"${label}" has ${missing.length} unresolvable relation${missing.length === 1 ? "" : "s"} in "${path2}" (target ${attribute.target ?? "unknown"})`,
+              "Following the relation yields nothing, so a linked title, image or page URL renders empty.",
+              `Re-link "${path2}" on "${label}" to an existing ${attribute.target ?? "entry"}, or clear it.`
+            );
+          }
+        }
+        if (attribute.type === "media" && !isEmpty(value)) {
+          const files = Array.isArray(value) ? value : [value];
+          for (const file of files) {
+            const id = file?.id;
+            if (!id) {
+              continue;
+            }
+            const exists = await strapi.db.query("plugin::upload.file").findOne({ where: { id }, select: ["id"] }).catch(() => null);
+            if (!exists) {
+              add(
+                "missing-media",
+                { contentTypeUid: uid, documentId, field: path2 },
+                `"${label}" references file id ${id} in "${path2}", which is not in the Media Library`,
+                "The image or download is a broken link on every page that renders it.",
+                `Re-upload the file and re-select it on "${path2}" for "${label}", or clear the field.`
+              );
+            }
+          }
+        }
+        if (attribute.type === "component") {
+          const definition = componentOf(attribute.component);
+          if (!definition) {
+            add(
+              "component-broken",
+              { contentTypeUid: uid, documentId, field: path2 },
+              `"${label}" uses component "${attribute.component}" in "${path2}", which is not registered`,
+              "The component cannot be resolved, so the section it belongs to fails to render.",
+              `Restore the "${attribute.component}" component definition, or remove "${path2}" from ${uid}.`
+            );
+          } else if (!isEmpty(value)) {
+            const entries = attribute.repeatable ? Array.isArray(value) ? value : [] : [value];
+            for (const [index2, entry] of entries.entries()) {
+              await service.inspectEntry({
+                uid,
+                attributes: definition.attributes ?? {},
+                // The component entry carries the parent's identity for reporting purposes.
+                doc: { ...entry, documentId, title: label },
+                draftAndPublish,
+                add,
+                outOfTime,
+                pathPrefix: attribute.repeatable ? `${path2}[${index2}]` : path2
+              });
+            }
+          }
+        }
+        if (attribute.type === "dynamiczone" && !isEmpty(value)) {
+          const entries = Array.isArray(value) ? value : [];
+          for (const [index2, entry] of entries.entries()) {
+            const componentName = entry?.__component;
+            const definition = componentName ? componentOf(componentName) : null;
+            if (!definition) {
+              add(
+                "component-broken",
+                { contentTypeUid: uid, documentId, field: `${path2}[${index2}]` },
+                `"${label}" has a "${componentName ?? "unnamed"}" block in "${path2}" that is not a registered component`,
+                "The block cannot be resolved, so the page section fails to render.",
+                `Remove the block from "${path2}" on "${label}", or restore the "${componentName}" component.`
+              );
+              continue;
+            }
+            await service.inspectEntry({
+              uid,
+              attributes: definition.attributes ?? {},
+              doc: { ...entry, documentId, title: label },
+              draftAndPublish,
+              add,
+              outOfTime,
+              pathPrefix: `${path2}[${index2}]`
+            });
+          }
+        }
+      }
+    }
+  };
+  return service;
+};
+const AUDIT_AREAS = [
+  "permissions",
+  "endpoints",
+  "uploads",
+  "settings",
+  "content-secrets"
+];
+const DANGEROUS_UPLOAD_TYPES = [
+  "application/x-httpd-php",
+  "application/x-sh",
+  "application/x-msdownload",
+  "application/x-msdos-program",
+  "application/javascript",
+  "text/javascript",
+  "application/x-executable",
+  "application/vnd.microsoft.portable-executable",
+  "text/html",
+  "image/svg+xml"
+];
+const WRITE_ACTIONS = ["create", "update", "delete", "publish"];
+const SEVERITY = {
+  "public-write-permission": "critical",
+  "secret-like-value": "critical",
+  "unauthenticated-endpoint": "high",
+  "unsafe-upload-types": "high",
+  "role-overbroad": "medium",
+  "debug-setting": "medium"
+};
+const auditSecurityService = ({ strapi }) => {
+  const plugin = () => strapi.plugin("ai-content-studio");
+  const redact = () => plugin().service("redact");
+  const service = {
+    async run({
+      areas = AUDIT_AREAS,
+      userAbility
+    }) {
+      const deadline = Date.now() + plugin().service("config").getAuditOptions().timeBudgetMs;
+      const outOfTime = () => Date.now() >= deadline;
+      const findings = [];
+      const coverage = { inspected: [], skippedForPermissions: [], skippedForBudget: [] };
+      const finding = (category, location, evidence, impact, remediation) => {
+        findings.push({
+          category,
+          severity: SEVERITY[category],
+          location,
+          evidence: redact().redactSecrets(evidence),
+          impact,
+          remediation
+        });
+      };
+      const selected = areas.filter((area) => AUDIT_AREAS.includes(area));
+      for (const area of selected) {
+        if (outOfTime()) {
+          coverage.skippedForBudget.push(area);
+          continue;
+        }
+        coverage.inspected.push(area);
+        try {
+          if (area === "permissions" || area === "endpoints") {
+            await service.auditPublicRole(finding, area);
+          }
+          if (area === "permissions") {
+            await service.auditAdminRoles(finding);
+          }
+          if (area === "uploads") {
+            service.auditUploadRules(finding);
+          }
+          if (area === "settings") {
+            service.auditDebugSettings(finding);
+          }
+          if (area === "content-secrets") {
+            await service.auditStoredSecrets(finding, userAbility, outOfTime, coverage);
+          }
+        } catch (err) {
+          coverage.inspected = coverage.inspected.filter((a) => a !== area);
+          coverage.skippedForBudget.push(`${area} (could not be inspected)`);
+          strapi.log.warn(
+            `[ai-content-studio] security audit area "${area}" failed: ${redact().describeError(err)}`
+          );
+        }
+      }
+      const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+      for (const f of findings) {
+        counts[f.severity] += 1;
+      }
+      return { kind: "security", runAt: (/* @__PURE__ */ new Date()).toISOString(), coverage, counts, findings };
+    },
+    /**
+     * The public (unauthenticated) role: write grants are critical, and any content-API endpoint it
+     * can read is reported so an unintended public exposure is visible.
+     */
+    async auditPublicRole(finding, area) {
+      const publicRole = await strapi.db.query("plugin::users-permissions.role").findOne({ where: { type: "public" }, populate: { permissions: true } });
+      if (!publicRole) {
+        return;
+      }
+      const permissions = Array.isArray(publicRole.permissions) ? publicRole.permissions : [];
+      for (const permission of permissions) {
+        const action = String(permission.action ?? "");
+        if (!action.startsWith("api::")) {
+          continue;
+        }
+        const verb = action.split(".").pop() ?? "";
+        if (area === "permissions" && WRITE_ACTIONS.includes(verb)) {
+          finding(
+            "public-write-permission",
+            { contentTypeUid: action.split(".").slice(0, 2).join("."), configPath: `role "public" -> ${action}` },
+            `The public role is granted "${verb}" on ${action}`,
+            "Anyone on the internet can change or destroy this content with no credentials at all.",
+            `In Settings -> Users & Permissions -> Roles -> Public, untick "${verb}" for that content type.`
+          );
+        }
+        if (area === "endpoints" && verb === "find") {
+          finding(
+            "unauthenticated-endpoint",
+            { contentTypeUid: action.split(".").slice(0, 2).join("."), configPath: `role "public" -> ${action}` },
+            `${action} is readable without authentication`,
+            "The endpoint and every field it returns are public. That is correct for a website, and a data leak for anything internal.",
+            'Confirm this content type is meant to be public. If it is not, untick "find"/"findOne" for the Public role.'
+          );
+        }
+      }
+    },
+    /**
+     * A role holding permissions outside its stated scope. Checkable version: an admin role whose
+     * name/description says read-only or author-only yet holds delete or publish.
+     */
+    async auditAdminRoles(finding) {
+      const roles = await strapi.db.query("admin::role").findMany({ populate: { permissions: true } }).catch(() => []);
+      for (const role of Array.isArray(roles) ? roles : []) {
+        if (role.code === "strapi-super-admin") {
+          continue;
+        }
+        const described = `${role.name ?? ""} ${role.description ?? ""}`.toLowerCase();
+        const claimsReadOnly = /read[- ]?only|viewer|reviewer|read access/.test(described);
+        const claimsAuthorScope = /author|contributor|writer/.test(described);
+        const actions = (Array.isArray(role.permissions) ? role.permissions : []).map(
+          (p) => String(p.action ?? "")
+        );
+        const escalations = actions.filter(
+          (action) => claimsReadOnly ? /\.(create|update|delete|publish)$/.test(action) : claimsAuthorScope ? /\.(delete|publish)$/.test(action) : false
+        );
+        if (escalations.length > 0) {
+          finding(
+            "role-overbroad",
+            { configPath: `admin role "${role.name}"` },
+            `Role "${role.name}" is described as ${claimsReadOnly ? "read-only" : "author-scoped"} but holds ${escalations.length} action${escalations.length === 1 ? "" : "s"} beyond that, e.g. ${escalations.slice(0, 3).join(", ")}`,
+            'Anyone in this role can do more than the role is documented to allow, so reviews of "who can do what" are wrong.',
+            `Either narrow "${role.name}" in Settings -> Administration Panel -> Roles, or update its description to match what it actually grants.`
+          );
+        }
+      }
+    },
+    /** Upload rules that accept executable or script types. */
+    auditUploadRules(finding) {
+      const allowedTypes = strapi.config.get("plugin::upload.allowedTypes", void 0);
+      const sizeLimit = strapi.config.get("plugin::upload.sizeLimit", void 0);
+      if (Array.isArray(allowedTypes)) {
+        const dangerous = allowedTypes.filter((t) => DANGEROUS_UPLOAD_TYPES.includes(String(t)));
+        if (dangerous.length > 0) {
+          finding(
+            "unsafe-upload-types",
+            { configPath: "plugin::upload.allowedTypes" },
+            `Uploads explicitly allow ${dangerous.join(", ")}`,
+            "A script or executable served from your own origin can run in a visitor's browser (stored XSS) or be executed server-side.",
+            `Remove ${dangerous.join(", ")} from plugin::upload.allowedTypes, or serve uploads from a separate origin with Content-Disposition: attachment.`
+          );
+        }
+      } else {
+        finding(
+          "unsafe-upload-types",
+          { configPath: "plugin::upload.allowedTypes" },
+          "Uploads have no MIME allow-list, so any file type is accepted, including SVG, HTML and scripts",
+          "An uploaded SVG or HTML file served from your origin can execute JavaScript in a visitor's session.",
+          "Set plugin::upload.allowedTypes in config/plugins.ts to the types your project actually needs, e.g. ['images', 'files'] with SVG excluded."
+        );
+      }
+      if (typeof sizeLimit === "number" && sizeLimit > 512 * 1024 * 1024) {
+        finding(
+          "unsafe-upload-types",
+          { configPath: "plugin::upload.sizeLimit" },
+          `The upload size limit is ${Math.round(sizeLimit / 1024 / 1024)} MB`,
+          "A very large limit makes it cheap for an authenticated account to exhaust disk or bandwidth.",
+          "Lower plugin::upload.sizeLimit to the largest file the project genuinely needs."
+        );
+      }
+    },
+    /** Debug and verbose-error settings that are unsafe in production. */
+    auditDebugSettings(finding) {
+      const setting = (path2) => strapi.config.get(path2, void 0);
+      if (setting("plugin::ai-content-studio.showProviderErrorDetails") === true) {
+        finding(
+          "debug-setting",
+          { configPath: "plugin::ai-content-studio.showProviderErrorDetails" },
+          "showProviderErrorDetails is enabled, so raw provider errors are surfaced in the chat UI",
+          "Provider errors can carry request URLs and internal detail. They are redacted, but the setting exists for debugging and widens what an editor sees.",
+          "Set AI_STUDIO_SHOW_ERROR_DETAILS=false (or remove showProviderErrorDetails) in production."
+        );
+      }
+      if (setting("plugin::graphql.playgroundAlways") === true) {
+        finding(
+          "debug-setting",
+          { configPath: "plugin::graphql.playgroundAlways" },
+          "The GraphQL playground is enabled unconditionally",
+          "The playground lets anyone who can reach it explore the whole schema, which is a map of your data model.",
+          "Set playgroundAlways: false outside development."
+        );
+      }
+      if (setting("server.app.keys") === void 0) {
+        finding(
+          "debug-setting",
+          { configPath: "server.app.keys" },
+          "APP_KEYS is not configured",
+          "Session cookies are signed with a default or missing key, which makes them forgeable.",
+          "Set APP_KEYS to a comma-separated pair of random secrets in the environment."
+        );
+      }
+    },
+    /**
+     * Secret-like values stored in content fields.
+     *
+     * Only string fields of types the CALLER can read are inspected, and a hit is reported as a mask
+     * plus its location — the value itself is never carried, not even into this function's return
+     * (FR-049). The finding text contains `mask()` output only.
+     */
+    async auditStoredSecrets(finding, userAbility, outOfTime, coverage) {
+      const uids = Object.keys(strapi.contentTypes).filter((uid) => uid.startsWith("api::"));
+      for (const uid of uids) {
+        if (outOfTime()) {
+          coverage.skippedForBudget.push(`content-secrets: ${uid}`);
+          continue;
+        }
+        let readable = false;
+        try {
+          readable = Boolean(
+            strapi.plugin("content-manager").service("permission-checker").create({ userAbility, model: uid }).can.read()
+          );
+        } catch {
+          readable = false;
+        }
+        if (!readable) {
+          coverage.skippedForPermissions.push(`content-secrets: ${uid}`);
+          continue;
+        }
+        const ct = strapi.contentTypes[uid];
+        const stringFields = Object.entries(ct?.attributes ?? {}).filter(([, a]) => ["string", "text", "richtext"].includes(a?.type)).map(([name22]) => name22);
+        if (stringFields.length === 0) {
+          continue;
+        }
+        let entries = [];
+        try {
+          const result = ct.kind === "singleType" ? [await strapi.documents(uid).findFirst({})] : await strapi.documents(uid).findMany({ limit: 50 });
+          entries = (Array.isArray(result) ? result : []).filter(Boolean);
+        } catch {
+          coverage.skippedForBudget.push(`content-secrets: ${uid}`);
+          continue;
+        }
+        for (const entry of entries) {
+          for (const field of stringFields) {
+            const value = entry?.[field];
+            if (!redact().looksSecretLike(value)) {
+              continue;
+            }
+            finding(
+              "secret-like-value",
+              { contentTypeUid: uid, documentId: entry.documentId, field },
+              // mask() first, then the finding helper redacts again. Two independent barriers.
+              `Field "${field}" holds what looks like a credential: ${redact().mask(String(value))}`,
+              "A credential stored in content is readable by anyone who can read that entry, and is served to the public if the type is public. Treat it as compromised.",
+              `Remove the value from "${field}" on this entry, move it to an environment variable, and ROTATE the credential — it must be assumed leaked.`
+            );
+          }
+        }
+      }
+    }
+  };
+  return service;
+};
 const MAX_FIELD_CHARS = 600;
 const MAX_PAGE_SIZE = 50;
 const toolsService = ({ strapi }) => ({
@@ -45807,12 +46340,51 @@ const toolsService = ({ strapi }) => ({
         });
       }
     });
+    const runQaScan = tool({
+      description: "Run a READ-ONLY functional QA pass over the running content setup: required fields empty on existing entries, relations pointing at missing documents, media fields referencing missing files, values outside an enumeration, component usage that cannot render, single types never created, and published entries failing their own required fields. Changes nothing. Report ONLY what the result contains — never infer or invent a finding, and if `findings` is empty say the project looks clean for the checks that ran. ALWAYS repeat the `coverage` block: a pass that skipped types for permissions or ran out of budget is not a clean bill of health.",
+      inputSchema: object$1({
+        contentTypeUids: array$1(string()).optional().describe("Limit the pass to these uids. Omit to inspect every type the caller can read."),
+        maxEntriesPerType: number$1().int().min(1).max(200).optional().describe("Sample cap per content type. Default 50, max 200.")
+      }),
+      execute: async ({ contentTypeUids, maxEntriesPerType }) => {
+        const report = await strapi.plugin("ai-content-studio").service("audit-qa").run({ userAbility, contentTypeUids, maxEntriesPerType });
+        return { ok: true, report };
+      }
+    });
+    const runSecurityAudit = tool({
+      description: "Run a READ-ONLY security audit of the running configuration: public-role write grants, unauthenticated content-API endpoints, roles holding permissions beyond their stated scope, upload rules accepting executable or script types, unsafe debug settings, and secret-like values stored in content. Changes nothing. Requires the audit.run permission; without it this returns permission_denied and you must relay that refusal WITHOUT speculating about what it would have found. Secret values are already masked — report the mask and its location, never attempt to reconstruct a value. Remediations are advice: applying one goes through proposeChanges and the normal permission checks.",
+      inputSchema: object$1({
+        areas: array$1(_enum(["permissions", "endpoints", "uploads", "settings", "content-secrets"])).optional().describe("Limit the audit to these areas. Omit for all of them.")
+      }),
+      execute: async ({ areas }) => {
+        const ability = userAbility;
+        let permitted = false;
+        try {
+          permitted = Boolean(ability?.can?.("plugin::ai-content-studio.audit.run"));
+        } catch {
+          permitted = false;
+        }
+        if (!permitted) {
+          return {
+            ok: false,
+            error: "permission_denied",
+            message: "Your account is not allowed to run the security audit."
+          };
+        }
+        const report = await strapi.plugin("ai-content-studio").service("audit-security").run({ areas, userAbility });
+        return { ok: true, report };
+      }
+    });
     const tools = { listContentTypes, searchEntries, getEntry };
     if (mode === "layout" || mode === "audit") {
       tools.describePageStructure = describePageStructure;
     }
     if (mode === "content" || mode === "layout") {
       tools.proposeChanges = proposeChanges;
+    }
+    if (mode === "audit") {
+      tools.runQaScan = runQaScan;
+      tools.runSecurityAudit = runSecurityAudit;
     }
     return tools;
   }
@@ -45828,6 +46400,9 @@ const services = {
   "change-sets": changeSetsService,
   attachments: attachmentsService,
   preview: previewService,
+  // Referenced as service('audit-qa') / service('audit-security').
+  "audit-qa": auditQaService,
+  "audit-security": auditSecurityService,
   tools: toolsService
 };
 const SUPER_ADMIN_CODE = "strapi-super-admin";

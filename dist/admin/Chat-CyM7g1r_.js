@@ -22155,6 +22155,167 @@ const LOADING_WORDS = [
   "Zesting",
   "Zigzagging"
 ];
+const Card$1 = styledComponents.styled.div`
+  align-self: stretch;
+  border: 1px solid ${({ theme }) => theme.colors.neutral200};
+  border-radius: 0.8rem;
+  overflow: hidden;
+`;
+const Head$2 = styledComponents.styled.div`
+  padding: 0.9rem 1.2rem;
+  background: ${({ theme }) => theme.colors.neutral100};
+  border-bottom: 1px solid ${({ theme }) => theme.colors.neutral150};
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.8rem;
+  justify-content: space-between;
+`;
+const Counts = styledComponents.styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+`;
+const Count = styledComponents.styled.span`
+  font-size: 1.1rem;
+  padding: 0.2rem 0.7rem;
+  border-radius: 1rem;
+  color: ${({ theme, $severity }) => $severity === "critical" || $severity === "high" ? theme.colors.danger600 : $severity === "medium" ? theme.colors.warning600 : theme.colors.neutral600};
+  background: ${({ theme, $severity }) => $severity === "critical" || $severity === "high" ? theme.colors.danger100 : $severity === "medium" ? theme.colors.warning100 : theme.colors.neutral150};
+`;
+const Group = styledComponents.styled.div`
+  border-bottom: 1px solid ${({ theme }) => theme.colors.neutral150};
+`;
+const GroupHead = styledComponents.styled.div`
+  padding: 0.5rem 1.2rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: ${({ theme, $severity }) => $severity === "critical" || $severity === "high" ? theme.colors.danger700 : $severity === "medium" ? theme.colors.warning700 : theme.colors.neutral700};
+  background: ${({ theme }) => theme.colors.neutral0};
+`;
+const Finding = styledComponents.styled.div`
+  padding: 0.7rem 1.2rem;
+  border-top: 1px solid ${({ theme }) => theme.colors.neutral150};
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 1.2rem;
+`;
+const Where = styledComponents.styled.div`
+  color: ${({ theme }) => theme.colors.neutral800};
+  font-weight: 600;
+  word-break: break-word;
+`;
+const Line = styledComponents.styled.div`
+  color: ${({ theme }) => theme.colors.neutral700};
+  word-break: break-word;
+`;
+const Evidence = styledComponents.styled.code`
+  font-size: 1.1rem;
+  background: ${({ theme }) => theme.colors.neutral150};
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  word-break: break-all;
+`;
+const Coverage = styledComponents.styled.div`
+  padding: 0.8rem 1.2rem;
+  font-size: 1.15rem;
+  color: ${({ theme }) => theme.colors.neutral700};
+  background: ${({ theme }) => theme.colors.neutral100};
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+`;
+const Warn = styledComponents.styled.span`
+  color: ${({ theme }) => theme.colors.warning700};
+`;
+const Clean = styledComponents.styled.div`
+  padding: 0.9rem 1.2rem;
+  font-size: 1.2rem;
+  color: ${({ theme }) => theme.colors.success600};
+`;
+const ORDER = ["critical", "high", "medium", "low"];
+const locationOf = (location) => [
+  location.contentTypeUid,
+  location.documentId ? `doc ${location.documentId}` : null,
+  location.field,
+  location.configPath
+].filter(Boolean).join(" · ") || "project configuration";
+const AuditReportCard = ({ report }) => {
+  const total = report.findings.length;
+  const partial2 = report.coverage.skippedForBudget.length > 0 || report.coverage.skippedForPermissions.length > 0;
+  return /* @__PURE__ */ jsxRuntime.jsxs(Card$1, { children: [
+    /* @__PURE__ */ jsxRuntime.jsxs(Head$2, { children: [
+      /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "delta", children: report.kind === "security" ? "Security audit" : "Functional QA pass" }),
+      /* @__PURE__ */ jsxRuntime.jsxs(Counts, { children: [
+        ORDER.filter((s) => report.counts[s] > 0).map((severity) => /* @__PURE__ */ jsxRuntime.jsxs(Count, { $severity: severity, children: [
+          report.counts[severity],
+          " ",
+          severity
+        ] }, severity)),
+        total === 0 ? /* @__PURE__ */ jsxRuntime.jsx(Count, { $severity: "low", children: "no findings" }) : null
+      ] })
+    ] }),
+    total === 0 ? /* @__PURE__ */ jsxRuntime.jsxs(Clean, { children: [
+      "No problems found for the checks that ran",
+      partial2 ? " — see the coverage note below" : "",
+      "."
+    ] }) : ORDER.filter((severity) => report.findings.some((f) => f.severity === severity)).map(
+      (severity) => /* @__PURE__ */ jsxRuntime.jsxs(Group, { children: [
+        /* @__PURE__ */ jsxRuntime.jsxs(GroupHead, { $severity: severity, children: [
+          severity,
+          " · ",
+          report.findings.filter((f) => f.severity === severity).length
+        ] }),
+        report.findings.filter((f) => f.severity === severity).map((finding, index2) => /* @__PURE__ */ jsxRuntime.jsxs(Finding, { children: [
+          /* @__PURE__ */ jsxRuntime.jsxs(Where, { children: [
+            finding.category,
+            " — ",
+            locationOf(finding.location)
+          ] }),
+          /* @__PURE__ */ jsxRuntime.jsx(Line, { children: /* @__PURE__ */ jsxRuntime.jsx(Evidence, { children: finding.evidence }) }),
+          /* @__PURE__ */ jsxRuntime.jsxs(Line, { children: [
+            /* @__PURE__ */ jsxRuntime.jsx("strong", { children: "Why it matters:" }),
+            " ",
+            finding.impact
+          ] }),
+          /* @__PURE__ */ jsxRuntime.jsxs(Line, { children: [
+            /* @__PURE__ */ jsxRuntime.jsx("strong", { children: "Fix:" }),
+            " ",
+            finding.remediation
+          ] })
+        ] }, `${finding.category}-${index2}`))
+      ] }, severity)
+    ),
+    /* @__PURE__ */ jsxRuntime.jsxs(Coverage, { children: [
+      /* @__PURE__ */ jsxRuntime.jsxs("span", { children: [
+        /* @__PURE__ */ jsxRuntime.jsx("strong", { children: "Coverage" }),
+        " · ",
+        report.coverage.inspected.length,
+        " inspected ·",
+        " ",
+        new Date(report.runAt).toLocaleString()
+      ] }),
+      report.coverage.skippedForPermissions.length > 0 ? /* @__PURE__ */ jsxRuntime.jsxs(Warn, { children: [
+        "Skipped for permissions (",
+        report.coverage.skippedForPermissions.length,
+        "):",
+        " ",
+        report.coverage.skippedForPermissions.join(", ")
+      ] }) : null,
+      report.coverage.skippedForBudget.length > 0 ? /* @__PURE__ */ jsxRuntime.jsxs(Warn, { children: [
+        "Not reached within the time budget (",
+        report.coverage.skippedForBudget.length,
+        "):",
+        " ",
+        report.coverage.skippedForBudget.join(", ")
+      ] }) : null,
+      report.kind === "security" ? /* @__PURE__ */ jsxRuntime.jsx("span", { children: "Remediations are advice. Applying one goes through the normal change plan and your normal permission checks." }) : null
+    ] })
+  ] });
+};
 const COLUMN_WIDTH = "46rem";
 const Shell = styledComponents.styled.div`
   display: flex;
@@ -22473,6 +22634,10 @@ const changeSetIdOf = (part) => {
   const output = part.output;
   return output?.ok && typeof output.changeSetId === "string" ? output.changeSetId : null;
 };
+const auditReportOf = (part) => {
+  const output = part.output;
+  return output?.ok && output.report?.coverage ? output.report : null;
+};
 const ReportBox = styledComponents.styled.div`
   border: 1px solid ${({ theme }) => theme.colors.neutral200};
   border-radius: 0.8rem;
@@ -22593,6 +22758,12 @@ const MessageList = ({
               const changeSetId = changeSetIdOf(part);
               if (changeSetId && renderChangeSet) {
                 return /* @__PURE__ */ jsxRuntime.jsx(React__namespace.Fragment, { children: renderChangeSet(changeSetId) }, index2);
+              }
+            }
+            if ((name2 === "runQaScan" || name2 === "runSecurityAudit") && part.state === "output-available") {
+              const report = auditReportOf(part);
+              if (report) {
+                return /* @__PURE__ */ jsxRuntime.jsx(AuditReportCard, { report }, index2);
               }
             }
             const { text: text2, danger } = toolLabel(part.state, name2);
