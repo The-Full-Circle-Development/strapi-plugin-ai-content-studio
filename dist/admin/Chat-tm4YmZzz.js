@@ -23774,6 +23774,29 @@ const ThreadSidebar = ({
     ] })
   ] });
 };
+const MODE_LABELS = {
+  content: "Content Editing",
+  layout: "Layout Mapping",
+  audit: "Code Audit"
+};
+const MODE_HINTS = {
+  content: "Propose text, media and publish changes for your approval.",
+  layout: "Map page sections and place media into the slots that exist.",
+  audit: "Read-only. QA and security findings; no content change is possible."
+};
+const ModeSelect = ({ mode, onChange, disabled = false }) => /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Field.Root, { hint: MODE_HINTS[mode], children: [
+  /* @__PURE__ */ jsxRuntime.jsx(designSystem.Field.Label, { children: "Mode" }),
+  /* @__PURE__ */ jsxRuntime.jsx(
+    designSystem.SingleSelect,
+    {
+      value: mode,
+      disabled,
+      onChange: (value) => onChange(String(value)),
+      children: Object.keys(MODE_LABELS).map((value) => /* @__PURE__ */ jsxRuntime.jsx(designSystem.SingleSelectOption, { value, children: MODE_LABELS[value] }, value))
+    }
+  ),
+  /* @__PURE__ */ jsxRuntime.jsx(designSystem.Field.Hint, {})
+] });
 const Split = styledComponents.styled.div`
   display: flex;
   height: calc(100vh - 6rem);
@@ -23821,7 +23844,10 @@ const Chat2 = () => {
     currentThreadId,
     setCurrentThreadId,
     threadIdRef,
+    mode,
+    setMode,
     modeRef,
+    changeMode,
     loading,
     hasMore,
     loadMore,
@@ -23882,7 +23908,9 @@ const Chat2 = () => {
     setInput("");
     threadIdRef.current = null;
     setCurrentThreadId(null);
-  }, [setMessages, threadIdRef, setCurrentThreadId]);
+    setMode("content");
+    modeRef.current = "content";
+  }, [setMessages, threadIdRef, setCurrentThreadId, setMode, modeRef]);
   const onSend = async () => {
     const text2 = input.trim();
     if (!text2 && attachments.length === 0 || busy || preparing) {
@@ -23936,7 +23964,8 @@ const Chat2 = () => {
             }
           });
         },
-        onLoadMore: () => void loadMore()
+        onLoadMore: () => void loadMore(),
+        header: /* @__PURE__ */ jsxRuntime.jsx(ModeSelect, { mode, onChange: (next) => void changeMode(next), disabled: busy })
       }
     ),
     /* @__PURE__ */ jsxRuntime.jsx(Main, { children: /* @__PURE__ */ jsxRuntime.jsxs(Shell, { children: [
@@ -23968,7 +23997,8 @@ const Chat2 = () => {
           disabled: preparing,
           canSend,
           onSend: () => void onSend(),
-          onStop: () => stop()
+          onStop: () => stop(),
+          hint: mode === "audit" ? "Code Audit is read-only — no content change is possible in this mode." : "Changes are proposed for your approval — nothing is written until you approve."
         }
       )
     ] }) })

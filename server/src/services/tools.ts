@@ -188,6 +188,142 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
     });
 
     /**
+     * Layout support (FR-030): report WHERE media and links can go, so a placement instruction can
+     * be resolved against slots that actually exist rather than guessed from field names that
+     * belong to some other project.
+     *
+     * Read-only and RBAC-gated on `read`. Ambiguity is REPORTED, not resolved: if a page has
+     * several media slots that could match "the hero image", all of them come back so the assistant
+     * asks instead of choosing (FR-035).
+     */
+    const describePageStructure = tool({
+      description:
+        "Describe a document's sections, components and the media / link / text slots inside them, with each slot's current value. Use this before proposing a placement so you target a slot that exists. Returns ALL candidate slots — if several could match what the user described, ask them which one; do not choose.",
+      inputSchema: z.object({
+        contentTypeUid: z.string().describe('Content-type uid, e.g. "api::page.page".'),
+        documentId: z.string().optional().describe('Omit for single types.'),
+      }),
+      execute: async ({ contentTypeUid, documentId }) => {
+        const bad = ensureAllowed(contentTypeUid);
+        if (bad) return bad;
+        if (!can(contentTypeUid, 'read')) return denied('read', contentTypeUid);
+
+        let doc: any = null;
+        if (isSingle(contentTypeUid)) {
+          doc = await docs(contentTypeUid).findFirst({ populate: '*' });
+        } else if (documentId) {
+          doc = await docs(contentTypeUid).findOne({ documentId, populate: '*' });
+        } else {
+          return {
+            ok: false,
+            error: 'missing_documentId',
+            message: 'documentId is required for collection types.',
+          };
+        }
+        if (!doc) return { ok: false, error: 'not_found' };
+
+        const componentAttributes = (component: string): Record<string, any> =>
+          (strapi.components as Record<string, any>)[component]?.attributes ?? {};
+
+        /** Summarize a slot's current value compactly — a media slot names its file, not its blob. */
+        const describeValue = (attribute: any, value: unknown): string | null => {
+          if (value === null || value === undefined) {
+            return null;
+          }
+          if (attribute?.type === 'media') {
+            const one = (v: any) => (v?.id ? `id ${v.id} — ${v.name ?? 'unnamed'}` : null);
+            if (Array.isArray(value)) {
+              return value.map(one).filter(Boolean).join(', ') || null;
+            }
+            return one(value);
+          }
+          if (attribute?.type === 'relation') {
+            if (Array.isArray(value)) {
+              return `${value.length} linked`;
+            }
+            return (value as any)?.documentId ? `linked ${(value as any).documentId}` : null;
+          }
+          return String(truncate(value));
+        };
+
+        /** Walk one component's attributes into a flat list of addressable slots. */
+        const slotsOf = (attributes: Record<string, any>, prefix: string, value: any): any[] => {
+          const slots: any[] = [];
+          for (const [name, attribute] of Object.entries(attributes)) {
+            const path = prefix ? `${prefix}.${name}` : name;
+            const current = value?.[name];
+            if (attribute.type === 'component') {
+              if (attribute.repeatable) {
+                const list = Array.isArray(current) ? current : [];
+                slots.push({
+                  field: path,
+                  type: 'component-list',
+                  component: attribute.component,
+                  repeatable: true,
+                  entries: list.length,
+                });
+                list.forEach((entry: any, i: number) => {
+                  slots.push(...slotsOf(componentAttributes(attribute.component), `${path}[${i}]`, entry));
+                });
+              } else {
+                slots.push(...slotsOf(componentAttributes(attribute.component), path, current));
+              }
+              continue;
+            }
+            if (attribute.type === 'dynamiczone') {
+              const list = Array.isArray(current) ? current : [];
+              list.forEach((entry: any, i: number) => {
+                const component = entry?.__component;
+                if (component) {
+                  slots.push({
+                    field: `${path}[${i}]`,
+                    type: 'dynamic-zone-entry',
+                    component,
+                    repeatable: true,
+                  });
+                  slots.push(...slotsOf(componentAttributes(component), `${path}[${i}]`, entry));
+                }
+              });
+              continue;
+            }
+            // Only slots a placement instruction can target are worth reporting.
+            if (!['media', 'string', 'text', 'richtext', 'relation', 'enumeration', 'boolean'].includes(attribute.type)) {
+              continue;
+            }
+            slots.push({
+              field: path,
+              type: attribute.type,
+              ...(attribute.type === 'media' ? { multiple: attribute.multiple === true } : {}),
+              ...(attribute.type === 'enumeration' ? { enum: attribute.enum } : {}),
+              currentValue: describeValue(attribute, current),
+            });
+          }
+          return slots;
+        };
+
+        const attributes = ctOf(contentTypeUid)?.attributes ?? {};
+        const allSlots = slotsOf(attributes, '', doc);
+        const label =
+          ['title', 'name', 'heading', 'label', 'slug']
+            .map((key) => doc[key])
+            .find((v) => typeof v === 'string' && v.trim() !== '') ??
+          ctOf(contentTypeUid)?.info?.displayName ??
+          contentTypeUid;
+
+        return {
+          ok: true,
+          contentTypeUid,
+          documentId: doc.documentId,
+          documentLabel: label,
+          slots: allSlots,
+          mediaSlots: allSlots.filter((s) => s.type === 'media').map((s) => s.field),
+          note:
+            'Every candidate slot is listed. If more than one could match what the user described, ask which one rather than choosing.',
+        };
+      },
+    });
+
+    /**
      * The ONLY tool that can affect content — and it affects nothing until the user approves.
      *
      * `createEntry`, `updateEntry` and `publishEntry` were REMOVED (R1). They executed inside the
@@ -247,14 +383,32 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
       },
     });
 
-    const readTools: ToolSet = { listContentTypes, searchEntries, getEntry };
+    /**
+     * The tool set per (caller ability, mode) — contracts/model-tools.md.
+     *
+     * | tool                  | content | layout | audit |
+     * | listContentTypes      |    y    |   y    |   y   |
+     * | searchEntries         |    y    |   y    |   y   |
+     * | getEntry              |    y    |   y    |   y   |
+     * | describePageStructure |    -    |   y    |   y   |
+     * | proposeChanges        |    y    |   y    |   -   |
+     * | runQaScan             |    -    |   -    |   y   |
+     * | runSecurityAudit      |    -    |   -    |   y (permission-gated inside)
+     *
+     * `audit` mode simply never BUILDS proposeChanges, so read-only is structural — there is no
+     * capability to refuse at runtime, which is the strongest form of FR-029. And a mode only ever
+     * narrows: nothing below adds an ability the caller's permissions do not already allow, because
+     * every tool still RBAC-checks the caller per call (FR-031).
+     */
+    const tools: ToolSet = { listContentTypes, searchEntries, getEntry };
 
-    // `audit` mode simply never builds proposeChanges, so read-only is STRUCTURAL — there is no
-    // capability to refuse at runtime (FR-029). Modes only ever narrow (FR-031).
-    if (mode === 'audit') {
-      return readTools;
+    if (mode === 'layout' || mode === 'audit') {
+      tools.describePageStructure = describePageStructure;
     }
-    return { ...readTools, proposeChanges };
+    if (mode === 'content' || mode === 'layout') {
+      tools.proposeChanges = proposeChanges;
+    }
+    return tools;
   },
 });
 

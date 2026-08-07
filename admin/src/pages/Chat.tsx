@@ -6,6 +6,7 @@ import { MessageList } from '../components/MessageList';
 import { Composer } from '../components/Composer';
 import { ChangePlanCard, type ApplyReport } from '../components/ChangePlanCard';
 import { ThreadSidebar } from '../components/ThreadSidebar';
+import { ModeSelect } from '../components/ModeSelect';
 import { Column, ErrorText, Scroll, Shell } from '../components/styles';
 import { backendURL, useThreads } from '../hooks/useThreads';
 import { styled } from 'styled-components';
@@ -71,7 +72,10 @@ export const Chat = () => {
     currentThreadId,
     setCurrentThreadId,
     threadIdRef,
+    mode,
+    setMode,
     modeRef,
+    changeMode,
     loading,
     hasMore,
     loadMore,
@@ -144,9 +148,12 @@ export const Chat = () => {
     setInput('');
     threadIdRef.current = null;
     setCurrentThreadId(null);
+    // A new conversation starts in Content Editing (FR-027).
+    setMode('content');
+    modeRef.current = 'content';
     // The thread row itself is created lazily on the first send, so opening the panel and not
     // typing leaves no empty conversation behind.
-  }, [setMessages, threadIdRef, setCurrentThreadId]);
+  }, [setMessages, threadIdRef, setCurrentThreadId, setMode, modeRef]);
 
   const onSend = async () => {
     const text = input.trim();
@@ -212,6 +219,7 @@ export const Chat = () => {
             });
           }}
           onLoadMore={() => void loadMore()}
+          header={<ModeSelect mode={mode} onChange={(next) => void changeMode(next)} disabled={busy} />}
         />
 
         <Main>
@@ -250,6 +258,11 @@ export const Chat = () => {
               canSend={canSend}
               onSend={() => void onSend()}
               onStop={() => stop()}
+              hint={
+                mode === 'audit'
+                  ? 'Code Audit is read-only — no content change is possible in this mode.'
+                  : 'Changes are proposed for your approval — nothing is written until you approve.'
+              }
             />
           </Shell>
         </Main>

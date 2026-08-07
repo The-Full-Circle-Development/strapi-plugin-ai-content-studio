@@ -42712,6 +42712,9 @@ const chatController = ({ strapi }) => ({
       return ctx.notFound("That conversation does not exist.");
     }
     const mode = parsed.data.mode ?? thread.mode ?? "content";
+    if (parsed.data.mode && parsed.data.mode !== thread.mode) {
+      await threads().setMode(threadId, ownerId, mode);
+    }
     const userAbility = ctx.state.userAbility;
     let model;
     let supportsVision = false;
@@ -45355,6 +45358,115 @@ const toolsService = ({ strapi }) => ({
         return { ok: true, entry: compact(doc) };
       }
     });
+    const describePageStructure = tool({
+      description: "Describe a document's sections, components and the media / link / text slots inside them, with each slot's current value. Use this before proposing a placement so you target a slot that exists. Returns ALL candidate slots — if several could match what the user described, ask them which one; do not choose.",
+      inputSchema: object$1({
+        contentTypeUid: string().describe('Content-type uid, e.g. "api::page.page".'),
+        documentId: string().optional().describe("Omit for single types.")
+      }),
+      execute: async ({ contentTypeUid, documentId }) => {
+        const bad = ensureAllowed(contentTypeUid);
+        if (bad) return bad;
+        if (!can(contentTypeUid, "read")) return denied("read", contentTypeUid);
+        let doc = null;
+        if (isSingle(contentTypeUid)) {
+          doc = await docs(contentTypeUid).findFirst({ populate: "*" });
+        } else if (documentId) {
+          doc = await docs(contentTypeUid).findOne({ documentId, populate: "*" });
+        } else {
+          return {
+            ok: false,
+            error: "missing_documentId",
+            message: "documentId is required for collection types."
+          };
+        }
+        if (!doc) return { ok: false, error: "not_found" };
+        const componentAttributes = (component) => strapi.components[component]?.attributes ?? {};
+        const describeValue = (attribute, value) => {
+          if (value === null || value === void 0) {
+            return null;
+          }
+          if (attribute?.type === "media") {
+            const one = (v) => v?.id ? `id ${v.id} — ${v.name ?? "unnamed"}` : null;
+            if (Array.isArray(value)) {
+              return value.map(one).filter(Boolean).join(", ") || null;
+            }
+            return one(value);
+          }
+          if (attribute?.type === "relation") {
+            if (Array.isArray(value)) {
+              return `${value.length} linked`;
+            }
+            return value?.documentId ? `linked ${value.documentId}` : null;
+          }
+          return String(truncate(value));
+        };
+        const slotsOf = (attributes22, prefix, value) => {
+          const slots = [];
+          for (const [name22, attribute] of Object.entries(attributes22)) {
+            const path = prefix ? `${prefix}.${name22}` : name22;
+            const current = value?.[name22];
+            if (attribute.type === "component") {
+              if (attribute.repeatable) {
+                const list = Array.isArray(current) ? current : [];
+                slots.push({
+                  field: path,
+                  type: "component-list",
+                  component: attribute.component,
+                  repeatable: true,
+                  entries: list.length
+                });
+                list.forEach((entry, i) => {
+                  slots.push(...slotsOf(componentAttributes(attribute.component), `${path}[${i}]`, entry));
+                });
+              } else {
+                slots.push(...slotsOf(componentAttributes(attribute.component), path, current));
+              }
+              continue;
+            }
+            if (attribute.type === "dynamiczone") {
+              const list = Array.isArray(current) ? current : [];
+              list.forEach((entry, i) => {
+                const component = entry?.__component;
+                if (component) {
+                  slots.push({
+                    field: `${path}[${i}]`,
+                    type: "dynamic-zone-entry",
+                    component,
+                    repeatable: true
+                  });
+                  slots.push(...slotsOf(componentAttributes(component), `${path}[${i}]`, entry));
+                }
+              });
+              continue;
+            }
+            if (!["media", "string", "text", "richtext", "relation", "enumeration", "boolean"].includes(attribute.type)) {
+              continue;
+            }
+            slots.push({
+              field: path,
+              type: attribute.type,
+              ...attribute.type === "media" ? { multiple: attribute.multiple === true } : {},
+              ...attribute.type === "enumeration" ? { enum: attribute.enum } : {},
+              currentValue: describeValue(attribute, current)
+            });
+          }
+          return slots;
+        };
+        const attributes2 = ctOf(contentTypeUid)?.attributes ?? {};
+        const allSlots = slotsOf(attributes2, "", doc);
+        const label = ["title", "name", "heading", "label", "slug"].map((key) => doc[key]).find((v) => typeof v === "string" && v.trim() !== "") ?? ctOf(contentTypeUid)?.info?.displayName ?? contentTypeUid;
+        return {
+          ok: true,
+          contentTypeUid,
+          documentId: doc.documentId,
+          documentLabel: label,
+          slots: allSlots,
+          mediaSlots: allSlots.filter((s) => s.type === "media").map((s) => s.field),
+          note: "Every candidate slot is listed. If more than one could match what the user described, ask which one rather than choosing."
+        };
+      }
+    });
     const proposeChanges = tool({
       description: "Propose content changes for the user to approve. This writes NOTHING — it records a pending plan and returns it for review. Call it ONCE per request with every field you intend to change. Items the caller may not perform come back under `blocked`. After it returns, tell the user plainly that nothing has changed yet and that the plan is waiting for their approval in the panel.",
       inputSchema: object$1({
@@ -45388,11 +45500,14 @@ const toolsService = ({ strapi }) => ({
         });
       }
     });
-    const readTools = { listContentTypes, searchEntries, getEntry };
-    if (mode === "audit") {
-      return readTools;
+    const tools = { listContentTypes, searchEntries, getEntry };
+    if (mode === "layout" || mode === "audit") {
+      tools.describePageStructure = describePageStructure;
     }
-    return { ...readTools, proposeChanges };
+    if (mode === "content" || mode === "layout") {
+      tools.proposeChanges = proposeChanges;
+    }
+    return tools;
   }
 });
 const services = {

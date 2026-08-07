@@ -2,7 +2,7 @@ import { convertToModelMessages, streamText, stepCountIs, type UIMessage } from 
 import { z } from 'zod';
 import type { Core } from '@strapi/strapi';
 import { ProviderConfigError } from '../services/registry';
-import { CHAT_MODES } from '../types';
+import { CHAT_MODES, type ChatMode } from '../types';
 
 /**
  * Request body. `threadId` is REQUIRED: every turn belongs to a durable, owner-scoped conversation
@@ -37,7 +37,16 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     if (!thread) {
       return ctx.notFound('That conversation does not exist.');
     }
-    const mode = (parsed.data.mode ?? thread.mode ?? 'content') as 'content' | 'layout' | 'audit';
+    /**
+     * The mode travels with the request, is persisted on the thread so it survives a reload
+     * (FR-028), and is recorded on each message as `modeAtSend` so history stays readable after a
+     * switch (FR-030's sibling requirement in US5-5). A mode only ever NARROWS the tool set; it
+     * can never grant a capability the caller lacks (FR-031).
+     */
+    const mode = (parsed.data.mode ?? thread.mode ?? 'content') as ChatMode;
+    if (parsed.data.mode && parsed.data.mode !== thread.mode) {
+      await threads().setMode(threadId, ownerId, mode);
+    }
 
     // Set by the admin auth strategy for type:'admin' routes — the CALLER's CASL ability.
     const userAbility = ctx.state.userAbility;

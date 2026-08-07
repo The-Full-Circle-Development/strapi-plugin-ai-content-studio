@@ -2,7 +2,7 @@ import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import * as React from "react";
 import { useRef, useCallback, useSyncExternalStore, useEffect } from "react";
 import { useAuth, useNotification, Page } from "@strapi/strapi/admin";
-import { Loader, Typography, Button, Checkbox, IconButton as IconButton$1 } from "@strapi/design-system";
+import { Loader, Typography, Button, Checkbox, IconButton as IconButton$1, Field as Field$1, SingleSelect, SingleSelectOption } from "@strapi/design-system";
 import { Sparkle, Cross, Paperclip, Stop, ArrowUp, Plus, Check, Pencil, Trash } from "@strapi/icons";
 import { styled } from "styled-components";
 var marker = "vercel.ai.error";
@@ -23755,6 +23755,29 @@ const ThreadSidebar = ({
     ] })
   ] });
 };
+const MODE_LABELS = {
+  content: "Content Editing",
+  layout: "Layout Mapping",
+  audit: "Code Audit"
+};
+const MODE_HINTS = {
+  content: "Propose text, media and publish changes for your approval.",
+  layout: "Map page sections and place media into the slots that exist.",
+  audit: "Read-only. QA and security findings; no content change is possible."
+};
+const ModeSelect = ({ mode, onChange, disabled = false }) => /* @__PURE__ */ jsxs(Field$1.Root, { hint: MODE_HINTS[mode], children: [
+  /* @__PURE__ */ jsx(Field$1.Label, { children: "Mode" }),
+  /* @__PURE__ */ jsx(
+    SingleSelect,
+    {
+      value: mode,
+      disabled,
+      onChange: (value) => onChange(String(value)),
+      children: Object.keys(MODE_LABELS).map((value) => /* @__PURE__ */ jsx(SingleSelectOption, { value, children: MODE_LABELS[value] }, value))
+    }
+  ),
+  /* @__PURE__ */ jsx(Field$1.Hint, {})
+] });
 const Split = styled.div`
   display: flex;
   height: calc(100vh - 6rem);
@@ -23802,7 +23825,10 @@ const Chat2 = () => {
     currentThreadId,
     setCurrentThreadId,
     threadIdRef,
+    mode,
+    setMode,
     modeRef,
+    changeMode,
     loading,
     hasMore,
     loadMore,
@@ -23863,7 +23889,9 @@ const Chat2 = () => {
     setInput("");
     threadIdRef.current = null;
     setCurrentThreadId(null);
-  }, [setMessages, threadIdRef, setCurrentThreadId]);
+    setMode("content");
+    modeRef.current = "content";
+  }, [setMessages, threadIdRef, setCurrentThreadId, setMode, modeRef]);
   const onSend = async () => {
     const text2 = input.trim();
     if (!text2 && attachments.length === 0 || busy || preparing) {
@@ -23917,7 +23945,8 @@ const Chat2 = () => {
             }
           });
         },
-        onLoadMore: () => void loadMore()
+        onLoadMore: () => void loadMore(),
+        header: /* @__PURE__ */ jsx(ModeSelect, { mode, onChange: (next) => void changeMode(next), disabled: busy })
       }
     ),
     /* @__PURE__ */ jsx(Main, { children: /* @__PURE__ */ jsxs(Shell, { children: [
@@ -23949,7 +23978,8 @@ const Chat2 = () => {
           disabled: preparing,
           canSend,
           onSend: () => void onSend(),
-          onStop: () => stop()
+          onStop: () => stop(),
+          hint: mode === "audit" ? "Code Audit is read-only — no content change is possible in this mode." : "Changes are proposed for your approval — nothing is written until you approve."
         }
       )
     ] }) })
