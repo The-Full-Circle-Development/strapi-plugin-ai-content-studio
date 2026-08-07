@@ -35,6 +35,25 @@ export interface MaskedStudioConfig {
   providers: Record<ProviderId, MaskedProviderState>;
 }
 
+/* --------------------------------------------------- static plugin options (config/index.ts) */
+
+export interface PreviewOptions {
+  enabled: boolean;
+  baseUrl: string | null;
+  paths: Record<string, string>;
+  ttlMinutes: number;
+}
+
+export interface AttachmentOptions {
+  totalBudgetMb: number;
+  totalBudgetBytes: number;
+}
+
+export interface AuditOptions {
+  timeBudgetSeconds: number;
+  timeBudgetMs: number;
+}
+
 export const PROVIDERS: ProviderId[] = ['anthropic', 'google', 'openai'];
 
 const STORE_PARAMS = { type: 'plugin', name: 'ai-content-studio', key: 'settings' } as const;
@@ -51,9 +70,20 @@ const defaults = (): StudioSettings => ({
   },
 });
 
+/** Clamp a config number into a sane range, falling back to the default for junk input. */
+const num = (value: unknown, fallback: number, min: number, max: number): number => {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, Math.trunc(n)));
+};
+
 const configService = ({ strapi }: { strapi: Core.Strapi }) => {
   const store = () => strapi.store(STORE_PARAMS);
   const cryptoSvc = () => strapi.plugin('ai-content-studio').service('crypto');
+  const option = <T>(key: string, fallback: T): T =>
+    strapi.config.get(`plugin::ai-content-studio.${key}`, fallback) as T;
 
   /** Fills defaults for any missing field and derives `isSet` from the stored ciphertext. */
   const normalize = (raw: Partial<StudioSettings> | null | undefined): StudioSettings => {
@@ -143,6 +173,40 @@ const configService = ({ strapi }: { strapi: Core.Strapi }) => {
         activeModel: current.activeModel,
         providers,
       };
+    },
+
+    /* ------------------------------------------------- static options, typed and defaulted */
+
+    /**
+     * Preview options. `enabled` is false unless a project opts in, and an enabled preview with
+     * no `baseUrl` is treated as NOT configured, so the panel falls back to the field comparison
+     * instead of producing a broken URL (FR-014).
+     */
+    getPreviewOptions(): PreviewOptions {
+      const raw = option<Record<string, unknown>>('preview', {});
+      const baseUrl = typeof raw.baseUrl === 'string' && raw.baseUrl.trim() !== '' ? raw.baseUrl.trim().replace(/\/+$/, '') : null;
+      const paths =
+        raw.paths && typeof raw.paths === 'object' && !Array.isArray(raw.paths)
+          ? (raw.paths as Record<string, string>)
+          : {};
+      return {
+        enabled: raw.enabled === true && baseUrl !== null,
+        baseUrl,
+        paths,
+        ttlMinutes: num(raw.ttlMinutes, 30, 1, 1440),
+      };
+    },
+
+    getAttachmentOptions(): AttachmentOptions {
+      const raw = option<Record<string, unknown>>('attachments', {});
+      const totalBudgetMb = num(raw.totalBudgetMb, 50, 1, 2048);
+      return { totalBudgetMb, totalBudgetBytes: totalBudgetMb * 1024 * 1024 };
+    },
+
+    getAuditOptions(): AuditOptions {
+      const raw = option<Record<string, unknown>>('audit', {});
+      const timeBudgetSeconds = num(raw.timeBudgetSeconds, 120, 5, 900);
+      return { timeBudgetSeconds, timeBudgetMs: timeBudgetSeconds * 1000 };
     },
   };
 

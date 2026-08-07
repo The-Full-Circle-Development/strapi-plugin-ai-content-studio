@@ -1,0 +1,57 @@
+{
+  "kind": "collectionType",
+  "collectionName": "ai_studio_preview_sessions",
+  "info": {
+    "singularName": "preview-session",
+    "pluralName": "preview-sessions",
+    "displayName": "AI Studio preview session",
+    "description": "A short-lived, owner-only view of one pending change set. Staged file BYTES are not here — they live in the creating instance's memory."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {
+    "content-manager": {
+      "visible": false
+    },
+    "content-type-builder": {
+      "visible": false
+    }
+  },
+  "attributes": {
+    "changeSet": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::ai-content-studio.change-set",
+      "inversedBy": "previewSessions"
+    },
+    "ownerId": {
+      "type": "integer",
+      "required": true,
+      "private": true
+    },
+    "sessionId": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "overlay": {
+      "type": "json",
+      "required": true
+    },
+    "stagedFiles": {
+      "type": "json"
+    },
+    "expiresAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "revokedAt": {
+      "type": "datetime"
+    },
+    "targetUrl": {
+      "type": "string",
+      "required": true
+    }
+  }
+}

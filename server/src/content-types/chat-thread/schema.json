@@ -1,0 +1,61 @@
+{
+  "kind": "collectionType",
+  "collectionName": "ai_studio_chat_threads",
+  "info": {
+    "singularName": "chat-thread",
+    "pluralName": "chat-threads",
+    "displayName": "AI Studio chat thread",
+    "description": "One conversation, owned by exactly one admin user. Private to its owner — super-admin included."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {
+    "content-manager": {
+      "visible": false
+    },
+    "content-type-builder": {
+      "visible": false
+    }
+  },
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true,
+      "maxLength": 120
+    },
+    "ownerId": {
+      "type": "integer",
+      "required": true,
+      "private": true
+    },
+    "mode": {
+      "type": "enumeration",
+      "enum": ["content", "layout", "audit"],
+      "required": true,
+      "default": "content"
+    },
+    "lastActivityAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "contextSummary": {
+      "type": "text"
+    },
+    "summarizedThroughMessageId": {
+      "type": "string"
+    },
+    "messages": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "plugin::ai-content-studio.chat-message",
+      "mappedBy": "thread"
+    },
+    "changeSets": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "plugin::ai-content-studio.change-set",
+      "mappedBy": "thread"
+    }
+  }
+}

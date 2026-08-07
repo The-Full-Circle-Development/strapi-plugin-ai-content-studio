@@ -25,6 +25,15 @@ const bootstrap = async ({ strapi }: { strapi: Core.Strapi }) => {
       uid: 'settings.update',
       pluginName: 'ai-content-studio',
     },
+    {
+      // A list of a project's permission leaks and weak configuration is itself sensitive
+      // (spec decision D3), so the security audit gets its own grantable action rather than
+      // riding on chat.use. Assign it to super-admin only unless you mean to delegate it.
+      section: 'plugins',
+      displayName: 'Run AI Content Studio security audit',
+      uid: 'audit.run',
+      pluginName: 'ai-content-studio',
+    },
   ];
 
   await strapi.admin.services.permission.actionProvider.registerMany(actions);

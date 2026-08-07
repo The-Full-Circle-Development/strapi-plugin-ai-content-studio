@@ -25,16 +25,110 @@ const bootstrap = async ({ strapi }) => {
       displayName: "Update AI Content Studio settings",
       uid: "settings.update",
       pluginName: "ai-content-studio"
+    },
+    {
+      // A list of a project's permission leaks and weak configuration is itself sensitive
+      // (spec decision D3), so the security audit gets its own grantable action rather than
+      // riding on chat.use. Assign it to super-admin only unless you mean to delegate it.
+      section: "plugins",
+      displayName: "Run AI Content Studio security audit",
+      uid: "audit.run",
+      pluginName: "ai-content-studio"
     }
   ];
   await strapi.admin.services.permission.actionProvider.registerMany(actions);
 };
 const config$1 = {
   default: {
-    showProviderErrorDetails: process.env.AI_STUDIO_SHOW_ERROR_DETAILS === "true"
+    showProviderErrorDetails: process.env.AI_STUDIO_SHOW_ERROR_DETAILS === "true",
+    preview: {
+      /** Off by default — a project must opt in before any non-admin preview surface does anything. */
+      enabled: false,
+      /** Front-end origin previews are opened against, e.g. "https://staging.example.com". */
+      baseUrl: process.env.AI_STUDIO_PREVIEW_BASE_URL,
+      /** content-type uid -> path pattern, e.g. { 'api::page.page': '/:slug' }. */
+      paths: {},
+      /** Lifetime of a preview session AND of a pending change set, in minutes. */
+      ttlMinutes: 30
+    },
+    attachments: {
+      /** Total size of files held in the browser for one conversation, in megabytes. */
+      totalBudgetMb: 50
+    },
+    audit: {
+      /** Wall-clock deadline for one QA / security pass. Whatever it misses is reported uncovered. */
+      timeBudgetSeconds: 120
+    }
   },
   validator() {
   }
+};
+const kind$3 = "collectionType";
+const collectionName$3 = "ai_studio_chat_threads";
+const info$3 = { "singularName": "chat-thread", "pluralName": "chat-threads", "displayName": "AI Studio chat thread", "description": "One conversation, owned by exactly one admin user. Private to its owner — super-admin included." };
+const options$3 = { "draftAndPublish": false };
+const pluginOptions$3 = { "content-manager": { "visible": false }, "content-type-builder": { "visible": false } };
+const attributes$3 = { "title": { "type": "string", "required": true, "maxLength": 120 }, "ownerId": { "type": "integer", "required": true, "private": true }, "mode": { "type": "enumeration", "enum": ["content", "layout", "audit"], "required": true, "default": "content" }, "lastActivityAt": { "type": "datetime", "required": true }, "contextSummary": { "type": "text" }, "summarizedThroughMessageId": { "type": "string" }, "messages": { "type": "relation", "relation": "oneToMany", "target": "plugin::ai-content-studio.chat-message", "mappedBy": "thread" }, "changeSets": { "type": "relation", "relation": "oneToMany", "target": "plugin::ai-content-studio.change-set", "mappedBy": "thread" } };
+const chatThreadSchema = {
+  kind: kind$3,
+  collectionName: collectionName$3,
+  info: info$3,
+  options: options$3,
+  pluginOptions: pluginOptions$3,
+  attributes: attributes$3
+};
+const kind$2 = "collectionType";
+const collectionName$2 = "ai_studio_chat_messages";
+const info$2 = { "singularName": "chat-message", "pluralName": "chat-messages", "displayName": "AI Studio chat message", "description": "One turn, stored in the shape the chat UI replays. `parts` never holds attachment bytes." };
+const options$2 = { "draftAndPublish": false };
+const pluginOptions$2 = { "content-manager": { "visible": false }, "content-type-builder": { "visible": false } };
+const attributes$2 = { "thread": { "type": "relation", "relation": "manyToOne", "target": "plugin::ai-content-studio.chat-thread", "inversedBy": "messages" }, "role": { "type": "enumeration", "enum": ["user", "assistant"], "required": true }, "sequence": { "type": "integer", "required": true }, "parts": { "type": "json", "required": true }, "attachmentManifest": { "type": "json" }, "interrupted": { "type": "boolean", "default": false }, "modeAtSend": { "type": "enumeration", "enum": ["content", "layout", "audit"], "required": true, "default": "content" }, "changeSet": { "type": "relation", "relation": "oneToOne", "target": "plugin::ai-content-studio.change-set" } };
+const chatMessageSchema = {
+  kind: kind$2,
+  collectionName: collectionName$2,
+  info: info$2,
+  options: options$2,
+  pluginOptions: pluginOptions$2,
+  attributes: attributes$2
+};
+const kind$1 = "collectionType";
+const collectionName$1 = "ai_studio_change_sets";
+const info$1 = { "singularName": "change-set", "pluralName": "change-sets", "displayName": "AI Studio change set", "description": "One pending change plan. Items are a JSON array — they are only ever read and written as a whole set." };
+const options$1 = { "draftAndPublish": false };
+const pluginOptions$1 = { "content-manager": { "visible": false }, "content-type-builder": { "visible": false } };
+const attributes$1 = { "thread": { "type": "relation", "relation": "manyToOne", "target": "plugin::ai-content-studio.chat-thread", "inversedBy": "changeSets" }, "ownerId": { "type": "integer", "required": true, "private": true }, "status": { "type": "enumeration", "enum": ["pending", "applied", "partially_applied", "rejected", "expired"], "required": true, "default": "pending" }, "items": { "type": "json", "required": true }, "summary": { "type": "text" }, "expiresAt": { "type": "datetime", "required": true }, "proposedAt": { "type": "datetime", "required": true }, "resolvedAt": { "type": "datetime" }, "approvedByUserId": { "type": "integer", "private": true }, "approvedItemIds": { "type": "json" }, "destructiveConfirmed": { "type": "boolean", "default": false }, "previewSessions": { "type": "relation", "relation": "oneToMany", "target": "plugin::ai-content-studio.preview-session", "mappedBy": "changeSet" } };
+const changeSetSchema = {
+  kind: kind$1,
+  collectionName: collectionName$1,
+  info: info$1,
+  options: options$1,
+  pluginOptions: pluginOptions$1,
+  attributes: attributes$1
+};
+const kind = "collectionType";
+const collectionName = "ai_studio_preview_sessions";
+const info = { "singularName": "preview-session", "pluralName": "preview-sessions", "displayName": "AI Studio preview session", "description": "A short-lived, owner-only view of one pending change set. Staged file BYTES are not here — they live in the creating instance's memory." };
+const options = { "draftAndPublish": false };
+const pluginOptions = { "content-manager": { "visible": false }, "content-type-builder": { "visible": false } };
+const attributes = { "changeSet": { "type": "relation", "relation": "manyToOne", "target": "plugin::ai-content-studio.change-set", "inversedBy": "previewSessions" }, "ownerId": { "type": "integer", "required": true, "private": true }, "sessionId": { "type": "string", "required": true, "unique": true }, "overlay": { "type": "json", "required": true }, "stagedFiles": { "type": "json" }, "expiresAt": { "type": "datetime", "required": true }, "revokedAt": { "type": "datetime" }, "targetUrl": { "type": "string", "required": true } };
+const previewSessionSchema = {
+  kind,
+  collectionName,
+  info,
+  options,
+  pluginOptions,
+  attributes
+};
+const contentTypes = {
+  "chat-thread": { schema: chatThreadSchema },
+  "chat-message": { schema: chatMessageSchema },
+  "change-set": { schema: changeSetSchema },
+  "preview-session": { schema: previewSessionSchema }
+};
+const UID = {
+  thread: "plugin::ai-content-studio.chat-thread",
+  message: "plugin::ai-content-studio.chat-message",
+  changeSet: "plugin::ai-content-studio.change-set"
 };
 var marker$3 = "vercel.ai.error";
 var symbol$3 = Symbol.for(marker$3);
@@ -242,16 +336,16 @@ var marker12 = `vercel.ai.error.${name11}`;
 var symbol12 = Symbol.for(marker12);
 var _a12, _b12;
 var TooManyEmbeddingValuesForCallError = class extends (_b12 = AISDKError, _a12 = symbol12, _b12) {
-  constructor(options) {
+  constructor(options2) {
     super({
       name: name11,
-      message: `Too many values for a single embedding call. The ${options.provider} model "${options.modelId}" can only embed up to ${options.maxEmbeddingsPerCall} values per call, but ${options.values.length} values were provided.`
+      message: `Too many values for a single embedding call. The ${options2.provider} model "${options2.modelId}" can only embed up to ${options2.maxEmbeddingsPerCall} values per call, but ${options2.values.length} values were provided.`
     });
     this[_a12] = true;
-    this.provider = options.provider;
-    this.modelId = options.modelId;
-    this.maxEmbeddingsPerCall = options.maxEmbeddingsPerCall;
-    this.values = options.values;
+    this.provider = options2.provider;
+    this.modelId = options2.modelId;
+    this.maxEmbeddingsPerCall = options2.maxEmbeddingsPerCall;
+    this.values = options2.values;
   }
   static isInstance(error) {
     return AISDKError.hasMarker(error, marker12);
@@ -4257,14 +4351,14 @@ const objectProcessor = (schema, ctx, _json, params) => {
 const unionProcessor = (schema, ctx, json2, params) => {
   const def = schema._zod.def;
   const isExclusive = def.inclusive === false;
-  const options = def.options.map((x, i) => process$1(x, ctx, {
+  const options2 = def.options.map((x, i) => process$1(x, ctx, {
     ...params,
     path: [...params.path, isExclusive ? "oneOf" : "anyOf", i]
   }));
   if (isExclusive) {
-    json2.oneOf = options;
+    json2.oneOf = options2;
   } else {
-    json2.anyOf = options;
+    json2.anyOf = options2;
   }
 };
 const intersectionProcessor = (schema, ctx, json2, params) => {
@@ -5133,10 +5227,10 @@ const ZodUnion = /* @__PURE__ */ $constructor("ZodUnion", (inst, def) => {
   inst._zod.processJSONSchema = (ctx, json2, params) => unionProcessor(inst, ctx, json2, params);
   inst.options = def.options;
 });
-function union(options, params) {
+function union(options2, params) {
   return new ZodUnion({
     type: "union",
-    options,
+    options: options2,
     ...normalizeParams(params)
   });
 }
@@ -5144,10 +5238,10 @@ const ZodDiscriminatedUnion = /* @__PURE__ */ $constructor("ZodDiscriminatedUnio
   ZodUnion.init(inst, def);
   $ZodDiscriminatedUnion.init(inst, def);
 });
-function discriminatedUnion(discriminator, options, params) {
+function discriminatedUnion(discriminator, options2, params) {
   return new ZodDiscriminatedUnion({
     type: "union",
-    options,
+    options: options2,
     discriminator,
     ...normalizeParams(params)
   });
@@ -5526,8 +5620,8 @@ var ZodFirstPartyTypeKind;
   ZodFirstPartyTypeKind2["ZodReadonly"] = "ZodReadonly";
 })(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
 class ParseError extends Error {
-  constructor(message, options) {
-    super(message), this.name = "ParseError", this.type = options.type, this.field = options.field, this.value = options.value, this.line = options.line;
+  constructor(message, options2) {
+    super(message), this.name = "ParseError", this.type = options2.type, this.field = options2.field, this.value = options2.value, this.line = options2.line;
   }
 }
 const LF = 10, CR = 13, SPACE = 32;
@@ -5682,8 +5776,8 @@ ${value}`, dataLines++;
       data
     }), id = void 0, data = "", dataLines = 0, eventType = void 0;
   }
-  function reset(options = {}) {
-    if (options.consume && pendingFragments.length > 0) {
+  function reset(options2 = {}) {
+    if (options2.consume && pendingFragments.length > 0) {
       const incompleteLine = pendingFragments.join("");
       parseLine(incompleteLine, 0, incompleteLine.length);
     }
@@ -5758,11 +5852,11 @@ function createToolNameMapping({
     }
   };
 }
-async function delay(delayInMs, options) {
+async function delay(delayInMs, options2) {
   if (delayInMs == null) {
     return Promise.resolve();
   }
-  const signal = options == null ? void 0 : options.abortSignal;
+  const signal = options2 == null ? void 0 : options2.abortSignal;
   return new Promise((resolve2, reject) => {
     if (signal == null ? void 0 : signal.aborted) {
       reject(createAbortError());
@@ -5850,8 +5944,8 @@ function convertUint8ArrayToBase64(array2) {
 function convertToBase64(value) {
   return value instanceof Uint8Array ? convertUint8ArrayToBase64(value) : value;
 }
-function convertToFormData(input, options = {}) {
-  const { useArrayBrackets = true } = options;
+function convertToFormData(input, options2 = {}) {
+  const { useArrayBrackets = true } = options2;
   const formData = new FormData();
   for (const [key, value] of Object.entries(input)) {
     if (value == null) {
@@ -5960,8 +6054,8 @@ function isIPv4(hostname) {
   const parts = hostname.split(".");
   if (parts.length !== 4) return false;
   return parts.every((part) => {
-    const num = Number(part);
-    return Number.isInteger(num) && num >= 0 && num <= 255 && String(num) === part;
+    const num2 = Number(part);
+    return Number.isInteger(num2) && num2 >= 0 && num2 <= 255 && String(num2) === part;
   });
 }
 function isPrivateIPv4(ip) {
@@ -6135,12 +6229,12 @@ async function readResponseWithSizeLimit({
   }
   return result;
 }
-async function downloadBlob(url, options) {
+async function downloadBlob(url, options2) {
   var _a22, _b22;
   try {
     const response = await fetchWithValidatedRedirects({
       url,
-      abortSignal: options == null ? void 0 : options.abortSignal
+      abortSignal: options2 == null ? void 0 : options2.abortSignal
     });
     if (!response.ok) {
       await cancelResponseBody(response);
@@ -6153,7 +6247,7 @@ async function downloadBlob(url, options) {
     const data = await readResponseWithSizeLimit({
       response,
       url,
-      maxBytes: (_a22 = options == null ? void 0 : options.maxBytes) != null ? _a22 : DEFAULT_MAX_DOWNLOAD_SIZE
+      maxBytes: (_a22 = options2 == null ? void 0 : options2.maxBytes) != null ? _a22 : DEFAULT_MAX_DOWNLOAD_SIZE
     });
     const contentType = (_b22 = response.headers.get("content-type")) != null ? _b22 : void 0;
     return new Blob([data], contentType ? { type: contentType } : void 0);
@@ -6559,12 +6653,12 @@ var defaultOptions = {
   base64Strategy: "contentEncoding:base64",
   nameStrategy: "ref"
 };
-var getDefaultOptions = (options) => typeof options === "string" ? {
+var getDefaultOptions = (options2) => typeof options2 === "string" ? {
   ...defaultOptions,
-  name: options
+  name: options2
 } : {
   ...defaultOptions,
-  ...options
+  ...options2
 };
 function parseAnyDef() {
   return {};
@@ -7141,19 +7235,19 @@ var primitiveMappings = {
   ZodNull: "null"
 };
 function parseUnionDef(def, refs) {
-  const options = def.options instanceof Map ? Array.from(def.options.values()) : def.options;
-  if (options.every(
+  const options2 = def.options instanceof Map ? Array.from(def.options.values()) : def.options;
+  if (options2.every(
     (x) => x._def.typeName in primitiveMappings && (!x._def.checks || !x._def.checks.length)
   )) {
-    const types = options.reduce((types2, x) => {
+    const types = options2.reduce((types2, x) => {
       const type = primitiveMappings[x._def.typeName];
       return type && !types2.includes(type) ? [...types2, type] : types2;
     }, []);
     return {
       type: types.length > 1 ? types : types[0]
     };
-  } else if (options.every((x) => x._def.typeName === "ZodLiteral" && !x.description)) {
-    const types = options.reduce(
+  } else if (options2.every((x) => x._def.typeName === "ZodLiteral" && !x.description)) {
+    const types = options2.reduce(
       (acc, x) => {
         const type = typeof x._def.value;
         switch (type) {
@@ -7174,11 +7268,11 @@ function parseUnionDef(def, refs) {
       },
       []
     );
-    if (types.length === options.length) {
+    if (types.length === options2.length) {
       const uniqueTypes = types.filter((x, i, a) => a.indexOf(x) === i);
       return {
         type: uniqueTypes.length > 1 ? uniqueTypes : uniqueTypes[0],
-        enum: options.reduce(
+        enum: options2.reduce(
           (acc, x) => {
             return acc.includes(x._def.value) ? acc : [...acc, x._def.value];
           },
@@ -7186,10 +7280,10 @@ function parseUnionDef(def, refs) {
         )
       };
     }
-  } else if (options.every((x) => x._def.typeName === "ZodEnum")) {
+  } else if (options2.every((x) => x._def.typeName === "ZodEnum")) {
     return {
       type: "string",
-      enum: options.reduce(
+      enum: options2.reduce(
         (acc, x) => [
           ...acc,
           ...x._def.values.filter((x2) => !acc.includes(x2))
@@ -7557,8 +7651,8 @@ var addMeta = (def, refs, jsonSchema2) => {
   }
   return jsonSchema2;
 };
-var getRefs = (options) => {
-  const _options = getDefaultOptions(options);
+var getRefs = (options2) => {
+  const _options = getDefaultOptions(options2);
   const currentPath = _options.name !== void 0 ? [..._options.basePath, _options.definitionPath, _options.name] : _options.basePath;
   return {
     ..._options,
@@ -7577,10 +7671,10 @@ var getRefs = (options) => {
     )
   };
 };
-var zod3ToJsonSchema = (schema, options) => {
+var zod3ToJsonSchema = (schema, options2) => {
   var _a22;
-  const refs = getRefs(options);
-  let definitions = typeof options === "object" && options.definitions ? Object.entries(options.definitions).reduce(
+  const refs = getRefs(options2);
+  let definitions = typeof options2 === "object" && options2.definitions ? Object.entries(options2.definitions).reduce(
     (acc, [name32, schema2]) => {
       var _a32;
       return {
@@ -7597,7 +7691,7 @@ var zod3ToJsonSchema = (schema, options) => {
     },
     {}
   ) : void 0;
-  const name22 = typeof options === "string" ? options : (options == null ? void 0 : options.nameStrategy) === "title" ? void 0 : options == null ? void 0 : options.name;
+  const name22 = typeof options2 === "string" ? options2 : (options2 == null ? void 0 : options2.nameStrategy) === "title" ? void 0 : options2 == null ? void 0 : options2.name;
   const main = (_a22 = parseDef(
     schema._def,
     name22 === void 0 ? refs : {
@@ -7606,7 +7700,7 @@ var zod3ToJsonSchema = (schema, options) => {
     },
     false
   )) != null ? _a22 : parseAnyDef();
-  const title = typeof options === "object" && options.name !== void 0 && options.nameStrategy === "title" ? options.name : void 0;
+  const title = typeof options2 === "object" && options2.name !== void 0 && options2.nameStrategy === "title" ? options2.name : void 0;
   if (title !== void 0) {
     main.title = title;
   }
@@ -7628,11 +7722,11 @@ var zod3ToJsonSchema = (schema, options) => {
   return combined;
 };
 var schemaSymbol = /* @__PURE__ */ Symbol.for("vercel.ai.schema");
-function lazySchema(createSchema) {
+function lazySchema(createSchema2) {
   let schema;
   return () => {
     if (schema == null) {
-      schema = createSchema();
+      schema = createSchema2();
     }
     return schema;
   };
@@ -7680,7 +7774,7 @@ function standardSchema(standardSchema2) {
     }
   );
 }
-function zod3Schema(zodSchema2, options) {
+function zod3Schema(zodSchema2, options2) {
   var _a22;
   const useReferences = (_a22 = void 0) != null ? _a22 : false;
   return jsonSchema(
@@ -7696,7 +7790,7 @@ function zod3Schema(zodSchema2, options) {
     }
   );
 }
-function zod4Schema(zodSchema2, options) {
+function zod4Schema(zodSchema2, options2) {
   var _a22;
   const useReferences = (_a22 = void 0) != null ? _a22 : false;
   return jsonSchema(
@@ -7719,7 +7813,7 @@ function zod4Schema(zodSchema2, options) {
 function isZod4Schema(zodSchema2) {
   return "_zod" in zodSchema2;
 }
-function zodSchema(zodSchema2, options) {
+function zodSchema(zodSchema2, options2) {
   if (isZod4Schema(zodSchema2)) {
     return zod4Schema(zodSchema2);
   } else {
@@ -8151,9 +8245,9 @@ function isAsyncIterable(obj) {
 async function* executeTool({
   execute,
   input,
-  options
+  options: options2
 }) {
-  const result = execute(input, options);
+  const result = execute(input, options2);
   if (isAsyncIterable(result)) {
     let lastOutput;
     for await (const output of result) {
@@ -9045,16 +9139,16 @@ var GatewayLanguageModel = class {
   get provider() {
     return this.config.provider;
   }
-  async getArgs(options) {
-    const { abortSignal: _abortSignal, ...optionsWithoutSignal } = options;
+  async getArgs(options2) {
+    const { abortSignal: _abortSignal, ...optionsWithoutSignal } = options2;
     return {
       args: this.maybeEncodeFileParts(optionsWithoutSignal),
       warnings: []
     };
   }
-  async doGenerate(options) {
-    const { args, warnings } = await this.getArgs(options);
-    const { abortSignal } = options;
+  async doGenerate(options2) {
+    const { args, warnings } = await this.getArgs(options2);
+    const { abortSignal } = options2;
     const resolvedHeaders = await resolve(this.config.headers());
     try {
       const {
@@ -9065,7 +9159,7 @@ var GatewayLanguageModel = class {
         url: this.getUrl(),
         headers: combineHeaders(
           resolvedHeaders,
-          options.headers,
+          options2.headers,
           this.getModelConfigHeaders(this.modelId, false),
           await resolve(this.config.o11yHeaders)
         ),
@@ -9088,16 +9182,16 @@ var GatewayLanguageModel = class {
       throw await asGatewayError(error, await parseAuthMethod(resolvedHeaders));
     }
   }
-  async doStream(options) {
-    const { args, warnings } = await this.getArgs(options);
-    const { abortSignal } = options;
+  async doStream(options2) {
+    const { args, warnings } = await this.getArgs(options2);
+    const { abortSignal } = options2;
     const resolvedHeaders = await resolve(this.config.headers());
     try {
       const { value: response, responseHeaders } = await postJsonToApi({
         url: this.getUrl(),
         headers: combineHeaders(
           resolvedHeaders,
-          options.headers,
+          options2.headers,
           this.getModelConfigHeaders(this.modelId, true),
           await resolve(this.config.o11yHeaders)
         ),
@@ -9121,7 +9215,7 @@ var GatewayLanguageModel = class {
             transform(chunk, controller) {
               if (chunk.success) {
                 const streamPart = chunk.value;
-                if (streamPart.type === "raw" && !options.includeRawChunks) {
+                if (streamPart.type === "raw" && !options2.includeRawChunks) {
                   return;
                 }
                 if (streamPart.type === "response-metadata" && streamPart.timestamp && typeof streamPart.timestamp === "string") {
@@ -9152,8 +9246,8 @@ var GatewayLanguageModel = class {
    * @param options - The options to encode.
    * @returns The options with the file parts encoded.
    */
-  maybeEncodeFileParts(options) {
-    for (const message of options.prompt) {
+  maybeEncodeFileParts(options2) {
+    for (const message of options2.prompt) {
       for (const part of message.content) {
         if (this.isFilePart(part)) {
           const filePart = part;
@@ -9167,7 +9261,7 @@ var GatewayLanguageModel = class {
         }
       }
     }
-    return options;
+    return options2;
   }
   getUrl() {
     return `${this.config.baseURL}/language-model`;
@@ -9876,22 +9970,22 @@ async function getVercelRequestId() {
 }
 var VERSION$5 = "3.0.133";
 var AI_GATEWAY_PROTOCOL_VERSION = "0.0.1";
-function createGatewayProvider(options = {}) {
+function createGatewayProvider(options2 = {}) {
   var _a112, _b112;
   let pendingMetadata = null;
   let metadataCache = null;
-  const cacheRefreshMillis = (_a112 = options.metadataCacheRefreshMillis) != null ? _a112 : 1e3 * 60 * 5;
+  const cacheRefreshMillis = (_a112 = options2.metadataCacheRefreshMillis) != null ? _a112 : 1e3 * 60 * 5;
   let lastFetchTime = 0;
-  const baseURL = (_b112 = withoutTrailingSlash(options.baseURL)) != null ? _b112 : "https://ai-gateway.vercel.sh/v3/ai";
+  const baseURL = (_b112 = withoutTrailingSlash(options2.baseURL)) != null ? _b112 : "https://ai-gateway.vercel.sh/v3/ai";
   const getHeaders = async () => {
     try {
-      const auth = await getGatewayAuthToken(options);
+      const auth = await getGatewayAuthToken(options2);
       return withUserAgentSuffix(
         {
           Authorization: `Bearer ${auth.token}`,
           "ai-gateway-protocol-version": AI_GATEWAY_PROTOCOL_VERSION,
           [GATEWAY_AUTH_METHOD_HEADER]: auth.authMethod,
-          ...options.headers
+          ...options2.headers
         },
         `ai-sdk/gateway/${VERSION$5}`
       );
@@ -9937,19 +10031,19 @@ function createGatewayProvider(options = {}) {
       provider: "gateway",
       baseURL,
       headers: getHeaders,
-      fetch: options.fetch,
+      fetch: options2.fetch,
       o11yHeaders: createO11yHeaders()
     });
   };
   const getAvailableModels = async () => {
     var _a122, _b122, _c;
-    const now2 = (_c = (_b122 = (_a122 = options._internal) == null ? void 0 : _a122.currentDate) == null ? void 0 : _b122.call(_a122).getTime()) != null ? _c : Date.now();
+    const now2 = (_c = (_b122 = (_a122 = options2._internal) == null ? void 0 : _a122.currentDate) == null ? void 0 : _b122.call(_a122).getTime()) != null ? _c : Date.now();
     if (!pendingMetadata || now2 - lastFetchTime > cacheRefreshMillis) {
       lastFetchTime = now2;
       pendingMetadata = new GatewayFetchMetadata({
         baseURL,
         headers: getHeaders,
-        fetch: options.fetch
+        fetch: options2.fetch
       }).getAvailableModels().then((metadata) => {
         metadataCache = metadata;
         return metadata;
@@ -9966,7 +10060,7 @@ function createGatewayProvider(options = {}) {
     return new GatewayFetchMetadata({
       baseURL,
       headers: getHeaders,
-      fetch: options.fetch
+      fetch: options2.fetch
     }).getCredits().catch(async (error) => {
       throw await asGatewayError(
         error,
@@ -9978,7 +10072,7 @@ function createGatewayProvider(options = {}) {
     return new GatewaySpendReport({
       baseURL,
       headers: getHeaders,
-      fetch: options.fetch
+      fetch: options2.fetch
     }).getSpendReport(params).catch(async (error) => {
       throw await asGatewayError(
         error,
@@ -9990,7 +10084,7 @@ function createGatewayProvider(options = {}) {
     return new GatewayGenerationInfoFetcher({
       baseURL,
       headers: getHeaders,
-      fetch: options.fetch
+      fetch: options2.fetch
     }).getGenerationInfo(params).catch(async (error) => {
       throw await asGatewayError(
         error,
@@ -10016,7 +10110,7 @@ function createGatewayProvider(options = {}) {
       provider: "gateway",
       baseURL,
       headers: getHeaders,
-      fetch: options.fetch,
+      fetch: options2.fetch,
       o11yHeaders: createO11yHeaders()
     });
   };
@@ -10026,7 +10120,7 @@ function createGatewayProvider(options = {}) {
       provider: "gateway",
       baseURL,
       headers: getHeaders,
-      fetch: options.fetch,
+      fetch: options2.fetch,
       o11yHeaders: createO11yHeaders()
     });
   };
@@ -10037,7 +10131,7 @@ function createGatewayProvider(options = {}) {
       provider: "gateway",
       baseURL,
       headers: getHeaders,
-      fetch: options.fetch,
+      fetch: options2.fetch,
       o11yHeaders: createO11yHeaders()
     });
   };
@@ -10046,7 +10140,7 @@ function createGatewayProvider(options = {}) {
       provider: "gateway",
       baseURL,
       headers: getHeaders,
-      fetch: options.fetch,
+      fetch: options2.fetch,
       o11yHeaders: createO11yHeaders()
     });
   };
@@ -10060,9 +10154,9 @@ function createGatewayProvider(options = {}) {
   return provider;
 }
 var gateway = createGatewayProvider();
-async function getGatewayAuthToken(options) {
+async function getGatewayAuthToken(options2) {
   const apiKey = loadOptionalSetting({
-    settingValue: options.apiKey,
+    settingValue: options2.apiKey,
     environmentVariableName: "AI_GATEWAY_API_KEY"
   });
   if (apiKey) {
@@ -10286,8 +10380,8 @@ class DiagAPI {
     self2.disable = () => {
       unregisterGlobal(API_NAME$2, self2);
     };
-    self2.createComponentLogger = (options) => {
-      return new DiagComponentLogger(options);
+    self2.createComponentLogger = (options2) => {
+      return new DiagComponentLogger(options2);
     };
     self2.verbose = _logProxy("verbose");
     self2.debug = _logProxy("debug");
@@ -10601,8 +10695,8 @@ function wrapSpanContext(spanContext) {
 const contextApi = ContextAPI.getInstance();
 class NoopTracer {
   // startSpan starts a noop span.
-  startSpan(name17, options, context2 = contextApi.active()) {
-    const root = Boolean(options === null || options === void 0 ? void 0 : options.root);
+  startSpan(name17, options2, context2 = contextApi.active()) {
+    const root = Boolean(options2 === null || options2 === void 0 ? void 0 : options2.root);
     if (root) {
       return new NonRecordingSpan();
     }
@@ -10640,14 +10734,14 @@ function isSpanContext(spanContext) {
 }
 const NOOP_TRACER = new NoopTracer();
 class ProxyTracer {
-  constructor(provider, name17, version2, options) {
+  constructor(provider, name17, version2, options2) {
     this._provider = provider;
     this.name = name17;
     this.version = version2;
-    this.options = options;
+    this.options = options2;
   }
-  startSpan(name17, options, context2) {
-    return this._getTracer().startSpan(name17, options, context2);
+  startSpan(name17, options2, context2) {
+    return this._getTracer().startSpan(name17, options2, context2);
   }
   startActiveSpan(_name, _options, _context, _fn) {
     const tracer = this._getTracer();
@@ -10679,9 +10773,9 @@ class ProxyTracerProvider {
   /**
    * Get a {@link ProxyTracer}
    */
-  getTracer(name17, version2, options) {
+  getTracer(name17, version2, options2) {
     var _a17;
-    return (_a17 = this.getDelegateTracer(name17, version2, options)) !== null && _a17 !== void 0 ? _a17 : new ProxyTracer(this, name17, version2, options);
+    return (_a17 = this.getDelegateTracer(name17, version2, options2)) !== null && _a17 !== void 0 ? _a17 : new ProxyTracer(this, name17, version2, options2);
   }
   getDelegate() {
     var _a17;
@@ -10693,9 +10787,9 @@ class ProxyTracerProvider {
   setDelegate(delegate) {
     this._delegate = delegate;
   }
-  getDelegateTracer(name17, version2, options) {
+  getDelegateTracer(name17, version2, options2) {
     var _a17;
-    return (_a17 = this._delegate) === null || _a17 === void 0 ? void 0 : _a17.getTracer(name17, version2, options);
+    return (_a17 = this._delegate) === null || _a17 === void 0 ? void 0 : _a17.getTracer(name17, version2, options2);
   }
 }
 var SpanStatusCode;
@@ -10972,14 +11066,14 @@ var ToolCallRepairError = class extends AISDKError {
 };
 _a15 = symbol15;
 var UnsupportedModelVersionError = class extends AISDKError {
-  constructor(options) {
+  constructor(options2) {
     super({
       name: "AI_UnsupportedModelVersionError",
-      message: `Unsupported model version ${options.version} for provider "${options.provider}" and model "${options.modelId}". AI SDK 5 only supports models that implement specification version "v2".`
+      message: `Unsupported model version ${options2.version} for provider "${options2.provider}" and model "${options2.modelId}". AI SDK 5 only supports models that implement specification version "v2".`
     });
-    this.version = options.version;
-    this.provider = options.provider;
-    this.modelId = options.modelId;
+    this.version = options2.version;
+    this.provider = options2.provider;
+    this.modelId = options2.modelId;
   }
 };
 var name16 = "AI_UIMessageStreamError";
@@ -11062,12 +11156,12 @@ _a20 = symbol20;
 function asArray(value) {
   return value === void 0 ? [] : Array.isArray(value) ? value : [value];
 }
-async function notify(options) {
-  for (const callback of asArray(options.callbacks)) {
+async function notify(options2) {
+  for (const callback of asArray(options2.callbacks)) {
     if (callback == null)
       continue;
     try {
-      await callback(options.event);
+      await callback(options2.event);
     } catch (_ignored) {
     }
   }
@@ -11103,8 +11197,8 @@ function formatWarning({
 }
 var FIRST_WARNING_INFO_MESSAGE = "AI SDK Warning System: To turn off warning logging, set the AI_SDK_LOG_WARNINGS global to false.";
 var hasLoggedBefore = false;
-var logWarnings = (options) => {
-  if (options.warnings.length === 0) {
+var logWarnings = (options2) => {
+  if (options2.warnings.length === 0) {
     return;
   }
   const logger = globalThis.AI_SDK_LOG_WARNINGS;
@@ -11112,19 +11206,19 @@ var logWarnings = (options) => {
     return;
   }
   if (typeof logger === "function") {
-    logger(options);
+    logger(options2);
     return;
   }
   if (!hasLoggedBefore) {
     hasLoggedBefore = true;
     console.info(FIRST_WARNING_INFO_MESSAGE);
   }
-  for (const warning of options.warnings) {
+  for (const warning of options2.warnings) {
     console.warn(
       formatWarning({
         warning,
-        provider: options.provider,
-        model: options.model
+        provider: options2.provider,
+        model: options2.model
       })
     );
   }
@@ -12365,33 +12459,33 @@ function getBaseTelemetryAttributes({
     "ai.model.provider": model.provider,
     "ai.model.id": model.modelId,
     // settings:
-    ...Object.entries(settings).reduce((attributes, [key, value]) => {
+    ...Object.entries(settings).reduce((attributes2, [key, value]) => {
       if (key === "timeout") {
         const totalTimeoutMs = getTotalTimeoutMs(
           value
         );
         if (totalTimeoutMs != null) {
-          attributes[`ai.settings.${key}`] = totalTimeoutMs;
+          attributes2[`ai.settings.${key}`] = totalTimeoutMs;
         }
       } else {
-        attributes[`ai.settings.${key}`] = value;
+        attributes2[`ai.settings.${key}`] = value;
       }
-      return attributes;
+      return attributes2;
     }, {}),
     // add metadata as attributes:
     ...Object.entries((_a22 = telemetry == null ? void 0 : telemetry.metadata) != null ? _a22 : {}).reduce(
-      (attributes, [key, value]) => {
-        attributes[`ai.telemetry.metadata.${key}`] = value;
-        return attributes;
+      (attributes2, [key, value]) => {
+        attributes2[`ai.telemetry.metadata.${key}`] = value;
+        return attributes2;
       },
       {}
     ),
     // request headers
-    ...Object.entries(headers != null ? headers : {}).reduce((attributes, [key, value]) => {
+    ...Object.entries(headers != null ? headers : {}).reduce((attributes2, [key, value]) => {
       if (value !== void 0) {
-        attributes[`ai.request.headers.${key}`] = value;
+        attributes2[`ai.request.headers.${key}`] = value;
       }
-      return attributes;
+      return attributes2;
     }, {})
   };
 }
@@ -12466,13 +12560,13 @@ function getTracer({
 async function recordSpan({
   name: name22,
   tracer,
-  attributes,
+  attributes: attributes2,
   fn,
   endWhenDone = true
 }) {
   return tracer.startActiveSpan(
     name22,
-    { attributes: await attributes },
+    { attributes: await attributes2 },
     async (span) => {
       const ctx = context.active();
       try {
@@ -12509,13 +12603,13 @@ function recordErrorOnSpan(span, error) {
 }
 async function selectTelemetryAttributes({
   telemetry,
-  attributes
+  attributes: attributes2
 }) {
   if ((telemetry == null ? void 0 : telemetry.isEnabled) !== true) {
     return {};
   }
   const resultAttributes = {};
-  for (const [key, value] of Object.entries(attributes)) {
+  for (const [key, value] of Object.entries(attributes2)) {
     if (value == null) {
       continue;
     }
@@ -13068,8 +13162,8 @@ var DefaultGeneratedFile = class {
   }
 };
 var DefaultGeneratedFileWithType = class extends DefaultGeneratedFile {
-  constructor(options) {
-    super(options);
+  constructor(options2) {
+    super(options2);
     this.type = "file";
   }
 };
@@ -14490,30 +14584,30 @@ function processUIMessageStream({
             }
             return toolInvocation;
           }
-          function updateToolPart(options) {
+          function updateToolPart(options2) {
             var _a23;
             const part = state.message.parts.find(
-              (part2) => isStaticToolUIPart(part2) && part2.toolCallId === options.toolCallId
+              (part2) => isStaticToolUIPart(part2) && part2.toolCallId === options2.toolCallId
             );
-            const anyOptions = options;
+            const anyOptions = options2;
             const anyPart = part;
             if (part != null) {
-              part.state = options.state;
+              part.state = options2.state;
               anyPart.input = anyOptions.input;
               anyPart.output = anyOptions.output;
               anyPart.errorText = anyOptions.errorText;
               anyPart.rawInput = anyOptions.rawInput;
               anyPart.preliminary = anyOptions.preliminary;
-              if (options.title !== void 0) {
-                anyPart.title = options.title;
+              if (options2.title !== void 0) {
+                anyPart.title = options2.title;
               }
-              if (options.toolMetadata !== void 0) {
-                anyPart.toolMetadata = options.toolMetadata;
+              if (options2.toolMetadata !== void 0) {
+                anyPart.toolMetadata = options2.toolMetadata;
               }
               anyPart.providerExecuted = (_a23 = anyOptions.providerExecuted) != null ? _a23 : part.providerExecuted;
               const providerMetadata = anyOptions.providerMetadata;
               if (providerMetadata != null) {
-                if (options.state === "output-available" || options.state === "output-error") {
+                if (options2.state === "output-available" || options2.state === "output-error") {
                   const resultPart = part;
                   resultPart.resultProviderMetadata = providerMetadata;
                 } else {
@@ -14522,47 +14616,47 @@ function processUIMessageStream({
               }
             } else {
               state.message.parts.push({
-                type: `tool-${options.toolName}`,
-                toolCallId: options.toolCallId,
-                state: options.state,
-                title: options.title,
-                ...options.toolMetadata !== void 0 ? { toolMetadata: options.toolMetadata } : {},
+                type: `tool-${options2.toolName}`,
+                toolCallId: options2.toolCallId,
+                state: options2.state,
+                title: options2.title,
+                ...options2.toolMetadata !== void 0 ? { toolMetadata: options2.toolMetadata } : {},
                 input: anyOptions.input,
                 output: anyOptions.output,
                 rawInput: anyOptions.rawInput,
                 errorText: anyOptions.errorText,
                 providerExecuted: anyOptions.providerExecuted,
                 preliminary: anyOptions.preliminary,
-                ...anyOptions.providerMetadata != null && (options.state === "output-available" || options.state === "output-error") ? { resultProviderMetadata: anyOptions.providerMetadata } : {},
-                ...anyOptions.providerMetadata != null && !(options.state === "output-available" || options.state === "output-error") ? { callProviderMetadata: anyOptions.providerMetadata } : {}
+                ...anyOptions.providerMetadata != null && (options2.state === "output-available" || options2.state === "output-error") ? { resultProviderMetadata: anyOptions.providerMetadata } : {},
+                ...anyOptions.providerMetadata != null && !(options2.state === "output-available" || options2.state === "output-error") ? { callProviderMetadata: anyOptions.providerMetadata } : {}
               });
             }
           }
-          function updateDynamicToolPart(options) {
+          function updateDynamicToolPart(options2) {
             var _a23, _b22;
             const part = state.message.parts.find(
-              (part2) => part2.type === "dynamic-tool" && part2.toolCallId === options.toolCallId
+              (part2) => part2.type === "dynamic-tool" && part2.toolCallId === options2.toolCallId
             );
-            const anyOptions = options;
+            const anyOptions = options2;
             const anyPart = part;
             if (part != null) {
-              part.state = options.state;
-              anyPart.toolName = options.toolName;
+              part.state = options2.state;
+              anyPart.toolName = options2.toolName;
               anyPart.input = anyOptions.input;
               anyPart.output = anyOptions.output;
               anyPart.errorText = anyOptions.errorText;
               anyPart.rawInput = (_a23 = anyOptions.rawInput) != null ? _a23 : anyPart.rawInput;
               anyPart.preliminary = anyOptions.preliminary;
-              if (options.title !== void 0) {
-                anyPart.title = options.title;
+              if (options2.title !== void 0) {
+                anyPart.title = options2.title;
               }
-              if (options.toolMetadata !== void 0) {
-                anyPart.toolMetadata = options.toolMetadata;
+              if (options2.toolMetadata !== void 0) {
+                anyPart.toolMetadata = options2.toolMetadata;
               }
               anyPart.providerExecuted = (_b22 = anyOptions.providerExecuted) != null ? _b22 : part.providerExecuted;
               const providerMetadata = anyOptions.providerMetadata;
               if (providerMetadata != null) {
-                if (options.state === "output-available" || options.state === "output-error") {
+                if (options2.state === "output-available" || options2.state === "output-error") {
                   const resultPart = part;
                   resultPart.resultProviderMetadata = providerMetadata;
                 } else {
@@ -14572,18 +14666,18 @@ function processUIMessageStream({
             } else {
               state.message.parts.push({
                 type: "dynamic-tool",
-                toolName: options.toolName,
-                toolCallId: options.toolCallId,
-                state: options.state,
+                toolName: options2.toolName,
+                toolCallId: options2.toolCallId,
+                state: options2.state,
                 input: anyOptions.input,
                 output: anyOptions.output,
                 errorText: anyOptions.errorText,
                 preliminary: anyOptions.preliminary,
                 providerExecuted: anyOptions.providerExecuted,
-                title: options.title,
-                ...options.toolMetadata !== void 0 ? { toolMetadata: options.toolMetadata } : {},
-                ...anyOptions.providerMetadata != null && (options.state === "output-available" || options.state === "output-error") ? { resultProviderMetadata: anyOptions.providerMetadata } : {},
-                ...anyOptions.providerMetadata != null && !(options.state === "output-available" || options.state === "output-error") ? { callProviderMetadata: anyOptions.providerMetadata } : {}
+                title: options2.title,
+                ...options2.toolMetadata !== void 0 ? { toolMetadata: options2.toolMetadata } : {},
+                ...anyOptions.providerMetadata != null && (options2.state === "output-available" || options2.state === "output-error") ? { resultProviderMetadata: anyOptions.providerMetadata } : {},
+                ...anyOptions.providerMetadata != null && !(options2.state === "output-available" || options2.state === "output-error") ? { callProviderMetadata: anyOptions.providerMetadata } : {}
               });
             }
           }
@@ -16975,7 +17069,7 @@ var DefaultStreamTextResult = class {
     if (this._steps.isPending())
       this._steps.reject(error);
   }
-  async consumeStream(options) {
+  async consumeStream(options2) {
     var _a22;
     try {
       await consumeStream({
@@ -16983,12 +17077,12 @@ var DefaultStreamTextResult = class {
         onError: (error) => {
           var _a23;
           this.rejectResultPromises(error);
-          (_a23 = options == null ? void 0 : options.onError) == null ? void 0 : _a23.call(options, error);
+          (_a23 = options2 == null ? void 0 : options2.onError) == null ? void 0 : _a23.call(options2, error);
         }
       });
     } catch (error) {
       this.rejectResultPromises(error);
-      (_a22 = options == null ? void 0 : options.onError) == null ? void 0 : _a22.call(options, error);
+      (_a22 = options2 == null ? void 0 : options2.onError) == null ? void 0 : _a22.call(options2, error);
     }
   }
   get experimental_partialOutputStream() {
@@ -17374,7 +17468,7 @@ var DefaultStreamTextResult = class {
     });
   }
 };
-async function convertToModelMessages(messages, options) {
+async function convertToModelMessages(messages, options2) {
   const modelMessages = [];
   for (const message of messages) {
     switch (message.role) {
@@ -17418,7 +17512,7 @@ async function convertToModelMessages(messages, options) {
             }
             if (isDataUIPart(part)) {
               return (_a22 = void 0) == null ? void 0 : _a22.call(
-                options,
+                options2,
                 part
               );
             }
@@ -17494,7 +17588,7 @@ async function convertToModelMessages(messages, options) {
                 }
               } else if (isDataUIPart(part)) {
                 const dataPart = (_d = void 0) == null ? void 0 : _d.call(
-                  options,
+                  options2,
                   part
                 );
                 if (dataPart != null) {
@@ -21522,7 +21616,7 @@ var AnthropicMessagesLanguageModel = class {
       };
     });
   }
-  async doGenerate(options) {
+  async doGenerate(options2) {
     var _a17, _b15, _c, _d, _e, _f, _g;
     const {
       args,
@@ -21533,12 +21627,12 @@ var AnthropicMessagesLanguageModel = class {
       providerOptionsName,
       usedCustomProviderKey
     } = await this.getArgs({
-      ...options,
+      ...options2,
       stream: false,
-      userSuppliedBetas: await this.getBetasFromHeaders(options.headers)
+      userSuppliedBetas: await this.getBetasFromHeaders(options2.headers)
     });
     const citationDocuments = [
-      ...this.extractCitationDocuments(options.prompt)
+      ...this.extractCitationDocuments(options2.prompt)
     ];
     const markCodeExecutionDynamic = hasWebTool20260209WithoutCodeExecution(
       args.tools
@@ -21549,13 +21643,13 @@ var AnthropicMessagesLanguageModel = class {
       rawValue: rawResponse
     } = await postJsonToApi({
       url: this.buildRequestUrl(false),
-      headers: await this.getHeaders({ betas, headers: options.headers }),
+      headers: await this.getHeaders({ betas, headers: options2.headers }),
       body: this.transformRequestBody(args, betas),
       failedResponseHandler: anthropicFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
         anthropicMessagesResponseSchema
       ),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     const content = [];
@@ -22009,7 +22103,7 @@ var AnthropicMessagesLanguageModel = class {
       })()
     };
   }
-  async doStream(options) {
+  async doStream(options2) {
     var _a17, _b15;
     const {
       args: body,
@@ -22020,12 +22114,12 @@ var AnthropicMessagesLanguageModel = class {
       providerOptionsName,
       usedCustomProviderKey
     } = await this.getArgs({
-      ...options,
+      ...options2,
       stream: true,
-      userSuppliedBetas: await this.getBetasFromHeaders(options.headers)
+      userSuppliedBetas: await this.getBetasFromHeaders(options2.headers)
     });
     const citationDocuments = [
-      ...this.extractCitationDocuments(options.prompt)
+      ...this.extractCitationDocuments(options2.prompt)
     ];
     const markCodeExecutionDynamic = hasWebTool20260209WithoutCodeExecution(
       body.tools
@@ -22033,13 +22127,13 @@ var AnthropicMessagesLanguageModel = class {
     const url = this.buildRequestUrl(true);
     const { responseHeaders, value: response } = await postJsonToApi({
       url,
-      headers: await this.getHeaders({ betas, headers: options.headers }),
+      headers: await this.getHeaders({ betas, headers: options2.headers }),
       body: this.transformRequestBody(body, betas),
       failedResponseHandler: anthropicFailedResponseHandler,
       successfulResponseHandler: createEventSourceResponseHandler(
         anthropicMessagesChunkSchema
       ),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     let finishReason = {
@@ -22072,7 +22166,7 @@ var AnthropicMessagesLanguageModel = class {
         },
         transform(chunk, controller) {
           var _a22, _b22, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
-          if (options.includeRawChunks) {
+          if (options2.includeRawChunks) {
             controller.enqueue({ type: "raw", rawValue: chunk.rawValue });
           }
           if (!chunk.success) {
@@ -23459,25 +23553,25 @@ var anthropicTools = {
    */
   toolSearchBm25_20251119
 };
-function createAnthropic(options = {}) {
+function createAnthropic(options2 = {}) {
   var _a17, _b15;
   const baseURL = (_a17 = withoutTrailingSlash(
     loadOptionalSetting({
-      settingValue: options.baseURL,
+      settingValue: options2.baseURL,
       environmentVariableName: "ANTHROPIC_BASE_URL"
     })
   )) != null ? _a17 : "https://api.anthropic.com/v1";
-  const providerName = (_b15 = options.name) != null ? _b15 : "anthropic.messages";
-  if (options.apiKey && options.authToken) {
+  const providerName = (_b15 = options2.name) != null ? _b15 : "anthropic.messages";
+  if (options2.apiKey && options2.authToken) {
     throw new InvalidArgumentError$1({
       argument: "apiKey/authToken",
       message: "Both apiKey and authToken were provided. Please use only one authentication method."
     });
   }
   const getHeaders = () => {
-    const authHeaders = options.authToken ? { Authorization: `Bearer ${options.authToken}` } : {
+    const authHeaders = options2.authToken ? { Authorization: `Bearer ${options2.authToken}` } : {
       "x-api-key": loadApiKey({
-        apiKey: options.apiKey,
+        apiKey: options2.apiKey,
         environmentVariableName: "ANTHROPIC_API_KEY",
         description: "Anthropic"
       })
@@ -23486,7 +23580,7 @@ function createAnthropic(options = {}) {
       {
         "anthropic-version": "2023-06-01",
         ...authHeaders,
-        ...options.headers
+        ...options2.headers
       },
       `ai-sdk/anthropic/${VERSION$2}`
     );
@@ -23497,8 +23591,8 @@ function createAnthropic(options = {}) {
       provider: providerName,
       baseURL,
       headers: getHeaders,
-      fetch: options.fetch,
-      generateId: (_a22 = options.generateId) != null ? _a22 : generateId,
+      fetch: options2.fetch,
+      generateId: (_a22 = options2.generateId) != null ? _a22 : generateId,
       supportedUrls: () => ({
         "image/*": [/^https?:\/\/.*$/],
         "application/pdf": [/^https?:\/\/.*$/]
@@ -24309,9 +24403,9 @@ var OpenAIChatLanguageModel = class {
       warnings: [...warnings, ...toolWarnings]
     };
   }
-  async doGenerate(options) {
+  async doGenerate(options2) {
     var _a17, _b15, _c, _d, _e, _f, _g;
-    const { args: body, warnings } = await this.getArgs(options);
+    const { args: body, warnings } = await this.getArgs(options2);
     const {
       responseHeaders,
       value: response,
@@ -24321,13 +24415,13 @@ var OpenAIChatLanguageModel = class {
         path: "/chat/completions",
         modelId: this.modelId
       }),
-      headers: combineHeaders(this.config.headers(), options.headers),
+      headers: combineHeaders(this.config.headers(), options2.headers),
       body,
       failedResponseHandler: openaiFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
         openaiChatResponseSchema
       ),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     const choice2 = response.choices[0];
@@ -24382,8 +24476,8 @@ var OpenAIChatLanguageModel = class {
       providerMetadata
     };
   }
-  async doStream(options) {
-    const { args, warnings } = await this.getArgs(options);
+  async doStream(options2) {
+    const { args, warnings } = await this.getArgs(options2);
     const body = {
       ...args,
       stream: true,
@@ -24396,13 +24490,13 @@ var OpenAIChatLanguageModel = class {
         path: "/chat/completions",
         modelId: this.modelId
       }),
-      headers: combineHeaders(this.config.headers(), options.headers),
+      headers: combineHeaders(this.config.headers(), options2.headers),
       body,
       failedResponseHandler: openaiFailedResponseHandler,
       successfulResponseHandler: createEventSourceResponseHandler(
         openaiChatChunkSchema
       ),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     const toolCalls = [];
@@ -24422,7 +24516,7 @@ var OpenAIChatLanguageModel = class {
           },
           transform(chunk, controller) {
             var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
-            if (options.includeRawChunks) {
+            if (options2.includeRawChunks) {
               controller.enqueue({ type: "raw", rawValue: chunk.rawValue });
             }
             if (!chunk.success) {
@@ -24915,9 +25009,9 @@ var OpenAICompletionLanguageModel = class {
       warnings
     };
   }
-  async doGenerate(options) {
+  async doGenerate(options2) {
     var _a17;
-    const { args, warnings } = await this.getArgs(options);
+    const { args, warnings } = await this.getArgs(options2);
     const {
       responseHeaders,
       value: response,
@@ -24927,13 +25021,13 @@ var OpenAICompletionLanguageModel = class {
         path: "/completions",
         modelId: this.modelId
       }),
-      headers: combineHeaders(this.config.headers(), options.headers),
+      headers: combineHeaders(this.config.headers(), options2.headers),
       body: args,
       failedResponseHandler: openaiFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
         openaiCompletionResponseSchema
       ),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     const choice2 = response.choices[0];
@@ -24958,8 +25052,8 @@ var OpenAICompletionLanguageModel = class {
       warnings
     };
   }
-  async doStream(options) {
-    const { args, warnings } = await this.getArgs(options);
+  async doStream(options2) {
+    const { args, warnings } = await this.getArgs(options2);
     const body = {
       ...args,
       stream: true,
@@ -24972,13 +25066,13 @@ var OpenAICompletionLanguageModel = class {
         path: "/completions",
         modelId: this.modelId
       }),
-      headers: combineHeaders(this.config.headers(), options.headers),
+      headers: combineHeaders(this.config.headers(), options2.headers),
       body,
       failedResponseHandler: openaiFailedResponseHandler,
       successfulResponseHandler: createEventSourceResponseHandler(
         openaiCompletionChunkSchema
       ),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     let finishReason = {
@@ -24995,7 +25089,7 @@ var OpenAICompletionLanguageModel = class {
             controller.enqueue({ type: "stream-start", warnings });
           },
           transform(chunk, controller) {
-            if (options.includeRawChunks) {
+            if (options2.includeRawChunks) {
               controller.enqueue({ type: "raw", rawValue: chunk.rawValue });
             }
             if (!chunk.success) {
@@ -28002,9 +28096,9 @@ async function prepareResponsesTools({
 }
 function prepareFunctionTool({
   tool: tool2,
-  options
+  options: options2
 }) {
-  const deferLoading = options == null ? void 0 : options.deferLoading;
+  const deferLoading = options2 == null ? void 0 : options2.deferLoading;
   return {
     type: "function",
     name: tool2.name,
@@ -28334,7 +28428,7 @@ var OpenAIResponsesLanguageModel = class {
       isShellProviderExecuted
     };
   }
-  async doGenerate(options) {
+  async doGenerate(options2) {
     var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B;
     const {
       args: body,
@@ -28343,25 +28437,25 @@ var OpenAIResponsesLanguageModel = class {
       toolNameMapping,
       providerOptionsName,
       isShellProviderExecuted
-    } = await this.getArgs(options);
+    } = await this.getArgs(options2);
     const url = this.config.url({
       path: "/responses",
       modelId: this.modelId
     });
-    const approvalRequestIdToDummyToolCallIdFromPrompt = extractApprovalRequestIdToToolCallIdMapping(options.prompt);
+    const approvalRequestIdToDummyToolCallIdFromPrompt = extractApprovalRequestIdToToolCallIdMapping(options2.prompt);
     const {
       responseHeaders,
       value: response,
       rawValue: rawResponse
     } = await postJsonToApi({
       url,
-      headers: combineHeaders(this.config.headers(), options.headers),
+      headers: combineHeaders(this.config.headers(), options2.headers),
       body,
       failedResponseHandler: openaiFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
         openaiResponsesResponseSchema
       ),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     if (response.error) {
@@ -28512,7 +28606,7 @@ var OpenAIResponsesLanguageModel = class {
         }
         case "message": {
           for (const contentPart of part.content) {
-            if (((_f = (_e = options.providerOptions) == null ? void 0 : _e[providerOptionsName]) == null ? void 0 : _f.logprobs) && contentPart.logprobs) {
+            if (((_f = (_e = options2.providerOptions) == null ? void 0 : _e[providerOptionsName]) == null ? void 0 : _f.logprobs) && contentPart.logprobs) {
               logprobs.push(contentPart.logprobs);
             }
             const providerMetadata2 = {
@@ -28810,7 +28904,7 @@ var OpenAIResponsesLanguageModel = class {
       warnings
     };
   }
-  async doStream(options) {
+  async doStream(options2) {
     const {
       args: body,
       warnings,
@@ -28819,13 +28913,13 @@ var OpenAIResponsesLanguageModel = class {
       store,
       providerOptionsName,
       isShellProviderExecuted
-    } = await this.getArgs(options);
+    } = await this.getArgs(options2);
     const { responseHeaders, value: response } = await postJsonToApi({
       url: this.config.url({
         path: "/responses",
         modelId: this.modelId
       }),
-      headers: combineHeaders(this.config.headers(), options.headers),
+      headers: combineHeaders(this.config.headers(), options2.headers),
       body: {
         ...body,
         stream: true
@@ -28834,11 +28928,11 @@ var OpenAIResponsesLanguageModel = class {
       successfulResponseHandler: createEventSourceResponseHandler(
         openaiResponsesChunkSchema
       ),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     const self2 = this;
-    const approvalRequestIdToDummyToolCallIdFromPrompt = extractApprovalRequestIdToToolCallIdMapping(options.prompt);
+    const approvalRequestIdToDummyToolCallIdFromPrompt = extractApprovalRequestIdToToolCallIdMapping(options2.prompt);
     const approvalRequestIdToDummyToolCallIdFromStream = /* @__PURE__ */ new Map();
     let finishReason = {
       unified: "other",
@@ -28862,7 +28956,7 @@ var OpenAIResponsesLanguageModel = class {
           },
           transform(chunk, controller) {
             var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L;
-            if (options.includeRawChunks) {
+            if (options2.includeRawChunks) {
               controller.enqueue({ type: "raw", rawValue: chunk.rawValue });
             }
             if (!chunk.success) {
@@ -29524,7 +29618,7 @@ var OpenAIResponsesLanguageModel = class {
                 id: value.item_id,
                 delta: value.delta
               });
-              if (((_s = (_r = options.providerOptions) == null ? void 0 : _r[providerOptionsName]) == null ? void 0 : _s.logprobs) && value.logprobs) {
+              if (((_s = (_r = options2.providerOptions) == null ? void 0 : _r[providerOptionsName]) == null ? void 0 : _s.logprobs) && value.logprobs) {
                 logprobs.push(value.logprobs);
               }
             } else if (value.type === "response.reasoning_summary_part.added") {
@@ -29839,10 +29933,10 @@ var OpenAISpeechModel = class {
       warnings
     };
   }
-  async doGenerate(options) {
+  async doGenerate(options2) {
     var _a17, _b15, _c;
     const currentDate = (_c = (_b15 = (_a17 = this.config._internal) == null ? void 0 : _a17.currentDate) == null ? void 0 : _b15.call(_a17)) != null ? _c : /* @__PURE__ */ new Date();
-    const { requestBody, warnings } = await this.getArgs(options);
+    const { requestBody, warnings } = await this.getArgs(options2);
     const {
       value: audio,
       responseHeaders,
@@ -29852,11 +29946,11 @@ var OpenAISpeechModel = class {
         path: "/audio/speech",
         modelId: this.modelId
       }),
-      headers: combineHeaders(this.config.headers(), options.headers),
+      headers: combineHeaders(this.config.headers(), options2.headers),
       body: requestBody,
       failedResponseHandler: openaiFailedResponseHandler,
       successfulResponseHandler: createBinaryResponseHandler(),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     return {
@@ -30051,10 +30145,10 @@ var OpenAITranscriptionModel = class {
       warnings
     };
   }
-  async doGenerate(options) {
+  async doGenerate(options2) {
     var _a17, _b15, _c, _d, _e, _f, _g, _h;
     const currentDate = (_c = (_b15 = (_a17 = this.config._internal) == null ? void 0 : _a17.currentDate) == null ? void 0 : _b15.call(_a17)) != null ? _c : /* @__PURE__ */ new Date();
-    const { formData, warnings } = await this.getArgs(options);
+    const { formData, warnings } = await this.getArgs(options2);
     const {
       value: response,
       responseHeaders,
@@ -30064,13 +30158,13 @@ var OpenAITranscriptionModel = class {
         path: "/audio/transcriptions",
         modelId: this.modelId
       }),
-      headers: combineHeaders(this.config.headers(), options.headers),
+      headers: combineHeaders(this.config.headers(), options2.headers),
       formData,
       failedResponseHandler: openaiFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
         openaiTranscriptionResponseSchema
       ),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     const language = response.language != null && response.language in languageMap ? languageMap[response.language] : void 0;
@@ -30098,25 +30192,25 @@ var OpenAITranscriptionModel = class {
   }
 };
 var VERSION$1 = "3.0.73";
-function createOpenAI(options = {}) {
+function createOpenAI(options2 = {}) {
   var _a17, _b15;
   const baseURL = (_a17 = withoutTrailingSlash(
     loadOptionalSetting({
-      settingValue: options.baseURL,
+      settingValue: options2.baseURL,
       environmentVariableName: "OPENAI_BASE_URL"
     })
   )) != null ? _a17 : "https://api.openai.com/v1";
-  const providerName = (_b15 = options.name) != null ? _b15 : "openai";
+  const providerName = (_b15 = options2.name) != null ? _b15 : "openai";
   const getHeaders = () => withUserAgentSuffix(
     {
       Authorization: `Bearer ${loadApiKey({
-        apiKey: options.apiKey,
+        apiKey: options2.apiKey,
         environmentVariableName: "OPENAI_API_KEY",
         description: "OpenAI"
       })}`,
-      "OpenAI-Organization": options.organization,
-      "OpenAI-Project": options.project,
-      ...options.headers
+      "OpenAI-Organization": options2.organization,
+      "OpenAI-Project": options2.project,
+      ...options2.headers
     },
     `ai-sdk/openai/${VERSION$1}`
   );
@@ -30124,37 +30218,37 @@ function createOpenAI(options = {}) {
     provider: `${providerName}.chat`,
     url: ({ path }) => `${baseURL}${path}`,
     headers: getHeaders,
-    fetch: options.fetch
+    fetch: options2.fetch
   });
   const createCompletionModel = (modelId) => new OpenAICompletionLanguageModel(modelId, {
     provider: `${providerName}.completion`,
     url: ({ path }) => `${baseURL}${path}`,
     headers: getHeaders,
-    fetch: options.fetch
+    fetch: options2.fetch
   });
   const createEmbeddingModel = (modelId) => new OpenAIEmbeddingModel(modelId, {
     provider: `${providerName}.embedding`,
     url: ({ path }) => `${baseURL}${path}`,
     headers: getHeaders,
-    fetch: options.fetch
+    fetch: options2.fetch
   });
   const createImageModel = (modelId) => new OpenAIImageModel(modelId, {
     provider: `${providerName}.image`,
     url: ({ path }) => `${baseURL}${path}`,
     headers: getHeaders,
-    fetch: options.fetch
+    fetch: options2.fetch
   });
   const createTranscriptionModel = (modelId) => new OpenAITranscriptionModel(modelId, {
     provider: `${providerName}.transcription`,
     url: ({ path }) => `${baseURL}${path}`,
     headers: getHeaders,
-    fetch: options.fetch
+    fetch: options2.fetch
   });
   const createSpeechModel = (modelId) => new OpenAISpeechModel(modelId, {
     provider: `${providerName}.speech`,
     url: ({ path }) => `${baseURL}${path}`,
     headers: getHeaders,
-    fetch: options.fetch
+    fetch: options2.fetch
   });
   const createLanguageModel = (modelId) => {
     if (new.target) {
@@ -30169,7 +30263,7 @@ function createOpenAI(options = {}) {
       provider: `${providerName}.responses`,
       url: ({ path }) => `${baseURL}${path}`,
       headers: getHeaders,
-      fetch: options.fetch,
+      fetch: options2.fetch,
       fileIdPrefixes: ["file-"]
     });
   };
@@ -30555,9 +30649,9 @@ function getGoogleProviderOptions(providerOptions, providerOptionsName) {
     return allNamespaces.indexOf(namespace) === index2;
   });
   for (const namespace of namespaces) {
-    const options = providerOptions == null ? void 0 : providerOptions[namespace];
-    if (options != null) {
-      return options;
+    const options2 = providerOptions == null ? void 0 : providerOptions[namespace];
+    if (options2 != null) {
+      return options2;
     }
   }
 }
@@ -30667,16 +30761,16 @@ function appendLegacyToolResultParts(parts, toolName, outputValue, toolCallId) {
     }
   }
 }
-function convertToGoogleGenerativeAIMessages(prompt, options) {
+function convertToGoogleGenerativeAIMessages(prompt, options2) {
   var _a17, _b15, _c, _d, _e;
   const systemInstructionParts = [];
   const contents = [];
   let systemMessagesAllowed = true;
-  const isGemmaModel = (_a17 = options == null ? void 0 : options.isGemmaModel) != null ? _a17 : false;
-  const isGemini3Model = (_b15 = options == null ? void 0 : options.isGemini3Model) != null ? _b15 : false;
-  const providerOptionsName = (_c = options == null ? void 0 : options.providerOptionsName) != null ? _c : "google";
-  const supportsFunctionResponseParts = (_d = options == null ? void 0 : options.supportsFunctionResponseParts) != null ? _d : true;
-  const onWarning = options == null ? void 0 : options.onWarning;
+  const isGemmaModel = (_a17 = options2 == null ? void 0 : options2.isGemmaModel) != null ? _a17 : false;
+  const isGemini3Model = (_b15 = options2 == null ? void 0 : options2.isGemini3Model) != null ? _b15 : false;
+  const providerOptionsName = (_c = options2 == null ? void 0 : options2.providerOptionsName) != null ? _c : "google";
+  const supportsFunctionResponseParts = (_d = options2 == null ? void 0 : options2.supportsFunctionResponseParts) != null ? _d : true;
+  const onWarning = options2 == null ? void 0 : options2.onWarning;
   let sentinelInjected = false;
   const missingSignatureToolNames = [];
   const injectSkipSignature = (toolName) => {
@@ -31711,12 +31805,12 @@ var GoogleGenerativeAILanguageModel = class {
       extraHeaders: vertexPaygoHeaders
     };
   }
-  async doGenerate(options) {
+  async doGenerate(options2) {
     var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
-    const { args, warnings, providerOptionsName, extraHeaders } = await this.getArgs(options);
+    const { args, warnings, providerOptionsName, extraHeaders } = await this.getArgs(options2);
     const mergedHeaders = combineHeaders(
       await resolve(this.config.headers),
-      options.headers,
+      options2.headers,
       extraHeaders
     );
     const {
@@ -31731,7 +31825,7 @@ var GoogleGenerativeAILanguageModel = class {
       body: args,
       failedResponseHandler: googleFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(responseSchema),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     const candidate = response.candidates[0];
@@ -31893,11 +31987,11 @@ var GoogleGenerativeAILanguageModel = class {
       }
     };
   }
-  async doStream(options) {
-    const { args, warnings, providerOptionsName, extraHeaders } = await this.getArgs(options, { isStreaming: true });
+  async doStream(options2) {
+    const { args, warnings, providerOptionsName, extraHeaders } = await this.getArgs(options2, { isStreaming: true });
     const headers = combineHeaders(
       await resolve(this.config.headers),
-      options.headers,
+      options2.headers,
       extraHeaders
     );
     const { responseHeaders, value: response } = await postJsonToApi({
@@ -31908,7 +32002,7 @@ var GoogleGenerativeAILanguageModel = class {
       body: args,
       failedResponseHandler: googleFailedResponseHandler,
       successfulResponseHandler: createEventSourceResponseHandler(chunkSchema),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     let finishReason = {
@@ -31964,7 +32058,7 @@ var GoogleGenerativeAILanguageModel = class {
           },
           transform(chunk, controller) {
             var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
-            if (options.includeRawChunks) {
+            if (options2.includeRawChunks) {
               controller.enqueue({ type: "raw", rawValue: chunk.rawValue });
             }
             if (!chunk.success) {
@@ -32746,13 +32840,13 @@ var GoogleGenerativeAIImageModel = class {
   get provider() {
     return this.config.provider;
   }
-  async doGenerate(options) {
+  async doGenerate(options2) {
     if (isGeminiModel(this.modelId)) {
-      return this.doGenerateGemini(options);
+      return this.doGenerateGemini(options2);
     }
-    return this.doGenerateImagen(options);
+    return this.doGenerateImagen(options2);
   }
-  async doGenerateImagen(options) {
+  async doGenerateImagen(options2) {
     var _a17, _b15, _c;
     const {
       prompt,
@@ -32765,7 +32859,7 @@ var GoogleGenerativeAIImageModel = class {
       abortSignal,
       files,
       mask
-    } = options;
+    } = options2;
     const warnings = [];
     if (files != null && files.length > 0) {
       throw new Error(
@@ -32848,7 +32942,7 @@ var GoogleGenerativeAIImageModel = class {
       }
     };
   }
-  async doGenerateGemini(options) {
+  async doGenerateGemini(options2) {
     var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const {
       prompt,
@@ -32861,7 +32955,7 @@ var GoogleGenerativeAIImageModel = class {
       abortSignal,
       files,
       mask
-    } = options;
+    } = options2;
     const warnings = [];
     if (mask != null) {
       throw new Error(
@@ -33010,32 +33104,32 @@ var GoogleGenerativeAIVideoModel = class {
   get maxVideosPerCall() {
     return 4;
   }
-  async doGenerate(options) {
+  async doGenerate(options2) {
     var _a17, _b15, _c, _d, _e, _f, _g, _h;
     const currentDate = (_c = (_b15 = (_a17 = this.config._internal) == null ? void 0 : _a17.currentDate) == null ? void 0 : _b15.call(_a17)) != null ? _c : /* @__PURE__ */ new Date();
     const warnings = [];
     const googleOptions = await parseProviderOptions({
       provider: "google",
-      providerOptions: options.providerOptions,
+      providerOptions: options2.providerOptions,
       schema: googleVideoModelOptionsSchema
     });
     const instances = [{}];
     const instance = instances[0];
-    if (options.prompt != null) {
-      instance.prompt = options.prompt;
+    if (options2.prompt != null) {
+      instance.prompt = options2.prompt;
     }
-    if (options.image != null) {
-      if (options.image.type === "url") {
+    if (options2.image != null) {
+      if (options2.image.type === "url") {
         warnings.push({
           type: "unsupported",
           feature: "URL-based image input",
           details: "Google Generative AI video models require base64-encoded images. URL will be ignored."
         });
       } else {
-        const base64Data = typeof options.image.data === "string" ? options.image.data : convertUint8ArrayToBase64(options.image.data);
+        const base64Data = typeof options2.image.data === "string" ? options2.image.data : convertUint8ArrayToBase64(options2.image.data);
         instance.image = {
           inlineData: {
-            mimeType: options.image.mediaType || "image/png",
+            mimeType: options2.image.mediaType || "image/png",
             data: base64Data
           }
         };
@@ -33059,24 +33153,24 @@ var GoogleGenerativeAIVideoModel = class {
       });
     }
     const parameters = {
-      sampleCount: options.n
+      sampleCount: options2.n
     };
-    if (options.aspectRatio) {
-      parameters.aspectRatio = options.aspectRatio;
+    if (options2.aspectRatio) {
+      parameters.aspectRatio = options2.aspectRatio;
     }
-    if (options.resolution) {
+    if (options2.resolution) {
       const resolutionMap = {
         "1280x720": "720p",
         "1920x1080": "1080p",
         "3840x2160": "4k"
       };
-      parameters.resolution = resolutionMap[options.resolution] || options.resolution;
+      parameters.resolution = resolutionMap[options2.resolution] || options2.resolution;
     }
-    if (options.duration) {
-      parameters.durationSeconds = options.duration;
+    if (options2.duration) {
+      parameters.durationSeconds = options2.duration;
     }
-    if (options.seed) {
-      parameters.seed = options.seed;
+    if (options2.seed) {
+      parameters.seed = options2.seed;
     }
     if (googleOptions != null) {
       const opts = googleOptions;
@@ -33102,7 +33196,7 @@ var GoogleGenerativeAIVideoModel = class {
       url: `${this.config.baseURL}/models/${this.modelId}:predictLongRunning`,
       headers: combineHeaders(
         await resolve(this.config.headers),
-        options.headers
+        options2.headers
       ),
       body: {
         instances,
@@ -33112,7 +33206,7 @@ var GoogleGenerativeAIVideoModel = class {
         googleOperationSchema
       ),
       failedResponseHandler: googleFailedResponseHandler,
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     const operationName = operation.name;
@@ -33135,7 +33229,7 @@ var GoogleGenerativeAIVideoModel = class {
         });
       }
       await delay(pollIntervalMs);
-      if ((_f = options.abortSignal) == null ? void 0 : _f.aborted) {
+      if ((_f = options2.abortSignal) == null ? void 0 : _f.aborted) {
         throw new AISDKError({
           name: "GOOGLE_VIDEO_GENERATION_ABORTED",
           message: "Video generation request was aborted"
@@ -33145,13 +33239,13 @@ var GoogleGenerativeAIVideoModel = class {
         url: `${this.config.baseURL}/${operationName}`,
         headers: combineHeaders(
           await resolve(this.config.headers),
-          options.headers
+          options2.headers
         ),
         successfulResponseHandler: createJsonResponseHandler(
           googleOperationSchema
         ),
         failedResponseHandler: googleFailedResponseHandler,
-        abortSignal: options.abortSignal,
+        abortSignal: options2.abortSignal,
         fetch: this.config.fetch
       });
       finalOperation = statusOperation;
@@ -34099,34 +34193,34 @@ function convertFilePartToContent({
   mediaResolution
 }) {
   const topLevel = getTopLevelMediaType(part.mediaType);
-  let kind;
+  let kind2;
   switch (topLevel) {
     case "image":
-      kind = "image";
+      kind2 = "image";
       break;
     case "audio":
-      kind = "audio";
+      kind2 = "audio";
       break;
     case "video":
-      kind = "video";
+      kind2 = "video";
       break;
     case "application":
-      kind = "document";
+      kind2 = "document";
       break;
     default:
-      kind = void 0;
+      kind2 = void 0;
   }
-  if (kind == null) {
+  if (kind2 == null) {
     warnings.push({
       type: "other",
       message: `google.interactions: unsupported file media type "${part.mediaType}"; part dropped.`
     });
     return void 0;
   }
-  const resolutionField = mediaResolution != null && (kind === "image" || kind === "video") ? { resolution: mediaResolution } : {};
+  const resolutionField = mediaResolution != null && (kind2 === "image" || kind2 === "video") ? { resolution: mediaResolution } : {};
   if (part.data instanceof URL) {
     return {
-      type: kind,
+      type: kind2,
       uri: part.data.toString(),
       ...isFullMediaType(part.mediaType) ? { mime_type: part.mediaType } : {},
       ...resolutionField
@@ -34140,7 +34234,7 @@ function convertFilePartToContent({
     return void 0;
   }
   return {
-    type: kind,
+    type: kind2,
     data: convertToBase64(part.data),
     mime_type: part.mediaType,
     ...resolutionField
@@ -35562,16 +35656,16 @@ var GoogleInteractionsLanguageModel = class {
       ]
     };
   }
-  async getArgs(options) {
+  async getArgs(options2) {
     var _a17, _b15, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z;
     const warnings = [];
     const opts = await parseProviderOptions({
       provider: "google",
-      providerOptions: options.providerOptions,
+      providerOptions: options2.providerOptions,
       schema: googleInteractionsLanguageModelOptions
     });
     const isAgent = this.agent != null;
-    const hasTools = options.tools != null && options.tools.length > 0;
+    const hasTools = options2.tools != null && options2.tools.length > 0;
     let toolsForBody;
     let toolChoiceForBody;
     if (hasTools && isAgent) {
@@ -35581,15 +35675,15 @@ var GoogleInteractionsLanguageModel = class {
       });
     } else if (hasTools) {
       const prepared = prepareGoogleInteractionsTools({
-        tools: options.tools,
-        toolChoice: options.toolChoice
+        tools: options2.tools,
+        toolChoice: options2.toolChoice
       });
       toolsForBody = prepared.tools;
       toolChoiceForBody = prepared.toolChoice;
       warnings.push(...prepared.toolWarnings);
     }
     const responseFormatEntries = [];
-    if (((_a17 = options.responseFormat) == null ? void 0 : _a17.type) === "json") {
+    if (((_a17 = options2.responseFormat) == null ? void 0 : _a17.type) === "json") {
       if (isAgent) {
         warnings.push({
           type: "other",
@@ -35599,7 +35693,7 @@ var GoogleInteractionsLanguageModel = class {
         const entry = {
           type: "text",
           mime_type: "application/json",
-          ...options.responseFormat.schema != null ? { schema: options.responseFormat.schema } : {}
+          ...options2.responseFormat.schema != null ? { schema: options2.responseFormat.schema } : {}
         };
         responseFormatEntries.push(entry);
       }
@@ -35638,7 +35732,7 @@ var GoogleInteractionsLanguageModel = class {
       systemInstruction: convertedSystemInstruction,
       warnings: convWarnings
     } = convertToGoogleInteractionsInput({
-      prompt: options.prompt,
+      prompt: options2.prompt,
       previousInteractionId: (_h = opts == null ? void 0 : opts.previousInteractionId) != null ? _h : void 0,
       store: (_i = opts == null ? void 0 : opts.store) != null ? _i : void 0,
       mediaResolution: (_j = opts == null ? void 0 : opts.mediaResolution) != null ? _j : void 0
@@ -35657,13 +35751,13 @@ var GoogleInteractionsLanguageModel = class {
     let generationConfig;
     if (isAgent) {
       const droppedFields = [];
-      if (options.temperature != null) droppedFields.push("temperature");
-      if (options.topP != null) droppedFields.push("topP");
-      if (options.seed != null) droppedFields.push("seed");
-      if (options.stopSequences != null && options.stopSequences.length > 0) {
+      if (options2.temperature != null) droppedFields.push("temperature");
+      if (options2.topP != null) droppedFields.push("topP");
+      if (options2.seed != null) droppedFields.push("seed");
+      if (options2.stopSequences != null && options2.stopSequences.length > 0) {
         droppedFields.push("stopSequences");
       }
-      if (options.maxOutputTokens != null)
+      if (options2.maxOutputTokens != null)
         droppedFields.push("maxOutputTokens");
       if ((opts == null ? void 0 : opts.thinkingLevel) != null) droppedFields.push("thinkingLevel");
       if ((opts == null ? void 0 : opts.thinkingSummaries) != null) {
@@ -35679,11 +35773,11 @@ var GoogleInteractionsLanguageModel = class {
       generationConfig = void 0;
     } else {
       generationConfig = pruneUndefined({
-        temperature: (_l = options.temperature) != null ? _l : void 0,
-        top_p: (_m = options.topP) != null ? _m : void 0,
-        seed: (_n = options.seed) != null ? _n : void 0,
-        stop_sequences: options.stopSequences != null && options.stopSequences.length > 0 ? options.stopSequences : void 0,
-        max_output_tokens: (_o = options.maxOutputTokens) != null ? _o : void 0,
+        temperature: (_l = options2.temperature) != null ? _l : void 0,
+        top_p: (_m = options2.topP) != null ? _m : void 0,
+        seed: (_n = options2.seed) != null ? _n : void 0,
+        stop_sequences: options2.stopSequences != null && options2.stopSequences.length > 0 ? options2.stopSequences : void 0,
+        max_output_tokens: (_o = options2.maxOutputTokens) != null ? _o : void 0,
         thinking_level: (_p = opts == null ? void 0 : opts.thinkingLevel) != null ? _p : void 0,
         thinking_summaries: (_q = opts == null ? void 0 : opts.thinkingSummaries) != null ? _q : void 0,
         tool_choice: toolChoiceForBody
@@ -35792,14 +35886,14 @@ var GoogleInteractionsLanguageModel = class {
       pollingTimeoutMs: (_z = opts == null ? void 0 : opts.pollingTimeoutMs) != null ? _z : void 0
     };
   }
-  async doGenerate(options) {
+  async doGenerate(options2) {
     var _a17, _b15, _c, _d, _e, _f;
-    const { args, warnings, isAgent, pollingTimeoutMs } = await this.getArgs(options);
+    const { args, warnings, isAgent, pollingTimeoutMs } = await this.getArgs(options2);
     const url = `${this.config.baseURL}/interactions`;
     const mergedHeaders = combineHeaders(
       INTERACTIONS_API_REVISION_HEADER,
       this.config.headers ? await resolve(this.config.headers) : void 0,
-      options.headers
+      options2.headers
     );
     const postResult = await postJsonToApi({
       url,
@@ -35809,7 +35903,7 @@ var GoogleInteractionsLanguageModel = class {
       successfulResponseHandler: createJsonResponseHandler(
         googleInteractionsResponseSchema
       ),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     let {
@@ -35823,7 +35917,7 @@ var GoogleInteractionsLanguageModel = class {
         interactionId: response.id,
         headers: mergedHeaders,
         fetch: this.config.fetch,
-        abortSignal: options.abortSignal,
+        abortSignal: options2.abortSignal,
         timeoutMs: pollingTimeoutMs
       });
       response = polled.response;
@@ -35873,14 +35967,14 @@ var GoogleInteractionsLanguageModel = class {
       }
     };
   }
-  async doStream(options) {
+  async doStream(options2) {
     var _a17;
-    const { args, warnings, isBackground, pollingTimeoutMs } = await this.getArgs(options);
+    const { args, warnings, isBackground, pollingTimeoutMs } = await this.getArgs(options2);
     const url = `${this.config.baseURL}/interactions`;
     const mergedHeaders = combineHeaders(
       INTERACTIONS_API_REVISION_HEADER,
       this.config.headers ? await resolve(this.config.headers) : void 0,
-      options.headers
+      options2.headers
     );
     if (isBackground) {
       return this.doStreamBackground({
@@ -35888,7 +35982,7 @@ var GoogleInteractionsLanguageModel = class {
         warnings,
         url,
         mergedHeaders,
-        options,
+        options: options2,
         pollingTimeoutMs
       });
     }
@@ -35901,14 +35995,14 @@ var GoogleInteractionsLanguageModel = class {
       successfulResponseHandler: createEventSourceResponseHandler(
         googleInteractionsEventSchema
       ),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     const headerServiceTier = responseHeaders == null ? void 0 : responseHeaders["x-gemini-service-tier"];
     const transform2 = buildGoogleInteractionsStreamTransform({
       warnings,
       generateId: (_a17 = this.config.generateId) != null ? _a17 : generateId,
-      includeRawChunks: options.includeRawChunks,
+      includeRawChunks: options2.includeRawChunks,
       serviceTier: headerServiceTier
     });
     return {
@@ -35940,7 +36034,7 @@ var GoogleInteractionsLanguageModel = class {
     warnings,
     url,
     mergedHeaders,
-    options,
+    options: options2,
     pollingTimeoutMs
   }) {
     var _a17, _b15;
@@ -35952,7 +36046,7 @@ var GoogleInteractionsLanguageModel = class {
       successfulResponseHandler: createJsonResponseHandler(
         googleInteractionsResponseSchema
       ),
-      abortSignal: options.abortSignal,
+      abortSignal: options2.abortSignal,
       fetch: this.config.fetch
     });
     const { responseHeaders: postHeaders, value: postResponse } = postResult;
@@ -35968,7 +36062,7 @@ var GoogleInteractionsLanguageModel = class {
         response: postResponse,
         warnings,
         generateId: (_a17 = this.config.generateId) != null ? _a17 : generateId,
-        includeRawChunks: options.includeRawChunks,
+        includeRawChunks: options2.includeRawChunks,
         headerServiceTier
       });
       return {
@@ -35982,12 +36076,12 @@ var GoogleInteractionsLanguageModel = class {
       interactionId,
       headers: mergedHeaders,
       fetch: this.config.fetch,
-      abortSignal: options.abortSignal
+      abortSignal: options2.abortSignal
     });
     const transform2 = buildGoogleInteractionsStreamTransform({
       warnings,
       generateId: (_b15 = this.config.generateId) != null ? _b15 : generateId,
-      includeRawChunks: options.includeRawChunks,
+      includeRawChunks: options2.includeRawChunks,
       serviceTier: headerServiceTier
     });
     return {
@@ -36008,18 +36102,18 @@ function pruneUndefined(obj) {
   }
   return result;
 }
-function createGoogleGenerativeAI(options = {}) {
+function createGoogleGenerativeAI(options2 = {}) {
   var _a17, _b15;
-  const baseURL = (_a17 = withoutTrailingSlash(options.baseURL)) != null ? _a17 : "https://generativelanguage.googleapis.com/v1beta";
-  const providerName = (_b15 = options.name) != null ? _b15 : "google.generative-ai";
+  const baseURL = (_a17 = withoutTrailingSlash(options2.baseURL)) != null ? _a17 : "https://generativelanguage.googleapis.com/v1beta";
+  const providerName = (_b15 = options2.name) != null ? _b15 : "google.generative-ai";
   const getHeaders = () => withUserAgentSuffix(
     {
       "x-goog-api-key": loadApiKey({
-        apiKey: options.apiKey,
+        apiKey: options2.apiKey,
         environmentVariableName: "GOOGLE_GENERATIVE_AI_API_KEY",
         description: "Google Generative AI"
       }),
-      ...options.headers
+      ...options2.headers
     },
     `ai-sdk/google/${VERSION}`
   );
@@ -36029,7 +36123,7 @@ function createGoogleGenerativeAI(options = {}) {
       provider: providerName,
       baseURL,
       headers: getHeaders,
-      generateId: (_a22 = options.generateId) != null ? _a22 : generateId,
+      generateId: (_a22 = options2.generateId) != null ? _a22 : generateId,
       supportedUrls: () => ({
         "*": [
           // Google Generative Language "files" endpoint
@@ -36042,20 +36136,20 @@ function createGoogleGenerativeAI(options = {}) {
           new RegExp(`^https://youtu\\.be/[\\w-]+(?:\\?[\\w=&.-]*)?$`)
         ]
       }),
-      fetch: options.fetch
+      fetch: options2.fetch
     });
   };
   const createEmbeddingModel = (modelId) => new GoogleGenerativeAIEmbeddingModel(modelId, {
     provider: providerName,
     baseURL,
     headers: getHeaders,
-    fetch: options.fetch
+    fetch: options2.fetch
   });
   const createImageModel = (modelId, settings = {}) => new GoogleGenerativeAIImageModel(modelId, settings, {
     provider: providerName,
     baseURL,
     headers: getHeaders,
-    fetch: options.fetch
+    fetch: options2.fetch
   });
   const createVideoModel = (modelId) => {
     var _a22;
@@ -36063,8 +36157,8 @@ function createGoogleGenerativeAI(options = {}) {
       provider: providerName,
       baseURL,
       headers: getHeaders,
-      fetch: options.fetch,
-      generateId: (_a22 = options.generateId) != null ? _a22 : generateId
+      fetch: options2.fetch,
+      generateId: (_a22 = options2.generateId) != null ? _a22 : generateId
     });
   };
   const createInteractionsModel = (modelIdOrAgent) => {
@@ -36075,8 +36169,8 @@ function createGoogleGenerativeAI(options = {}) {
         provider: `${providerName}.interactions`,
         baseURL,
         headers: getHeaders,
-        generateId: (_a22 = options.generateId) != null ? _a22 : generateId,
-        fetch: options.fetch
+        generateId: (_a22 = options2.generateId) != null ? _a22 : generateId,
+        fetch: options2.fetch
       }
     );
   };
@@ -36179,6 +36273,7 @@ const registryService = ({ strapi }) => ({
     };
   }
 });
+const CHAT_MODES = ["content", "layout", "audit"];
 const SYSTEM_PROMPT = `You are the Concept Bath content assistant, embedded in the Strapi admin panel.
 
 You can inspect and edit the website's content using the provided tools.
@@ -36219,29 +36314,35 @@ You can inspect and edit the website's content using the provided tools.
 ## Style
 - Use Markdown (bold, lists, inline code) — it is rendered in the chat.
 - Be concise. Reference entries by their title and documentId.`;
-function redactSecrets(text2) {
-  return text2.replace(/([?&](?:key|api[_-]?key|access_token)=)[^&\s"']+/gi, "$1[redacted]").replace(/AIza[0-9A-Za-z\-_]{10,}/g, "[redacted]").replace(/sk-(?:ant-)?[A-Za-z0-9\-_]{6,}/g, "[redacted]").replace(/Bearer\s+[A-Za-z0-9\-_.]+/gi, "Bearer [redacted]");
-}
-function describeProviderError(error) {
-  const e = error;
-  const parts = [];
-  if (e?.name && e.name !== "Error") parts.push(String(e.name));
-  if (e?.statusCode) parts.push(`HTTP ${e.statusCode}`);
-  if (e?.message) parts.push(String(e.message));
-  else if (typeof error === "string") parts.push(error);
-  return redactSecrets(parts.join(" — ") || "unknown error");
-}
+const bodySchema = object$1({
+  threadId: string().min(1),
+  mode: _enum(CHAT_MODES).optional(),
+  messages: array$1(any())
+});
 const chatController = ({ strapi }) => ({
   async chat(ctx) {
-    const { messages } = ctx.request.body ?? {};
-    if (!Array.isArray(messages)) {
-      return ctx.badRequest("Request body must be { messages: UIMessage[] }.");
+    const plugin = strapi.plugin("ai-content-studio");
+    const redact = () => plugin.service("redact");
+    const threads = () => plugin.service("threads");
+    const parsed = bodySchema.safeParse(ctx.request.body ?? {});
+    if (!parsed.success) {
+      return ctx.badRequest("Request body must be { threadId: string, messages: UIMessage[] }.");
     }
+    const { threadId, messages } = parsed.data;
+    const ownerId = ctx.state?.user?.id;
+    if (!Number.isInteger(ownerId)) {
+      return ctx.unauthorized("Not authenticated.");
+    }
+    const thread = await threads().getOwnedThread(threadId, ownerId);
+    if (!thread) {
+      return ctx.notFound("That conversation does not exist.");
+    }
+    const mode = parsed.data.mode ?? thread.mode ?? "content";
     const userAbility = ctx.state.userAbility;
     let model;
     let supportsVision = false;
     try {
-      const active = await strapi.plugin("ai-content-studio").service("registry").getActiveModel();
+      const active = await plugin.service("registry").getActiveModel();
       model = active.model;
       supportsVision = active.supportsVision;
     } catch (err) {
@@ -36251,10 +36352,22 @@ const chatController = ({ strapi }) => ({
       strapi.log.error("[ai-content-studio] failed to build AI model", err);
       return ctx.internalServerError("AI provider initialization failed.");
     }
-    const tools = strapi.plugin("ai-content-studio").service("tools").buildTools({ userAbility });
+    const tools = plugin.service("tools").buildTools({ userAbility });
     const showErrorDetails = Boolean(
       strapi.config.get("plugin::ai-content-studio.showProviderErrorDetails", false)
     );
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === "user") {
+      await threads().appendMessage({
+        threadId,
+        ownerId,
+        role: "user",
+        // File parts hold base64 data URLs — never persist them (data-model: `parts` stores no
+        // attachment bytes). The text of the turn is what history needs.
+        parts: (lastMessage.parts ?? []).filter((part) => part?.type !== "file"),
+        modeAtSend: mode
+      });
+    }
     const trimmed = messages.map((message, index2) => {
       const keepFiles = index2 === messages.length - 1 && supportsVision;
       return keepFiles ? message : { ...message, parts: (message.parts ?? []).filter((part) => part.type !== "file") };
@@ -36266,17 +36379,36 @@ const chatController = ({ strapi }) => ({
       tools,
       stopWhen: stepCountIs(8),
       onError({ error }) {
-        strapi.log.error(`[ai-content-studio] stream error: ${describeProviderError(error)}`);
+        strapi.log.error(`[ai-content-studio] stream error: ${redact().describeError(error)}`);
       }
     });
     ctx.respond = false;
     result.pipeUIMessageStreamToResponse(ctx.res, {
+      // Persistence mode: the response message gets an id and arrives in `onFinish` already in
+      // the UI-part shape the chat replays, which is exactly what `chat-message.parts` stores.
+      originalMessages: messages,
+      async onFinish({ responseMessage, isAborted }) {
+        try {
+          await threads().appendMessage({
+            threadId,
+            ownerId,
+            role: "assistant",
+            parts: responseMessage?.parts ?? [],
+            modeAtSend: mode,
+            interrupted: isAborted
+          });
+        } catch (err) {
+          strapi.log.error(
+            `[ai-content-studio] failed to persist assistant turn: ${redact().describeError(err)}`
+          );
+        }
+      },
       onError(error) {
         if (error instanceof ProviderConfigError) {
           return error.message;
         }
         if (showErrorDetails) {
-          return `AI provider error: ${describeProviderError(error)}`;
+          return `AI provider error: ${redact().describeError(error)}`;
         }
         return "The AI provider returned an error. Please try again or check the provider settings.";
       },
@@ -36285,8 +36417,48 @@ const chatController = ({ strapi }) => ({
         Connection: "keep-alive"
       }
     });
+    return void 0;
   }
 });
+const createSchema = object$1({
+  mode: _enum(CHAT_MODES).optional()
+});
+const NOT_FOUND = "That conversation does not exist.";
+const threadsController = ({ strapi }) => {
+  const threads = () => strapi.plugin("ai-content-studio").service("threads");
+  const ownerOf = (ctx) => {
+    const id = ctx.state?.user?.id;
+    return Number.isInteger(id) ? id : null;
+  };
+  return {
+    async create(ctx) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized("Not authenticated.");
+      }
+      const parsed = createSchema.safeParse(ctx.request.body ?? {});
+      if (!parsed.success) {
+        return ctx.badRequest("Invalid request. `mode` must be one of content, layout, audit.");
+      }
+      const thread = await threads().createThread({ ownerId, mode: parsed.data.mode ?? "content" });
+      ctx.status = 201;
+      ctx.body = thread;
+      return void 0;
+    },
+    async findOne(ctx) {
+      const ownerId = ownerOf(ctx);
+      if (ownerId === null) {
+        return ctx.unauthorized("Not authenticated.");
+      }
+      const history = await threads().loadHistory(String(ctx.params.id), ownerId);
+      if (!history) {
+        return ctx.notFound(NOT_FOUND);
+      }
+      ctx.body = history;
+      return void 0;
+    }
+  };
+};
 const PROVIDERS = ["anthropic", "google", "openai"];
 const STORE_PARAMS = { type: "plugin", name: "ai-content-studio", key: "settings" };
 const emptyProvider = () => ({ apiKeyEnc: null, isSet: false, enabled: false });
@@ -36299,9 +36471,17 @@ const defaults = () => ({
     openai: emptyProvider()
   }
 });
+const num = (value, fallback, min, max) => {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, Math.trunc(n)));
+};
 const configService = ({ strapi }) => {
   const store = () => strapi.store(STORE_PARAMS);
   const cryptoSvc = () => strapi.plugin("ai-content-studio").service("crypto");
+  const option = (key, fallback) => strapi.config.get(`plugin::ai-content-studio.${key}`, fallback);
   const normalize = (raw) => {
     const base = defaults();
     if (!raw) {
@@ -36381,6 +36561,33 @@ const configService = ({ strapi }) => {
         activeModel: current.activeModel,
         providers
       };
+    },
+    /* ------------------------------------------------- static options, typed and defaulted */
+    /**
+     * Preview options. `enabled` is false unless a project opts in, and an enabled preview with
+     * no `baseUrl` is treated as NOT configured, so the panel falls back to the field comparison
+     * instead of producing a broken URL (FR-014).
+     */
+    getPreviewOptions() {
+      const raw = option("preview", {});
+      const baseUrl = typeof raw.baseUrl === "string" && raw.baseUrl.trim() !== "" ? raw.baseUrl.trim().replace(/\/+$/, "") : null;
+      const paths = raw.paths && typeof raw.paths === "object" && !Array.isArray(raw.paths) ? raw.paths : {};
+      return {
+        enabled: raw.enabled === true && baseUrl !== null,
+        baseUrl,
+        paths,
+        ttlMinutes: num(raw.ttlMinutes, 30, 1, 1440)
+      };
+    },
+    getAttachmentOptions() {
+      const raw = option("attachments", {});
+      const totalBudgetMb = num(raw.totalBudgetMb, 50, 1, 2048);
+      return { totalBudgetMb, totalBudgetBytes: totalBudgetMb * 1024 * 1024 };
+    },
+    getAuditOptions() {
+      const raw = option("audit", {});
+      const timeBudgetSeconds = num(raw.timeBudgetSeconds, 120, 5, 900);
+      return { timeBudgetSeconds, timeBudgetMs: timeBudgetSeconds * 1e3 };
     }
   };
   return service;
@@ -36423,20 +36630,29 @@ const settingsController = ({ strapi }) => {
 };
 const controllers = {
   chat: chatController,
+  threads: threadsController,
   settings: settingsController
 };
+const CHAT_USE = {
+  name: "admin::hasPermissions",
+  config: { actions: ["plugin::ai-content-studio.chat.use"] }
+};
+const chatRoute = (method, path, handler) => ({
+  method,
+  path,
+  handler,
+  config: {
+    policies: ["admin::isAuthenticatedAdmin", CHAT_USE]
+  }
+});
 const routes = {
   admin: {
     type: "admin",
     routes: [
-      {
-        method: "POST",
-        path: "/chat",
-        handler: "chat.chat",
-        config: {
-          policies: ["admin::isAuthenticatedAdmin"]
-        }
-      },
+      chatRoute("POST", "/chat", "chat.chat"),
+      // Threads — the caller's own conversations only.
+      chatRoute("POST", "/threads", "threads.create"),
+      chatRoute("GET", "/threads/:id", "threads.findOne"),
       {
         method: "GET",
         path: "/settings",
@@ -36461,6 +36677,7 @@ const IV_BYTES = 12;
 const KEY_BYTES = 32;
 const AUTH_TAG_BYTES = 16;
 const ENV_VAR = "AI_STUDIO_ENC_KEY";
+const PREVIEW_KEY_LABEL = "ai-content-studio:preview-token:v1";
 function loadKey() {
   const raw = process.env[ENV_VAR];
   if (!raw || raw.trim() === "") {
@@ -36481,6 +36698,7 @@ function loadKey() {
   }
   return key;
 }
+const b64url = (buf) => buf.toString("base64url");
 const cryptoService = ({ strapi: _strapi }) => {
   let cachedKey = null;
   const key = () => {
@@ -36488,6 +36706,15 @@ const cryptoService = ({ strapi: _strapi }) => {
       cachedKey = loadKey();
     }
     return cachedKey;
+  };
+  let cachedPreviewKey = null;
+  const previewKey = () => {
+    if (!cachedPreviewKey) {
+      cachedPreviewKey = Buffer.from(
+        crypto__default.default.hkdfSync("sha256", key(), Buffer.alloc(0), Buffer.from(PREVIEW_KEY_LABEL, "utf8"), KEY_BYTES)
+      );
+    }
+    return cachedPreviewKey;
   };
   return {
     /** Validates the env key. Throws (with no secret material) if missing/wrong length. */
@@ -36531,8 +36758,398 @@ const cryptoService = ({ strapi: _strapi }) => {
       const match = plaintext.match(/^([a-zA-Z]+-[a-zA-Z0-9]+)/);
       const prefix = match ? match[1] : plaintext.slice(0, 6);
       return `${prefix}-...••••${last4}`;
+    },
+    /* ------------------------------------------------------------ preview tokens (R11) */
+    /**
+     * Sign a preview token: `<base64url(payload)>.<base64url(HMAC-SHA256)>`.
+     * Opaque, single-purpose, and carries no ability to write.
+     */
+    signPreviewToken(payload) {
+      const body = b64url(Buffer.from(JSON.stringify(payload), "utf8"));
+      const sig = b64url(crypto__default.default.createHmac("sha256", previewKey()).update(body).digest());
+      return `${body}.${sig}`;
+    },
+    /**
+     * Verify signature AND expiry. Returns null for anything that does not verify — the caller
+     * IGNORES an invalid token rather than erroring, so a stale link degrades to the live site
+     * instead of breaking the page, and the token cannot be used to probe.
+     *
+     * Verification is pure crypto: it happens BEFORE any database access.
+     */
+    verifyPreviewToken(token) {
+      if (!token || typeof token !== "string") {
+        return null;
+      }
+      const dot = token.indexOf(".");
+      if (dot <= 0 || dot === token.length - 1) {
+        return null;
+      }
+      const body = token.slice(0, dot);
+      const sig = token.slice(dot + 1);
+      let expected;
+      let provided;
+      try {
+        expected = crypto__default.default.createHmac("sha256", previewKey()).update(body).digest();
+        provided = Buffer.from(sig, "base64url");
+      } catch {
+        return null;
+      }
+      if (provided.length !== expected.length || !crypto__default.default.timingSafeEqual(provided, expected)) {
+        return null;
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+      } catch {
+        return null;
+      }
+      const p = parsed;
+      if (!p || typeof p.sessionId !== "string" || typeof p.ownerId !== "number" || typeof p.changeSetId !== "string" || typeof p.exp !== "number") {
+        return null;
+      }
+      if (p.exp * 1e3 <= Date.now()) {
+        return null;
+      }
+      return p;
     }
   };
+};
+const MASK_TAIL = 4;
+const RULES = [
+  // key / token carried in a URL query string (Google puts the key in ?key=…)
+  { pattern: /([?&](?:key|api[_-]?key|access_token|token|secret)=)[^&\s"']+/gi, replacement: "$1[redacted]" },
+  // the plugin's own preview token, wherever it appears
+  { pattern: /([?&]aiStudioPreview=)[^&\s"']+/gi, replacement: "$1[redacted]" },
+  { pattern: /(x-ai-studio-preview:\s*)[A-Za-z0-9\-_.=]+/gi, replacement: "$1[redacted]" },
+  // provider key shapes
+  { pattern: /AIza[0-9A-Za-z\-_]{10,}/g, replacement: "[redacted]" },
+  { pattern: /sk-(?:ant-)?[A-Za-z0-9\-_]{6,}/g, replacement: "[redacted]" },
+  { pattern: /\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{16,}/g, replacement: "[redacted]" },
+  { pattern: /\bxox[abprs]-[A-Za-z0-9-]{10,}/g, replacement: "[redacted]" },
+  { pattern: /\bAKIA[0-9A-Z]{16}\b/g, replacement: "[redacted]" },
+  // bearer credentials and JWTs
+  { pattern: /Bearer\s+[A-Za-z0-9\-_.]+/gi, replacement: "Bearer [redacted]" },
+  { pattern: /\beyJ[A-Za-z0-9\-_]{8,}\.[A-Za-z0-9\-_]{8,}\.[A-Za-z0-9\-_]{8,}\b/g, replacement: "[redacted]" },
+  // "apiKey": "…" / api_key=… / password: …
+  {
+    pattern: /(\b(?:api[_-]?key|apikey|secret|password|passwd|token|auth)\b["']?\s*[:=]\s*["']?)[^\s"',;}]{6,}/gi,
+    replacement: "$1[redacted]"
+  }
+];
+const SECRET_LIKE = [
+  /sk-(?:ant-)?[A-Za-z0-9\-_]{6,}/,
+  /AIza[0-9A-Za-z\-_]{10,}/,
+  /\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{16,}/,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/,
+  /\bAKIA[0-9A-Z]{16}\b/,
+  /\beyJ[A-Za-z0-9\-_]{8,}\.[A-Za-z0-9\-_]{8,}\.[A-Za-z0-9\-_]{8,}\b/,
+  /\b(?:api[_-]?key|apikey|secret|password|passwd|access[_-]?token|private[_-]?key)\b["']?\s*[:=]/i,
+  /-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/,
+  // long, high-entropy, no-whitespace run that is not a URL or a sentence
+  /^[A-Za-z0-9+/=_-]{40,}$/
+];
+const redactService = ({ strapi: _strapi }) => ({
+  /** Strip anything key-shaped from a string before it is logged, returned, or sent to a model. */
+  redactSecrets(text2) {
+    if (!text2) {
+      return text2;
+    }
+    let out = text2;
+    for (const { pattern, replacement } of RULES) {
+      out = out.replace(pattern, replacement);
+    }
+    return out;
+  },
+  /** Recursively redact every string inside an arbitrary JSON-ish value. */
+  redactDeep(value, depth = 0) {
+    if (depth > 8) {
+      return "[omitted]";
+    }
+    if (typeof value === "string") {
+      return this.redactSecrets(value);
+    }
+    if (Array.isArray(value)) {
+      return value.map((v) => this.redactDeep(v, depth + 1));
+    }
+    if (value && typeof value === "object") {
+      const out = {};
+      for (const [k, v] of Object.entries(value)) {
+        out[k] = this.redactDeep(v, depth + 1);
+      }
+      return out;
+    }
+    return value;
+  },
+  /** True when a stored value looks like a credential and should be reported as a finding. */
+  looksSecretLike(value) {
+    if (typeof value !== "string") {
+      return false;
+    }
+    const trimmed = value.trim();
+    if (trimmed.length < 16 || /\s{2,}/.test(trimmed)) {
+      return false;
+    }
+    return SECRET_LIKE.some((re2) => re2.test(trimmed));
+  },
+  /**
+   * Mask a value for a finding: a recognizable prefix plus the last 4 characters, never more.
+   * e.g. "sk-ant-api03-AbC…xyz4f2a" -> "sk-ant-…••••4f2a"
+   */
+  mask(value) {
+    if (!value) {
+      return "";
+    }
+    const trimmed = value.trim();
+    if (trimmed.length <= MASK_TAIL) {
+      return "••••";
+    }
+    const prefixMatch = trimmed.match(/^([A-Za-z]+[-_][A-Za-z0-9]+)/);
+    const prefix = prefixMatch ? prefixMatch[1] : trimmed.slice(0, 4);
+    return `${prefix}…••••${trimmed.slice(-MASK_TAIL)}`;
+  },
+  /** Build a concise, key-free description of a provider / stream error. */
+  describeError(error) {
+    const e = error;
+    const parts = [];
+    if (e?.name && e.name !== "Error") {
+      parts.push(String(e.name));
+    }
+    if (e?.statusCode) {
+      parts.push(`HTTP ${e.statusCode}`);
+    }
+    if (e?.message) {
+      parts.push(String(e.message));
+    } else if (typeof error === "string") {
+      parts.push(error);
+    }
+    return this.redactSecrets(parts.join(" — ") || "unknown error");
+  }
+});
+const DEFAULT_TITLE = "New conversation";
+const MAX_TITLE_CHARS = 60;
+const threadsService = ({ strapi }) => {
+  const docs = (uid) => strapi.documents(uid);
+  const chains = /* @__PURE__ */ new Map();
+  const serialize = (threadId, work) => {
+    const prev = chains.get(threadId) ?? Promise.resolve();
+    const result = prev.then(work, work);
+    const tail = result.then(
+      () => void 0,
+      () => void 0
+    );
+    chains.set(threadId, tail);
+    void tail.then(() => {
+      if (chains.get(threadId) === tail) {
+        chains.delete(threadId);
+      }
+    });
+    return result;
+  };
+  const service = {
+    /** Short, human title from a first message. Clamped to 60 chars (FR-019). */
+    deriveTitle(text2) {
+      const cleaned = (text2 ?? "").replace(/```[\s\S]*?```/g, " ").replace(/\s+/g, " ").trim();
+      if (!cleaned) {
+        return DEFAULT_TITLE;
+      }
+      if (cleaned.length <= MAX_TITLE_CHARS) {
+        return cleaned;
+      }
+      const cut = cleaned.slice(0, MAX_TITLE_CHARS);
+      const lastSpace = cut.lastIndexOf(" ");
+      return `${(lastSpace > 20 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+    },
+    async createThread({
+      ownerId,
+      mode = "content",
+      title
+    }) {
+      const now2 = (/* @__PURE__ */ new Date()).toISOString();
+      const created = await docs(UID.thread).create({
+        data: {
+          title: title ? service.deriveTitle(title) : DEFAULT_TITLE,
+          ownerId,
+          mode,
+          lastActivityAt: now2
+        }
+      });
+      return {
+        id: created.documentId,
+        title: created.title,
+        mode: created.mode,
+        lastActivityAt: created.lastActivityAt,
+        messageCount: 0
+      };
+    },
+    /**
+     * The ONLY way to reach a thread. Returns null when the thread does not exist OR belongs to
+     * someone else — the caller cannot distinguish the two, which is the point. Callers answer
+     * 404 in both cases.
+     */
+    async getOwnedThread(threadId, ownerId) {
+      if (!threadId || typeof threadId !== "string" || !Number.isInteger(ownerId)) {
+        return null;
+      }
+      const thread = await docs(UID.thread).findOne({ documentId: threadId });
+      if (!thread || thread.ownerId !== ownerId) {
+        return null;
+      }
+      return thread;
+    },
+    /** Append one turn with a monotonic per-thread `sequence`. Also bumps last activity. */
+    async appendMessage(input) {
+      const { threadId, ownerId } = input;
+      return serialize(threadId, async () => {
+        const thread = await service.getOwnedThread(threadId, ownerId);
+        if (!thread) {
+          return null;
+        }
+        const last = await docs(UID.message).findMany({
+          filters: { thread: { documentId: threadId } },
+          sort: "sequence:desc",
+          limit: 1,
+          fields: ["sequence"]
+        });
+        const nextSequence = Number(last?.[0]?.sequence ?? 0) + 1;
+        const created = await docs(UID.message).create({
+          data: {
+            thread: threadId,
+            role: input.role,
+            sequence: nextSequence,
+            parts: input.parts ?? [],
+            attachmentManifest: input.attachmentManifest ?? null,
+            interrupted: input.interrupted ?? false,
+            modeAtSend: input.modeAtSend,
+            ...input.changeSetId ? { changeSet: input.changeSetId } : {}
+          }
+        });
+        const now2 = (/* @__PURE__ */ new Date()).toISOString();
+        const firstText = input.role === "user" && nextSequence === 1 ? (input.parts ?? []).map((p) => p).filter((p) => p?.type === "text" && typeof p.text === "string").map((p) => p.text).join(" ") : "";
+        const autoTitle = firstText && (thread.title === DEFAULT_TITLE || !thread.title) ? service.deriveTitle(firstText) : null;
+        await docs(UID.thread).update({
+          documentId: threadId,
+          data: { lastActivityAt: now2, ...autoTitle ? { title: autoTitle } : {} }
+        });
+        return {
+          id: created.documentId,
+          role: created.role,
+          sequence: created.sequence,
+          parts: created.parts ?? [],
+          attachmentManifest: created.attachmentManifest ?? null,
+          interrupted: Boolean(created.interrupted),
+          modeAtSend: created.modeAtSend,
+          changeSetId: null
+        };
+      });
+    },
+    /** Ordered messages for one thread. Owner-scoped; empty array is a valid history. */
+    async listMessages(threadId) {
+      const rows = await docs(UID.message).findMany({
+        filters: { thread: { documentId: threadId } },
+        sort: "sequence:asc",
+        populate: { changeSet: { fields: ["documentId"] } },
+        limit: -1
+      });
+      return (Array.isArray(rows) ? rows : []).map((m) => ({
+        id: m.documentId,
+        role: m.role,
+        sequence: m.sequence,
+        parts: Array.isArray(m.parts) ? m.parts : [],
+        attachmentManifest: Array.isArray(m.attachmentManifest) ? m.attachmentManifest : null,
+        interrupted: Boolean(m.interrupted),
+        modeAtSend: m.modeAtSend,
+        changeSetId: m.changeSet?.documentId ?? null
+      }));
+    },
+    /**
+     * Thread + full history in the shape the chat UI replays (FR-016).
+     *
+     * Also reports two things the UI must say out loud:
+     *   - `contextCondensed` — earlier detail was summarized rather than sent verbatim (FR-021);
+     *   - `expiredAttachments` — files held in the browser that were never ingested, so the user
+     *     can be told plainly and invited to re-attach (FR-038). Held bytes do not survive a
+     *     reload by design, so a manifest ordinal is expired unless an applied change item
+     *     recorded its ingestion.
+     */
+    async loadHistory(threadId, ownerId) {
+      const thread = await service.getOwnedThread(threadId, ownerId);
+      if (!thread) {
+        return null;
+      }
+      const messages = await service.listMessages(threadId);
+      const ingested = await service.ingestedOrdinals(threadId);
+      const expiredAttachments = messages.filter((m) => m.attachmentManifest && m.attachmentManifest.length > 0).map((m) => ({
+        messageId: m.id,
+        ordinals: (m.attachmentManifest ?? []).map((a) => a.ordinal).filter((ordinal) => !ingested.has(ordinal))
+      })).filter((entry) => entry.ordinals.length > 0);
+      return {
+        id: thread.documentId,
+        title: thread.title,
+        mode: thread.mode,
+        lastActivityAt: thread.lastActivityAt,
+        contextCondensed: Boolean(thread.contextSummary),
+        messages,
+        expiredAttachments
+      };
+    },
+    /** Ordinals in this thread whose files actually reached the Media Library. */
+    async ingestedOrdinals(threadId) {
+      const sets = await docs(UID.changeSet).findMany({
+        filters: { thread: { documentId: threadId } },
+        fields: ["items", "status"],
+        limit: -1
+      });
+      const out = /* @__PURE__ */ new Set();
+      for (const set of Array.isArray(sets) ? sets : []) {
+        if (set.status !== "applied" && set.status !== "partially_applied") {
+          continue;
+        }
+        for (const item of Array.isArray(set.items) ? set.items : []) {
+          if (typeof item?.attachmentOrdinal === "number" && item?.outcome?.state === "applied") {
+            out.add(item.attachmentOrdinal);
+          }
+        }
+      }
+      return out;
+    },
+    /** Bump `lastActivityAt` — used by apply / reject, which are not message appends. */
+    async touchLastActivity(threadId, ownerId) {
+      const thread = await service.getOwnedThread(threadId, ownerId);
+      if (!thread) {
+        return;
+      }
+      await docs(UID.thread).update({
+        documentId: threadId,
+        data: { lastActivityAt: (/* @__PURE__ */ new Date()).toISOString() }
+      });
+    },
+    /** Attach a produced plan to the message that produced it, so history replays the plan card. */
+    async linkChangeSetToMessage(messageId, changeSetId) {
+      if (!messageId || !changeSetId) {
+        return;
+      }
+      await docs(UID.message).update({
+        documentId: messageId,
+        data: { changeSet: changeSetId }
+      });
+    },
+    async setMode(threadId, ownerId, mode) {
+      const thread = await service.getOwnedThread(threadId, ownerId);
+      if (!thread || thread.mode === mode) {
+        return;
+      }
+      await docs(UID.thread).update({ documentId: threadId, data: { mode } });
+    },
+    summarize(thread) {
+      return {
+        id: thread.documentId,
+        title: thread.title,
+        mode: thread.mode,
+        lastActivityAt: thread.lastActivityAt
+      };
+    }
+  };
+  return service;
 };
 const MAX_FIELD_CHARS = 600;
 const MAX_PAGE_SIZE = 50;
@@ -36740,8 +37357,10 @@ const toolsService = ({ strapi }) => ({
 });
 const services = {
   crypto: cryptoService,
+  redact: redactService,
   config: configService,
   registry: registryService,
+  threads: threadsService,
   tools: toolsService
 };
 const SUPER_ADMIN_CODE = "strapi-super-admin";
@@ -36749,13 +37368,20 @@ const isSuperAdmin = (policyContext, _config, { strapi: _strapi }) => {
   const roles = policyContext.state?.user?.roles ?? [];
   return Array.isArray(roles) && roles.some((role) => role?.code === SUPER_ADMIN_CODE);
 };
+const AUDIT_RUN_ACTION = "plugin::ai-content-studio.audit.run";
+const hasAuditPermission = (policyContext, _config, { strapi: _strapi }) => {
+  const ability = policyContext.state?.userAbility;
+  return Boolean(ability?.can?.(AUDIT_RUN_ACTION));
+};
 const policies = {
-  "is-super-admin": isSuperAdmin
+  "is-super-admin": isSuperAdmin,
+  "has-audit-permission": hasAuditPermission
 };
 const index = {
   register,
   bootstrap,
   config: config$1,
+  contentTypes,
   controllers,
   routes,
   services,

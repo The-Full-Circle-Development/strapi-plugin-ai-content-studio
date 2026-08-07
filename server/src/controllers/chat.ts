@@ -1,6 +1,8 @@
 import { convertToModelMessages, streamText, stepCountIs, type UIMessage } from 'ai';
+import { z } from 'zod';
 import type { Core } from '@strapi/strapi';
 import { ProviderConfigError } from '../services/registry';
+import { CHAT_MODES } from '../types';
 
 const SYSTEM_PROMPT = `You are the Concept Bath content assistant, embedded in the Strapi admin panel.
 
@@ -44,35 +46,39 @@ You can inspect and edit the website's content using the provided tools.
 - Be concise. Reference entries by their title and documentId.`;
 
 /**
- * Strip anything that could be an API key / token from a string before it is logged or surfaced.
- * Providers do not normally echo the key, but some put it in a request URL (?key=…) — redact
- * defensively so neither the server log nor the UI can ever leak it.
+ * Request body. `threadId` is REQUIRED: every turn belongs to a durable, owner-scoped conversation
+ * (FR-016), and the thread is what makes the reply persist across a reload or a restart.
+ * Ownership is checked against `ctx.state.user.id` — a thread id from another user is a 404.
  */
-function redactSecrets(text: string): string {
-  return text
-    .replace(/([?&](?:key|api[_-]?key|access_token)=)[^&\s"']+/gi, '$1[redacted]')
-    .replace(/AIza[0-9A-Za-z\-_]{10,}/g, '[redacted]')
-    .replace(/sk-(?:ant-)?[A-Za-z0-9\-_]{6,}/g, '[redacted]')
-    .replace(/Bearer\s+[A-Za-z0-9\-_.]+/gi, 'Bearer [redacted]');
-}
-
-/** Build a concise, key-free description of a provider / stream error. */
-function describeProviderError(error: unknown): string {
-  const e = error as { name?: string; statusCode?: number; message?: string };
-  const parts: string[] = [];
-  if (e?.name && e.name !== 'Error') parts.push(String(e.name));
-  if (e?.statusCode) parts.push(`HTTP ${e.statusCode}`);
-  if (e?.message) parts.push(String(e.message));
-  else if (typeof error === 'string') parts.push(error);
-  return redactSecrets(parts.join(' — ') || 'unknown error');
-}
+const bodySchema = z.object({
+  threadId: z.string().min(1),
+  mode: z.enum(CHAT_MODES).optional(),
+  messages: z.array(z.any()),
+});
 
 const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
   async chat(ctx: any) {
-    const { messages } = (ctx.request.body ?? {}) as { messages?: UIMessage[] };
-    if (!Array.isArray(messages)) {
-      return ctx.badRequest('Request body must be { messages: UIMessage[] }.');
+    const plugin = strapi.plugin('ai-content-studio');
+    const redact = () => plugin.service('redact');
+    const threads = () => plugin.service('threads');
+
+    const parsed = bodySchema.safeParse(ctx.request.body ?? {});
+    if (!parsed.success) {
+      return ctx.badRequest('Request body must be { threadId: string, messages: UIMessage[] }.');
     }
+    const { threadId, messages } = parsed.data as { threadId: string; mode?: string; messages: UIMessage[] };
+
+    const ownerId = ctx.state?.user?.id;
+    if (!Number.isInteger(ownerId)) {
+      return ctx.unauthorized('Not authenticated.');
+    }
+
+    // Owner-scoped: a thread belonging to anyone else is indistinguishable from a missing one.
+    const thread = await threads().getOwnedThread(threadId, ownerId);
+    if (!thread) {
+      return ctx.notFound('That conversation does not exist.');
+    }
+    const mode = (parsed.data.mode ?? thread.mode ?? 'content') as 'content' | 'layout' | 'audit';
 
     // Set by the admin auth strategy for type:'admin' routes — the CALLER's CASL ability.
     const userAbility = ctx.state.userAbility;
@@ -80,7 +86,7 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     let model;
     let supportsVision = false;
     try {
-      const active = await strapi.plugin('ai-content-studio').service('registry').getActiveModel();
+      const active = await plugin.service('registry').getActiveModel();
       model = active.model;
       supportsVision = active.supportsVision;
     } catch (err) {
@@ -92,12 +98,27 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       return ctx.internalServerError('AI provider initialization failed.');
     }
 
-    const tools = strapi.plugin('ai-content-studio').service('tools').buildTools({ userAbility });
+    const tools = plugin.service('tools').buildTools({ userAbility });
 
     // Debug flag: surface the real (redacted) provider error to the UI instead of a generic one.
     const showErrorDetails = Boolean(
       strapi.config.get('plugin::ai-content-studio.showProviderErrorDetails', false)
     );
+
+    // Persist the user's turn BEFORE streaming, so a crash or a disconnect mid-generation still
+    // leaves an honest record of what was asked.
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === 'user') {
+      await threads().appendMessage({
+        threadId,
+        ownerId,
+        role: 'user',
+        // File parts hold base64 data URLs — never persist them (data-model: `parts` stores no
+        // attachment bytes). The text of the turn is what history needs.
+        parts: (lastMessage.parts ?? []).filter((part: any) => part?.type !== 'file'),
+        modeAtSend: mode,
+      });
+    }
 
     // Image handling that works with ALL models:
     //  - Drop file parts from older turns so we don't re-send base64 every request.
@@ -119,19 +140,39 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       stopWhen: stepCountIs(8),
       onError({ error }) {
         // Server-side only — redacted so a provider error that echoes a key/url can't leak it.
-        strapi.log.error(`[ai-content-studio] stream error: ${describeProviderError(error)}`);
+        strapi.log.error(`[ai-content-studio] stream error: ${redact().describeError(error)}`);
       },
     });
 
     // Take over the response so Koa does not serialize its own (empty) body and close the socket.
     ctx.respond = false;
     result.pipeUIMessageStreamToResponse(ctx.res, {
+      // Persistence mode: the response message gets an id and arrives in `onFinish` already in
+      // the UI-part shape the chat replays, which is exactly what `chat-message.parts` stores.
+      originalMessages: messages,
+      async onFinish({ responseMessage, isAborted }) {
+        try {
+          await threads().appendMessage({
+            threadId,
+            ownerId,
+            role: 'assistant',
+            parts: responseMessage?.parts ?? [],
+            modeAtSend: mode,
+            interrupted: isAborted,
+          });
+        } catch (err) {
+          // Never let a persistence failure surface as a provider error to the user.
+          strapi.log.error(
+            `[ai-content-studio] failed to persist assistant turn: ${redact().describeError(err)}`
+          );
+        }
+      },
       onError(error: unknown) {
         if (error instanceof ProviderConfigError) {
           return error.message;
         }
         if (showErrorDetails) {
-          return `AI provider error: ${describeProviderError(error)}`;
+          return `AI provider error: ${redact().describeError(error)}`;
         }
         return 'The AI provider returned an error. Please try again or check the provider settings.';
       },
@@ -140,6 +181,7 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
         Connection: 'keep-alive',
       },
     });
+    return undefined;
   },
 });
 

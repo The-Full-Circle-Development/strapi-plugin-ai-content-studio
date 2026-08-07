@@ -1,0 +1,75 @@
+{
+  "kind": "collectionType",
+  "collectionName": "ai_studio_change_sets",
+  "info": {
+    "singularName": "change-set",
+    "pluralName": "change-sets",
+    "displayName": "AI Studio change set",
+    "description": "One pending change plan. Items are a JSON array — they are only ever read and written as a whole set."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {
+    "content-manager": {
+      "visible": false
+    },
+    "content-type-builder": {
+      "visible": false
+    }
+  },
+  "attributes": {
+    "thread": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::ai-content-studio.chat-thread",
+      "inversedBy": "changeSets"
+    },
+    "ownerId": {
+      "type": "integer",
+      "required": true,
+      "private": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["pending", "applied", "partially_applied", "rejected", "expired"],
+      "required": true,
+      "default": "pending"
+    },
+    "items": {
+      "type": "json",
+      "required": true
+    },
+    "summary": {
+      "type": "text"
+    },
+    "expiresAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "proposedAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "resolvedAt": {
+      "type": "datetime"
+    },
+    "approvedByUserId": {
+      "type": "integer",
+      "private": true
+    },
+    "approvedItemIds": {
+      "type": "json"
+    },
+    "destructiveConfirmed": {
+      "type": "boolean",
+      "default": false
+    },
+    "previewSessions": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "plugin::ai-content-studio.preview-session",
+      "mappedBy": "changeSet"
+    }
+  }
+}

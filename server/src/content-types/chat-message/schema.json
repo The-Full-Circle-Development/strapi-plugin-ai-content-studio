@@ -1,0 +1,60 @@
+{
+  "kind": "collectionType",
+  "collectionName": "ai_studio_chat_messages",
+  "info": {
+    "singularName": "chat-message",
+    "pluralName": "chat-messages",
+    "displayName": "AI Studio chat message",
+    "description": "One turn, stored in the shape the chat UI replays. `parts` never holds attachment bytes."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {
+    "content-manager": {
+      "visible": false
+    },
+    "content-type-builder": {
+      "visible": false
+    }
+  },
+  "attributes": {
+    "thread": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::ai-content-studio.chat-thread",
+      "inversedBy": "messages"
+    },
+    "role": {
+      "type": "enumeration",
+      "enum": ["user", "assistant"],
+      "required": true
+    },
+    "sequence": {
+      "type": "integer",
+      "required": true
+    },
+    "parts": {
+      "type": "json",
+      "required": true
+    },
+    "attachmentManifest": {
+      "type": "json"
+    },
+    "interrupted": {
+      "type": "boolean",
+      "default": false
+    },
+    "modeAtSend": {
+      "type": "enumeration",
+      "enum": ["content", "layout", "audit"],
+      "required": true,
+      "default": "content"
+    },
+    "changeSet": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "plugin::ai-content-studio.change-set"
+    }
+  }
+}
