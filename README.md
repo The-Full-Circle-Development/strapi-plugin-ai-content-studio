@@ -256,19 +256,66 @@ where you're comfortable rolling "latest".
 ## Updating the curated model list
 
 Model lists are **curated/hardcoded** (by design — not fetched from any `/models` endpoint). They
-live in [`admin/src/data/models.ts`](admin/src/data/models.ts):
+live in [`admin/src/data/models.ts`](admin/src/data/models.ts), which is the single source of truth
+for the list. As shipped:
 
 ```ts
 export const MODELS: Record<ProviderId, ModelOption[]> = {
-  anthropic: [{ id: 'claude-opus-4-8', label: 'Claude Opus 4.8' }, /* … */],
-  openai:    [{ id: 'gpt-4.1', label: 'GPT-4.1' }, /* … */],
-  google:    [{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' }, /* … */],
+  anthropic: [
+    { id: 'claude-opus-5', label: 'Claude Opus 5' },
+    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
+    { id: 'claude-fable-5', label: 'Claude Fable 5' },
+    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
+    { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+  ],
+  openai: [
+    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna' },
+    { id: 'gpt-5.4', label: 'GPT-5.4' },
+  ],
+  google: [
+    { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash' },
+    { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
+    { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite' },
+    { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite' },
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
+  ],
 };
 ```
 
 `id` is the string passed straight to the provider's API; `label` is the dropdown caption. Edit the
 map, then **release** (below). All consuming projects pick up the new list on their next update +
 redeploy.
+
+This snippet is the one sanctioned copy of the list, which is why it has to be reconciled in the
+same commit as any edit to `models.ts` — see [`CLAUDE.md`](CLAUDE.md).
+
+> **`claude-fable-5` requires 30-day data retention.** It is not available to organizations
+> configured for zero data retention: every request from such an org returns `400
+> invalid_request_error`, regardless of the payload. The plugin cannot detect an org's retention
+> setting, and provider error details are redacted by default (see
+> `showProviderErrorDetails`), so a correctly-configured ZDR customer who selects Claude Fable 5
+> will see only a generic failure with no route to the real cause. If that is your situation, remove
+> the entry from the `anthropic` array.
+
+### Before you add an id
+
+The active model is **not** validated against this map — an install may hold any identifier the
+provider accepts, and dropping an entry here never breaks an install already saved on it. That
+also means a wrong id fails silently at the only place it matters: the send. So verify every
+identifier against the provider's live catalog before shipping it, never from memory, and check it
+against the prefix rules in `modelSupportsVision()`
+([`server/src/services/registry.ts`](server/src/services/registry.ts)) so image attachments are
+neither dropped for a capable model nor sent to one that would reject them.
+
+This repository enforces that rule two ways: [`CLAUDE.md`](CLAUDE.md) states it durably, and a
+`SessionStart` hook ([`.claude/hooks/session-model-context.mjs`](.claude/hooks/session-model-context.mjs),
+registered in [`.claude/settings.json`](.claude/settings.json)) restates it at the start of every
+Claude Code session with the current catalog parsed out of `models.ts` at read time. Both are repo
+tooling only — `files: ["dist"]` keeps them out of the published package.
 
 ---
 

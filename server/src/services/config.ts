@@ -62,7 +62,7 @@ const emptyProvider = (): ProviderState => ({ apiKeyEnc: null, isSet: false, ena
 
 const defaults = (): StudioSettings => ({
   activeProvider: 'anthropic',
-  activeModel: 'claude-sonnet-4-6',
+  activeModel: 'claude-sonnet-5',
   providers: {
     anthropic: emptyProvider(),
     google: emptyProvider(),

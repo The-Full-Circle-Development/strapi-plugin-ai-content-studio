@@ -5,7 +5,7 @@ const React = require("react");
 const reactIntl = require("react-intl");
 const admin = require("@strapi/strapi/admin");
 const designSystem = require("@strapi/design-system");
-const index = require("./index-DoNGvtmm.js");
+const index = require("./index-BgXHbBAu.js");
 function _interopNamespace(e) {
   if (e && e.__esModule) return e;
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
@@ -32,21 +32,24 @@ const PROVIDER_LABELS = {
 };
 const MODELS = {
   anthropic: [
+    { id: "claude-opus-5", label: "Claude Opus 5" },
+    { id: "claude-sonnet-5", label: "Claude Sonnet 5" },
+    { id: "claude-fable-5", label: "Claude Fable 5" },
     { id: "claude-opus-4-8", label: "Claude Opus 4.8" },
-    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
     { id: "claude-haiku-4-5", label: "Claude Haiku 4.5" }
   ],
   openai: [
-    { id: "gpt-4.1", label: "GPT-4.1" },
-    { id: "gpt-4o", label: "GPT-4o" },
-    { id: "o4-mini", label: "o4-mini" }
+    { id: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
+    { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
+    { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
+    { id: "gpt-5.4", label: "GPT-5.4" }
   ],
   google: [
     // Gemini 3.x — latest generation
+    { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash" },
     { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash" },
-    { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (preview)" },
+    { id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash Lite" },
     { id: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
-    { id: "gemini-3-flash-preview", label: "Gemini 3 Flash (preview)" },
     // Gemini 2.5 — stable workhorses
     { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
     { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
@@ -153,6 +156,8 @@ const SettingsForm = () => {
       setSaving(false);
     }
   };
+  const curated = MODELS[activeProvider];
+  const modelOptions = activeModel && !curated.some((m) => m.id === activeModel) ? [...curated, { id: activeModel, label: activeModel }] : curated;
   if (loading) {
     return /* @__PURE__ */ jsxRuntime.jsx(admin.Page.Loading, {});
   }
@@ -185,7 +190,7 @@ const SettingsForm = () => {
       ] }),
       /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Field.Root, { name: "activeModel", children: [
         /* @__PURE__ */ jsxRuntime.jsx(designSystem.Field.Label, { children: formatMessage({ id: index.getTranslation("settings.activeModel"), defaultMessage: "Active model" }) }),
-        /* @__PURE__ */ jsxRuntime.jsx(designSystem.SingleSelect, { value: activeModel, onChange: (value) => setActiveModel(String(value)), children: MODELS[activeProvider].map((m) => /* @__PURE__ */ jsxRuntime.jsx(designSystem.SingleSelectOption, { value: m.id, children: m.label }, m.id)) })
+        /* @__PURE__ */ jsxRuntime.jsx(designSystem.SingleSelect, { value: activeModel, onChange: (value) => setActiveModel(String(value)), children: modelOptions.map((m) => /* @__PURE__ */ jsxRuntime.jsx(designSystem.SingleSelectOption, { value: m.id, children: m.label }, m.id)) })
       ] }),
       PROVIDERS.map((p) => {
         const ps = server?.providers[p];

@@ -136,6 +136,23 @@ const SettingsForm = () => {
     }
   };
 
+  /**
+   * The options actually rendered in the model select.
+   *
+   * An install upgraded from an older version may hold an `activeModel` that is still perfectly
+   * valid at the provider but no longer curated here (e.g. `claude-sonnet-4-6`). We must neither
+   * change it nor render a select whose value matches no option — so we append a synthetic entry
+   * for it, labelled with the raw identifier because we have no display name for a model we don't
+   * curate. It is presentational only: never added to MODELS, never persisted, and never written
+   * back to the store on load. Recomputed every render, so it disappears as soon as the admin
+   * selects a curated model — or switches provider, which resets the selection anyway.
+   */
+  const curated = MODELS[activeProvider];
+  const modelOptions =
+    activeModel && !curated.some((m) => m.id === activeModel)
+      ? [...curated, { id: activeModel, label: activeModel }]
+      : curated;
+
   if (loading) {
     return <Page.Loading />;
   }
@@ -187,7 +204,7 @@ const SettingsForm = () => {
               {formatMessage({ id: getTranslation('settings.activeModel'), defaultMessage: 'Active model' })}
             </Field.Label>
             <SingleSelect value={activeModel} onChange={(value: string | number) => setActiveModel(String(value))}>
-              {MODELS[activeProvider].map((m) => (
+              {modelOptions.map((m) => (
                 <SingleSelectOption key={m.id} value={m.id}>
                   {m.label}
                 </SingleSelectOption>

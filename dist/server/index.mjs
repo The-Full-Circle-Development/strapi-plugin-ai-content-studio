@@ -43241,7 +43241,7 @@ const STORE_PARAMS = { type: "plugin", name: "ai-content-studio", key: "settings
 const emptyProvider = () => ({ apiKeyEnc: null, isSet: false, enabled: false });
 const defaults = () => ({
   activeProvider: "anthropic",
-  activeModel: "claude-sonnet-4-6",
+  activeModel: "claude-sonnet-5",
   providers: {
     anthropic: emptyProvider(),
     google: emptyProvider(),
