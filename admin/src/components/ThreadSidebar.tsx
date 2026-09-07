@@ -129,7 +129,6 @@ export interface ThreadSidebarProps {
   onRename: (threadId: string, title: string) => void;
   onDelete: (threadId: string) => void;
   onLoadMore?: () => void;
-  header?: React.ReactNode;
 }
 
 export const ThreadSidebar = ({
@@ -142,7 +141,6 @@ export const ThreadSidebar = ({
   onRename,
   onDelete,
   onLoadMore,
-  header,
 }: ThreadSidebarProps) => {
   const [renamingId, setRenamingId] = React.useState<string | null>(null);
   const [draft, setDraft] = React.useState('');
@@ -166,7 +164,6 @@ export const ThreadSidebar = ({
         <Button startIcon={<Plus />} onClick={onNew} fullWidth>
           New conversation
         </Button>
-        {header}
       </Head>
 
       <List>

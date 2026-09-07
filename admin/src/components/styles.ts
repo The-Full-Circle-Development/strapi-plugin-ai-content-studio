@@ -218,3 +218,41 @@ export const MarkdownBody = styled.div`
     text-align: left;
   }
 `;
+
+/**
+ * The Approve & Publish (Risky) confirmation (FR-044, FR-045).
+ *
+ * Deliberately louder than the destructive-item confirmation next to it: publishing is the one
+ * action here whose effect reaches the public, and the one whose full consequence is invisible in
+ * the plan's own before/after rows. It must never read as the safe default.
+ */
+export const RiskyConfirm = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem 1.2rem;
+  background: ${({ theme }) => theme.colors.danger100};
+  border-top: 2px solid ${({ theme }) => theme.colors.danger500};
+  color: ${({ theme }) => theme.colors.danger700};
+  font-size: 1.2rem;
+`;
+
+export const RiskyHeading = styled.div`
+  font-weight: 700;
+`;
+
+/**
+ * The consequence the plan's rows cannot show: publication is DOCUMENT-scoped, so any unreviewed
+ * draft edit already sitting on an affected document goes live too. This paragraph is not optional.
+ */
+export const RiskyDetail = styled.p`
+  margin: 0;
+  line-height: 1.45;
+`;
+
+export const RiskyActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 0.2rem;
+`;

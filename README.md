@@ -5,7 +5,9 @@ A multi-provider AI assistant embedded in the **Strapi v5** admin panel. Editors
 super-admin settings page switches the AI provider + model and manages API keys **without
 redeploying**.
 
-- **Providers:** Anthropic, Google, OpenAI — switchable from the UI (Vercel AI SDK v6).
+- **Providers:** Anthropic, OpenAI, Google, plus a generic **OpenAI-compatible endpoint** — all
+  switchable from the UI. Language-model access goes through one LangChain-backed provider layer
+  built from a declarative table (see *Providers* below).
 - **Streaming chat** with multi-step tool calling over Strapi's Document Service.
 - **Nothing is written without approval.** The assistant has no write tools. It *proposes* a change
   plan; the only code path that mutates content is an admin route driven by your click.
@@ -13,12 +15,17 @@ redeploying**.
 - **Persistent per-user conversations** that survive reloads and restarts.
 - **Deferred media ingestion:** attached files stay in your browser and enter the Media Library only
   when you approve the plan that uses them.
-- **Read-only QA and security audits** of the running configuration.
 - **Per-caller RBAC:** every content tool is gated by the calling admin's content-manager
   permissions — the assistant can never do more than the user could in the Content Manager.
 - **Encrypted keys at rest** (AES-256-GCM); the settings API returns a mask only, never the key.
-- **Self-contained:** the AI SDK is bundled into the shipped `dist/`. Consumers don't install any
-  AI dependencies and don't run a build step.
+- **The prompt knows your schema.** A deterministic, permission-filtered, size-bounded description
+  of *this* install's content types, fields, components and preview targets is embedded in the
+  assistant's instructions, and is inspectable from the settings page. On by default; it authorizes
+  nothing.
+- **Copyable replies:** copy an assistant message as Markdown, or a single code block on its own.
+- **Approve & Publish** in one deliberate, clearly risky action, behind an explicit confirmation.
+- **Self-contained:** every AI dependency is bundled into the shipped `dist/`. Consumers don't
+  install any AI dependencies and don't run a build step.
 
 ---
 
@@ -81,17 +88,132 @@ mask (e.g. `sk-ant-...••••4f2a`). Then open **AI Studio** in the nav and
 ### RBAC
 
 - **Chat**: grant `Plugins → AI Content Studio → Use AI Content Studio chat` to your editor roles.
-- **Security audit**: grant `Plugins → AI Content Studio → Run AI Content Studio security audit`
-  (`audit.run`). **New, and super-admin only by default.** An audit report is a map of a project's
-  weak points, so it is treated as need-to-know: a caller without this action gets a refusal with no
-  counts, no categories, and no partial findings. The *functional QA* pass needs no extra action —
-  it is bounded by the caller's existing read permissions.
 - **Settings** (provider/model + keys): **super-admin only**, enforced by route policy + the
   settings link permission. Keep the settings actions assigned to super-admin only.
+- **Grounding inspector** (`GET /ai-content-studio/settings/grounding`): gated on
+  `Read AI Content Studio settings` (`settings.read`) rather than super-admin, because it returns
+  only what the **calling** account can already read. It is the one non-super-admin settings
+  surface.
+- `audit.run` is **no longer registered** — the QA scan and security audit capabilities are retired.
+  See *Breaking changes* below.
 
 Content operations are always bounded by the caller's own content-manager permissions, checked
 twice for a write: once when the plan is proposed, and again against the caller's live ability at
 the moment of apply.
+
+---
+
+## Providers
+
+Language-model access goes through **one provider layer** built from a declarative table in
+[`server/src/services/providers.ts`](server/src/services/providers.ts). That table is the whole
+provider surface — nothing else in the codebase knows a provider's name, and adding one is a static
+import plus one row.
+
+| Provider (id) | Curated model list | Base URL |
+|---|---|---|
+| Anthropic (`anthropic`) | yes | no |
+| OpenAI (`openai`) | yes | optional |
+| Google (`google`) | yes | optional |
+| OpenAI-compatible endpoint (`openai-compatible`) | **no** | **required** |
+
+**A provider the adapter layer supports but this distribution does not carry is absent from the
+selection rather than offered and broken.** Every provider must bundle into the committed `dist/`,
+so the shipped set is deliberately small — breadth comes from the compatible endpoint instead.
+
+### Configuring one
+
+**Settings → AI Content Studio → Configuration.** Per provider: a toggle, a write-only **API key**
+field, and a **Base URL** field. Then pick the active provider and model at the top.
+
+- **Base URL is its own labelled field**, never merged into or shown beside the credential. It is
+  configuration, not a secret, so it is returned in full by the settings API and can be checked and
+  corrected without touching the key. It accepts an absolute `http:`/`https:` URL with no username
+  or password; trailing slashes are trimmed. `http://` is accepted so a self-hosted server on your
+  network works.
+- **Required for `openai-compatible`.** Without one, requests are refused *before generation begins*
+  with a message naming the field — never a stream that dies half-way.
+- **Optional for the other three**, so a self-hosted or proxied deployment of a first-party provider
+  needs no new code.
+
+### The OpenAI-compatible endpoint
+
+One adapter, zero per-provider code, reaching Groq, Mistral, DeepSeek, Together, Fireworks,
+Perplexity, Cerebras, xAI, OpenRouter, Ollama, vLLM, LM Studio and any self-hosted server speaking
+the same wire format. Point the Base URL at the endpoint and enter the model identifier directly.
+
+Two consequences worth knowing:
+
+- It ships **no curated model list**, so the model field becomes a plain text input. Whatever you
+  type is stored and sent **verbatim** — never normalized, lowercased or date-suffixed.
+- It reports **no image-input support**, for any identifier. The plugin cannot know what an arbitrary
+  endpoint accepts, and a wrong guess would send image bytes to a model that rejects them and fail
+  the whole request. Attachment *placement by filename* still works, on every provider.
+
+### Model identifiers
+
+A directly entered identifier survives a save/reload round trip unchanged, and an install keeps
+working after an identifier is dropped from a curated list in a later release. The curated lists are
+hardcoded by design and are never fetched from a provider `/models` endpoint — see *Updating the
+curated model list*.
+
+---
+
+## Project structure in the prompt (grounding)
+
+The assistant is told what *this* install actually contains, so it stops guessing at field names.
+
+**On by default.** A generated description of the running schema — content types with their kind,
+display name, draft-and-publish and localization flags and preview target; every field with its
+type, required flag, enumeration values, relation target and cardinality, component reference and
+repeatability; component structures; and the dotted paths of every media field — is embedded as a
+clearly delimited, explicitly subordinate section of the instructions.
+
+Four properties are what make that safe to have on by default:
+
+- **Deterministic.** Identical request inputs produce a byte-identical description. Every list is
+  sorted by a fixed byte ordering, enum values keep their declared order, and there are no
+  timestamps, no entry values, no counts of content and no language model anywhere in it.
+- **Permission-filtered.** A content type appears only if the **calling** account can read it, via
+  the same live check every tool makes. Two accounts legitimately see different descriptions.
+- **Size-bounded.** A declared character budget (24,000 by default) with deterministic tiered
+  degradation — full, then component expansions dropped, then names and flags only, then content
+  types dropped from the end of the sorted order with the count stated. It says when it is partial
+  and tells the assistant to discover the rest with tools.
+- **Inspectable.** The settings page shows the **exact** text your requests are carrying, its tier
+  and its size against the budget.
+
+**It derives only from the running instance's schema and this plugin's own configuration. It never
+reads, parses or analyses your application's source code.**
+
+**It authorizes nothing.** Every read and every applied change is still checked against the caller's
+live permissions, so a content type described here can still come back blocked with a reason. It is
+a map, not a key.
+
+### Two switches, one precedence rule
+
+| Switch | Where | Who sets it | Role |
+|---|---|---|---|
+| `grounding.enabled` | `config/plugins.ts` in your app | your developer, at deploy time | The **hard off-switch**. No runtime toggle can re-enable it |
+| The settings **Toggle** | the plugin store | a super-admin, at runtime | Turns it off without a redeploy |
+
+The description is embedded **only when both are `true`**. Both default to `true`. With the hard
+off-switch `false`, the settings Toggle renders disabled and names the config key, so nobody is left
+flipping a control that does nothing.
+
+```ts
+// config/plugins.ts
+'ai-content-studio': {
+  enabled: true,
+  config: {
+    grounding: { enabled: true, maxChars: 24000 }, // maxChars is clamped to 2000..80000
+  },
+},
+```
+
+With grounding off, the assistant falls back to tool-based discovery and **nothing else about its
+behaviour changes** — no other instruction changes, no tool is added or removed, and stored history
+stays valid.
 
 ---
 
@@ -116,6 +238,61 @@ Because apply is a plain HTTP route and not a tool, there is no path from the mo
 Service at all. The guarantee is structural, not a prompt instruction.
 
 Pending plans expire after `preview.ttlMinutes` (default 30) without being applied.
+
+### Approve & Publish (Risky)
+
+The plan card also offers **Approve & Publish (Risky)** — a visually distinct danger action that
+applies the approved items and then publishes each affected document, in one deliberate step.
+
+**Approve all, Approve selected, Reject and Select all are unchanged** in behaviour and appearance.
+
+It runs as a **second phase of the same apply call**, after every write completes, so a document is
+never published against a half-written draft. It cannot be reached independently.
+
+Activating it only **arms a confirmation** — a single activation writes nothing and publishes
+nothing, and dismissing it or navigating away leaves both undone. The confirmation states both
+consequences, and the second one is why it exists:
+
+> Publishing makes this content publicly visible immediately.
+>
+> It publishes each affected document's **entire current draft** — not only the fields this plan
+> reviewed. Any unreviewed draft edit already sitting on those documents will go live with it.
+
+Document-scoped publication is the one consequence of this action that is **invisible in the plan's
+own before/after rows**, which is exactly why it is spelled out before you commit.
+
+Per document, in the publish phase:
+
+- **`publish` is re-checked against your live ability at the moment of application.** It is a
+  *separate* action from the `update` already checked for the write, and is never inherited from it —
+  you may hold one without the other. A refusal is reported as **blocked with its reason**, never
+  skipped silently, and the field write's outcome is still reported accurately alongside it.
+- A content type that does not use draft & publish is reported **live on save**; no publish is
+  attempted.
+- A write that came back `stale`, `blocked` or `failed` **never** causes a publish.
+- Two field changes on one document are **one** publish call, reported on each contributing item.
+
+The per-item report is appended to the conversation and persisted on the thread, so a reload replays
+it. A set is reported `applied` only when every write applied **and** every publish either succeeded
+or was not applicable — a blocked publish makes it `partially_applied`, never a success.
+
+The destructive-item confirmation remains **separate and additionally required**.
+
+---
+
+## Copying the assistant's replies
+
+Every assistant message carries a copy control that places its **Markdown source** on the clipboard,
+and every fenced code block carries one that copies **only that block**. Both work identically on a
+conversation restored after a reload.
+
+- A message that is only a structured card (a plan, an apply report) gets **no control**, rather
+  than one that copies nothing.
+- A reply that is still streaming gets no control, so a partial value is never offered as complete.
+- The outcome is announced to assistive technology, not just coloured.
+- If the browser blocks the clipboard — most often because the panel is served over plain HTTP, where
+  `navigator.clipboard` does not exist — a hidden-textarea fallback is tried, and if that fails too
+  you get an **explicit message**. Never a silent no-op.
 
 ---
 
@@ -229,10 +406,37 @@ Stated here so they are not rediscovered as bugs:
 - **Held attachments do not survive a panel reload**, by design — the alternative is storing
   unapproved user files server-side, which is what deferred ingestion exists to avoid. A restored
   thread shows them as expired and invites you to re-attach.
-- **Audits inspect the running configuration, never project source files.** Content types,
-  components, relations, media references, role permissions, plugin settings, and existing content
-  data — not files on disk.
-- **There is still no automated test suite.** Verification is manual, in a running admin panel.
+- **The generated schema description derives from the running instance only** — content types,
+  components, relations, media fields and this plugin's preview configuration. It never reads,
+  parses or analyses your application's source files.
+- **`openai-compatible` never claims image-input support**, for any identifier, because the plugin
+  cannot know what an arbitrary endpoint accepts. Attachment placement by filename still works.
+- **The automated test suite covers pure functions only.** It asserts the deterministic composition
+  of the instructions, the deterministic derivation and tiered degradation of the schema
+  description, the declared image-input rule and configuration normalization. It never calls a
+  provider, opens a socket or boots a host — so streaming, tool calling, RBAC, replay and the UI
+  are still verified **manually, in a running admin panel**, and a model identifier is still only
+  verified by one live send.
+
+---
+
+## Breaking changes
+
+Each entry names the version that removes it and what a consumer should do.
+
+### 1.7.0
+
+| Breaking change | What you should do |
+|---|---|
+| **`plugin::ai-content-studio.audit.run` is no longer registered.** | Nothing is required — a stored grant for an unregistered action is inert, and the upgrade will not fail. Remove it from any role for tidiness. |
+| **The QA scan and the security audit capabilities are gone.** The `runQaScan` and `runSecurityAudit` tools, both audit services, the audit policy and the audit report card are deleted. | Nothing. The capability is **retired, not moved**, and no replacement is planned in the panel. If asked for one, the assistant now says so plainly rather than improvising a substitute. |
+| **The Layout Mapping and Code Audit modes are gone**, along with the mode selector. Every conversation is content editing. | Nothing. Existing conversations — including ones recorded under a removed mode — open, replay in full and accept new messages. The `chat-thread.mode` and `chat-message.modeAtSend` columns are deliberately left in place as vestigial rather than migrated. A stored audit tool call renders as a plain "Used …" pill. |
+| **The `audit` plugin config key is ignored.** | Remove `audit: { … }` from `config/plugins.ts`. An unknown key is harmless, but it no longer does anything. |
+| **`@ai-sdk/anthropic`, `@ai-sdk/openai` and `@ai-sdk/google` are no longer dependencies.** | Nothing — they were bundled, never installed by you. `ai` and `@ai-sdk/react` remain: they are the wire and storage format, not providers. |
+
+Not a removal, but worth knowing on upgrade: **grounding is on by default** (see *Project structure
+in the prompt*). Set `grounding: { enabled: false }` in `config/plugins.ts` if this install must
+never carry a generated prompt section.
 
 ---
 
@@ -307,9 +511,13 @@ The active model is **not** validated against this map — an install may hold a
 provider accepts, and dropping an entry here never breaks an install already saved on it. That
 also means a wrong id fails silently at the only place it matters: the send. So verify every
 identifier against the provider's live catalog before shipping it, never from memory, and check it
-against the prefix rules in `modelSupportsVision()`
-([`server/src/services/registry.ts`](server/src/services/registry.ts)) so image attachments are
-neither dropped for a capable model nor sent to one that would reject them.
+against its provider's declared `supportsVision` rule in
+[`server/src/services/providers.ts`](server/src/services/providers.ts) so image attachments are
+neither dropped for a capable model nor sent to one that would reject them. Those rules are declared
+**per provider** in the table there (they replaced a single prefix-matching function that branched
+on provider identity), and they are covered by
+[`providers.test.ts`](server/src/services/providers.test.ts) — a descriptor reverted to bare
+default-deny turns that suite red instead of silently withholding images.
 
 This repository enforces that rule two ways: [`CLAUDE.md`](CLAUDE.md) states it durably, and a
 `SessionStart` hook ([`.claude/hooks/session-model-context.mjs`](.claude/hooks/session-model-context.mjs),
@@ -367,32 +575,45 @@ server/src/
   services/crypto.ts      AES-256-GCM encrypt/decrypt/mask + AI_STUDIO_ENC_KEY
                           validation + HMAC preview-token sign/verify
   services/redact.ts      ONE secret-redaction implementation, shared by the
-                          stream error path, the audits, and token logging
-  services/config.ts      plugin-store config + typed preview/attachment/audit options
-  services/registry.ts    per-request provider/model builder (createProviderRegistry)
-  services/prompt.ts      system prompt: shared base + one per-mode section
+                          stream error path and token logging
+  services/config.ts      plugin-store config + typed preview/attachment/grounding
+                          options + the single grounding precedence rule
+  services/providers.ts   THE provider table: static imports + declared
+                          capabilities. The only file that knows a provider's name
+  services/registry.ts    per-request resolution of the active provider from
+                          persisted config -> a chat-model instance
+  services/agent.ts       the per-request agent + the model-call ceiling
+  services/prompt.ts      sectioned instructions, in a fixed declared order, with a
+                          version derived from their own text
+  services/grounding.ts   the deterministic, permission-scoped, size-bounded
+                          description of this install's schema
   services/threads.ts     owner-scoped conversations, message append, condensing
-  services/change-sets.ts propose -> apply, the six-step gate, the ONLY write path
+  services/change-sets.ts propose -> apply -> publish, the seven-step gate,
+                          the ONLY write path
   services/preview.ts     preview sessions, overlay payload, staged file bytes
   services/attachments.ts limits, manifest validation, idempotent ingestion
-  services/audit-qa.ts    read-only functional checks
-  services/audit-security.ts read-only configuration checks, masked at the boundary
-  services/tools.ts       read tools + describePageStructure + proposeChanges +
-                          runQaScan + runSecurityAudit, selected per mode
+  services/tools.ts       one tool set: listContentTypes, searchEntries, getEntry,
+                          describePageStructure, proposeChanges
   middlewares/preview-overlay.ts  content-API response overlay, inert without a token
   controllers/            chat, threads, change-sets, attachments, preview, settings
   routes/index.ts         type:'admin' routes under /ai-content-studio/*
   routes/preview.ts       the single token-gated non-admin route (staged files)
-  policies/               is-super-admin, has-audit-permission
+  policies/               is-super-admin
 admin/src/
   index.ts                addMenuLink (Chat) + addSettingsLink (Settings)
   pages/Chat.tsx          page shell: transport + useChat + wiring
-  pages/Settings.tsx      provider/model dropdowns + masked write-only key fields
-  components/             ThreadSidebar, ModeSelect, MessageList, Composer,
-                          ChangePlanCard, PreviewPanel, AuditReportCard
-  hooks/                  useThreads, useChangeSet, useAttachments
+  pages/Settings.tsx      provider/model/base-URL fields, masked write-only keys,
+                          the grounding toggle and its inspector
+  components/             ThreadSidebar, MessageList, Composer, CopyButton,
+                          ChangePlanCard, PreviewPanel
+  hooks/                  useThreads, useChangeSet, useAttachments, useCopy
   data/models.ts          curated per-provider model lists (edit me)
+  data/providers.ts       the shipped-provider catalog (a SEPARATE module — see
+                          the parseability note in models.ts)
 ```
+
+Four pure-function suites live beside the code they cover — `providers.test.ts`, `config.test.ts`,
+`prompt.test.ts`, `grounding.test.ts`. They are excluded from the published `dist/`.
 
 ## License
 

@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import type { Core } from '@strapi/strapi';
-import { CHAT_MODES } from '../types';
 
 /**
  * Thread routes. Thin: all logic lives in `services/threads`.
@@ -12,18 +11,17 @@ import { CHAT_MODES } from '../types';
  * Failures are actionable and never carry an internal error or credential (FR-053).
  */
 
-const createSchema = z.object({
-  mode: z.enum(CHAT_MODES).optional(),
-});
+/*
+ * `mode` is gone from both bodies (contracts/removals.md §1). There is one mode, so a new
+ * conversation takes no selection step and there is nothing to switch. An older client that still
+ * sends `mode` is not rejected for it — the field is simply ignored, so a cached admin bundle keeps
+ * working through the upgrade.
+ */
+const createSchema = z.object({}).passthrough();
 
-const updateSchema = z
-  .object({
-    title: z.string().max(120).optional(),
-    mode: z.enum(CHAT_MODES).optional(),
-  })
-  .refine((body) => body.title !== undefined || body.mode !== undefined, {
-    message: 'Provide a title or a mode.',
-  });
+const updateSchema = z.object({
+  title: z.string().max(120),
+});
 
 const listSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -48,9 +46,9 @@ const threadsController = ({ strapi }: { strapi: Core.Strapi }) => {
       }
       const parsed = createSchema.safeParse(ctx.request.body ?? {});
       if (!parsed.success) {
-        return ctx.badRequest('Invalid request. `mode` must be one of content, layout, audit.');
+        return ctx.badRequest('Invalid request body.');
       }
-      const thread = await threads().createThread({ ownerId, mode: parsed.data.mode ?? 'content' });
+      const thread = await threads().createThread({ ownerId });
       ctx.status = 201;
       ctx.body = thread;
       return undefined;
@@ -94,18 +92,10 @@ const threadsController = ({ strapi }: { strapi: Core.Strapi }) => {
       }
       const parsed = updateSchema.safeParse(ctx.request.body ?? {});
       if (!parsed.success) {
-        return ctx.badRequest('Provide a title, or a mode of content, layout or audit.');
+        return ctx.badRequest('Provide a title.');
       }
       const id = String(ctx.params.id);
-      if (parsed.data.mode) {
-        await threads().setMode(id, ownerId, parsed.data.mode);
-      }
-      const summary =
-        parsed.data.title !== undefined
-          ? await threads().renameThread(id, ownerId, parsed.data.title)
-          : await threads()
-              .getOwnedThread(id, ownerId)
-              .then((thread: any) => (thread ? threads().summarize(thread) : null));
+      const summary = await threads().renameThread(id, ownerId, parsed.data.title);
 
       if (!summary) {
         return ctx.notFound(NOT_FOUND);

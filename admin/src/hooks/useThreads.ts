@@ -9,12 +9,9 @@ import { useAuth } from '@strapi/strapi/admin';
  * admin session, so nothing here sends an owner: another user's thread is simply a 404.
  */
 
-export type ChatMode = 'content' | 'layout' | 'audit';
-
 export interface ThreadSummary {
   id: string;
   title: string;
-  mode: ChatMode;
   lastActivityAt: string;
   messageCount?: number;
 }
@@ -26,7 +23,8 @@ export interface StoredMessage {
   parts: unknown[];
   attachmentManifest: Array<{ ordinal: number; filename: string; mimeType: string; sizeBytes: number }> | null;
   interrupted: boolean;
-  modeAtSend: ChatMode;
+  /** Null for turns stored before instruction versioning existed (FR-019). */
+  promptVersion: string | null;
   changeSetId: string | null;
 }
 
@@ -95,7 +93,6 @@ export function useThreads() {
 
   const [threads, setThreads] = React.useState<ThreadSummary[]>([]);
   const [currentThreadId, setCurrentThreadId] = React.useState<string | null>(null);
-  const [mode, setMode] = React.useState<ChatMode>('content');
   const [loading, setLoading] = React.useState(false);
   const [nextCursor, setNextCursor] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -105,11 +102,6 @@ export function useThreads() {
   React.useEffect(() => {
     threadIdRef.current = currentThreadId;
   }, [currentThreadId]);
-
-  const modeRef = React.useRef<ChatMode>(mode);
-  React.useEffect(() => {
-    modeRef.current = mode;
-  }, [mode]);
 
   const refresh = React.useCallback(async (cursor?: string | null) => {
     setLoading(true);
@@ -139,20 +131,16 @@ export function useThreads() {
     }
   }, [token, refresh]);
 
-  const createThread = React.useCallback(
-    async (nextMode: ChatMode = 'content'): Promise<ThreadSummary> => {
-      const thread = await adminFetch<ThreadSummary>('/threads', tokenRef.current, {
-        method: 'POST',
-        body: JSON.stringify({ mode: nextMode }),
-      });
-      threadIdRef.current = thread.id;
-      setCurrentThreadId(thread.id);
-      setMode(thread.mode);
-      setThreads((current) => [thread, ...current.filter((t) => t.id !== thread.id)]);
-      return thread;
-    },
-    []
-  );
+  const createThread = React.useCallback(async (): Promise<ThreadSummary> => {
+    const thread = await adminFetch<ThreadSummary>('/threads', tokenRef.current, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    threadIdRef.current = thread.id;
+    setCurrentThreadId(thread.id);
+    setThreads((current) => [thread, ...current.filter((t) => t.id !== thread.id)]);
+    return thread;
+  }, []);
 
   /** Full history for a thread, in the shape `useChat` replays. */
   const loadHistory = React.useCallback(async (threadId: string): Promise<ThreadHistory | null> => {
@@ -161,7 +149,6 @@ export function useThreads() {
       const history = await adminFetch<ThreadHistory>(`/threads/${threadId}`, tokenRef.current);
       threadIdRef.current = history.id;
       setCurrentThreadId(history.id);
-      setMode(history.mode);
       return history;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open that conversation.');
@@ -201,29 +188,6 @@ export function useThreads() {
     []
   );
 
-  /** Persist a mode change on the thread so it survives a reload (FR-028). */
-  const changeMode = React.useCallback(
-    async (nextMode: ChatMode) => {
-      setMode(nextMode);
-      modeRef.current = nextMode;
-      const id = threadIdRef.current;
-      if (!id) {
-        // No thread yet — the mode rides along when one is created on the first send.
-        return;
-      }
-      setThreads((current) => current.map((t) => (t.id === id ? { ...t, mode: nextMode } : t)));
-      try {
-        await adminFetch<ThreadSummary>(`/threads/${id}`, tokenRef.current, {
-          method: 'PATCH',
-          body: JSON.stringify({ mode: nextMode }),
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not change the mode.');
-      }
-    },
-    []
-  );
-
   /**
    * Guarantees a thread id exists before a send. Resolving lazily (rather than on mount) means
    * opening the panel and not typing leaves no empty conversation behind.
@@ -232,7 +196,7 @@ export function useThreads() {
     if (threadIdRef.current) {
       return threadIdRef.current;
     }
-    const thread = await createThread(modeRef.current);
+    const thread = await createThread();
     return thread.id;
   }, [createThread]);
 
@@ -243,10 +207,6 @@ export function useThreads() {
     currentThreadId,
     setCurrentThreadId,
     threadIdRef,
-    mode,
-    setMode,
-    modeRef,
-    changeMode,
     loading,
     hasMore: nextCursor !== null,
     loadMore: () => refresh(nextCursor),

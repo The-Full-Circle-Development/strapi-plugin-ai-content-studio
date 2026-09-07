@@ -1,12 +1,12 @@
 import * as React from 'react';
 import { getToolName, isToolUIPart, isFileUIPart, type UIMessage } from 'ai';
-import { Loader, Typography } from '@strapi/design-system';
+import { Loader, Typography, useNotifyAT } from '@strapi/design-system';
 import { Sparkle } from '@strapi/icons';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { styled } from 'styled-components';
 import { LOADING_WORDS } from '../data/loadingWords';
-import { AuditReportCard, type AuditReportView } from './AuditReportCard';
+import { CopyButton } from './CopyButton';
 import {
   AssistantContent,
   AssistantRow,
@@ -156,15 +156,6 @@ const changeSetIdOf = (part: unknown): string | null => {
   return output?.ok && typeof output.changeSetId === 'string' ? output.changeSetId : null;
 };
 
-/**
- * An audit tool result carries a report — unless it was refused, in which case there is nothing to
- * render and the assistant's own text says so with no counts and no partial findings (FR-048).
- */
-const auditReportOf = (part: unknown): AuditReportView | null => {
-  const output = (part as { output?: { ok?: boolean; report?: AuditReportView } }).output;
-  return output?.ok && output.report?.coverage ? output.report : null;
-};
-
 interface ApplyReportPart {
   changeSetId: string;
   appliedAt: string;
@@ -177,8 +168,46 @@ interface ApplyReportPart {
     message: string | null;
     oldValue: unknown;
     newValue: unknown;
+    /** Present only when the approve-and-publish action ran (FR-050). */
+    publish?: { state: string; message?: string | null } | null;
   }>;
 }
+
+/** The copy control sits above the block it copies, out of the reading flow. */
+const CopyBar = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  align-self: stretch;
+`;
+
+const CodeBlockWrap = styled.div`
+  align-self: stretch;
+  position: relative;
+`;
+
+/**
+ * The raw contents of a fenced code block, pulled out of what `react-markdown` handed us.
+ *
+ * `pre` is overridden rather than `code` because a fenced block is ALWAYS inside a `pre`, whereas
+ * distinguishing inline from block code at the `code` level is not reliable in react-markdown v10
+ * (the `inline` prop was removed). This returns only the block's own text, with no surrounding
+ * prose (FR-039).
+ */
+const codeTextOf = (node: React.ReactNode): string => {
+  if (typeof node === 'string') {
+    return node;
+  }
+  if (typeof node === 'number') {
+    return String(node);
+  }
+  if (Array.isArray(node)) {
+    return node.map(codeTextOf).join('');
+  }
+  if (React.isValidElement(node)) {
+    return codeTextOf((node.props as { children?: React.ReactNode }).children);
+  }
+  return '';
+};
 
 const ReportBox = styled.div`
   border: 1px solid ${({ theme }) => theme.colors.neutral200};
@@ -211,6 +240,29 @@ const REPORT_TONE: Record<string, 'success' | 'danger' | 'warning' | 'neutral'> 
   skipped: 'neutral',
 };
 
+/**
+ * What the publish phase did to this item's document, in plain English (FR-050).
+ *
+ * Every refusal carries its reason. `skipped` is deliberately silent: the write did not reach
+ * `applied`, so the write outcome on the same row already explains why nothing was published.
+ */
+const publishLine = (publish: { state: string; message?: string | null }): string | null => {
+  switch (publish.state) {
+    case 'published':
+      return 'published';
+    case 'not_applicable':
+      return 'live on save (this type does not use draft & publish)';
+    case 'blocked':
+      return `publish blocked${publish.message ? `: ${publish.message}` : ''}`;
+    case 'failed':
+      return `publish failed${publish.message ? `: ${publish.message}` : ''}`;
+    case 'skipped':
+      return null;
+    default:
+      return publish.state;
+  }
+};
+
 const showValue = (value: unknown): string => {
   if (value === null || value === undefined || value === '') {
     return '(empty)';
@@ -234,20 +286,29 @@ const ApplyReport = ({ report }: { report: ApplyReportPart }) => (
     <Typography variant="pi" fontWeight="bold">
       Applied {new Date(report.appliedAt).toLocaleString()}
     </Typography>
-    {report.items.map((item) => (
-      <ReportRow key={item.id} $tone={REPORT_TONE[item.state] ?? 'neutral'}>
-        <strong>{item.state}</strong> — {item.field ? `${item.field} on ` : ''}
-        {item.documentLabel}
-        {item.state === 'applied' ? (
-          <>
-            : {showValue(item.oldValue)} → {showValue(item.newValue)}
-            {item.resultingState === 'unchanged' ? '' : ` (${item.resultingState})`}
-          </>
-        ) : item.message ? (
-          <>: {item.message}</>
-        ) : null}
-      </ReportRow>
-    ))}
+    {report.items.map((item) => {
+      const publish = item.publish ? publishLine(item.publish) : null;
+      return (
+        <ReportRow key={item.id} $tone={REPORT_TONE[item.state] ?? 'neutral'}>
+          <strong>{item.state}</strong> — {item.field ? `${item.field} on ` : ''}
+          {item.documentLabel}
+          {item.state === 'applied' ? (
+            <>
+              : {showValue(item.oldValue)} → {showValue(item.newValue)}
+              {item.resultingState === 'unchanged' ? '' : ` (${item.resultingState})`}
+            </>
+          ) : item.message ? (
+            <>: {item.message}</>
+          ) : null}
+          {/*
+            When the publish phase ran, every row says what happened to its document — with the
+            reason whenever either the write or the publish was refused (FR-050). A write that
+            applied while its publish was blocked must not read as a success.
+          */}
+          {publish ? <> — {publish}</> : null}
+        </ReportRow>
+      );
+    })}
   </ReportBox>
 );
 
@@ -270,6 +331,62 @@ export const MessageList = ({
 }: MessageListProps) => {
   const busy = status === 'submitted' || status === 'streaming';
   const loadingWord = useCyclingWord(busy, LOADING_WORDS);
+
+  /**
+   * The live regions the copy outcome is announced into (FR-041).
+   *
+   * `useNotifyAT` is called HERE and the notifier is passed down, never called inside a per-message
+   * `CopyButton`: its cleanup clears all three regions when ANY consumer unmounts, so one
+   * unmounting control would wipe another's pending announcement. `notifyAlert` is used for the
+   * failure path because a failed copy is something the user must act on; `notifyStatus` for
+   * success.
+   */
+  const { notifyStatus, notifyAlert } = useNotifyAT();
+  const announce = React.useCallback(
+    (message: string, ok: boolean) => {
+      if (ok) {
+        notifyStatus(message);
+      } else {
+        notifyAlert(message);
+      }
+    },
+    [notifyStatus, notifyAlert]
+  );
+
+  /**
+   * The Markdown SOURCE of an assistant turn — the `text` parts joined, which is the source as
+   * authored (FR-038). Each text part renders as its own Markdown block, so joining on a blank line
+   * reproduces what the reader actually sees.
+   *
+   * Returns `''` for a turn that is only a structured card (a plan, an apply report). The caller
+   * renders NO control in that case rather than one that copies nothing (FR-043).
+   */
+  const markdownSourceOf = (message: UIMessage): string =>
+    message.parts
+      .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+      .map((part) => part.text)
+      .join('\n\n')
+      .trim();
+
+  /** Markdown renderers: every fenced code block gets its own copy control (FR-039). */
+  const markdownComponents = React.useMemo(
+    () => ({
+      pre: ({ children }: { children?: React.ReactNode }) => {
+        const code = codeTextOf(children);
+        return (
+          <CodeBlockWrap>
+            {code ? (
+              <CopyBar>
+                <CopyButton value={code} label="Copy this code block" announce={announce} />
+              </CopyBar>
+            ) : null}
+            <pre>{children}</pre>
+          </CodeBlockWrap>
+        );
+      },
+    }),
+    [announce]
+  );
 
   const renderImageParts = (message: UIMessage) =>
     message.parts.map((part, index) =>
@@ -298,7 +415,7 @@ export const MessageList = ({
 
   return (
     <>
-      {messages.map((message) =>
+      {messages.map((message, messageIndex) =>
         message.role === 'user' ? (
           <UserRow key={message.id}>
             <UserBubble>
@@ -331,7 +448,9 @@ export const MessageList = ({
                 if (part.type === 'text') {
                   return (
                     <MarkdownBody key={index}>
-                      <Markdown remarkPlugins={[remarkGfm]}>{part.text}</Markdown>
+                      <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                        {part.text}
+                      </Markdown>
                     </MarkdownBody>
                   );
                 }
@@ -374,17 +493,12 @@ export const MessageList = ({
                       );
                     }
                   }
-                  // An audit report is rendered structurally, so severity grouping and — above all
-                  // — the coverage statement cannot be lost in prose (FR-041, FR-044).
-                  if (
-                    (name === 'runQaScan' || name === 'runSecurityAudit') &&
-                    part.state === 'output-available'
-                  ) {
-                    const report = auditReportOf(part);
-                    if (report) {
-                      return <AuditReportCard key={index} report={report} />;
-                    }
-                  }
+                  /*
+                   * There is deliberately NO audit branch here any more (contracts/removals.md §2).
+                   * A stored `runQaScan` / `runSecurityAudit` part falls through to the generic
+                   * pill below, so it reads as something that HAPPENED without implying the
+                   * capability is still available. No migration; no stored transcript is rewritten.
+                   */
                   const { text, danger } = toolLabel(part.state, name);
                   return (
                     <ToolPill key={index} $danger={danger}>
@@ -397,6 +511,30 @@ export const MessageList = ({
                 }
                 return null;
               })}
+              {/*
+                One copy control per assistant message, placing that message's MARKDOWN SOURCE on
+                the clipboard (FR-038). Two rules decide whether it appears at all:
+
+                  - a message that is only a structured card has no readable source, so it gets NO
+                    control rather than one that copies nothing (FR-043);
+                  - while this turn is still streaming there is no control, so a partial value is
+                    never offered as though it were complete (FR-043).
+
+                Behaviour is identical on a restored conversation, because the source is the stored
+                `parts` either way (FR-042).
+              */}
+              {(() => {
+                const source = markdownSourceOf(message);
+                const streamingThis = busy && messageIndex === messages.length - 1;
+                if (!source || streamingThis) {
+                  return null;
+                }
+                return (
+                  <CopyBar>
+                    <CopyButton value={source} label="Copy this reply" announce={announce} />
+                  </CopyBar>
+                );
+              })()}
             </AssistantContent>
           </AssistantRow>
         )

@@ -1,14 +1,13 @@
-import { createProviderRegistry, type LanguageModel } from 'ai';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { Core } from '@strapi/strapi';
 import type { ProviderId } from './config';
+import { getDescriptor } from './providers';
 
 export type ProviderConfigErrorCode =
   | 'NO_ACTIVE_PROVIDER'
   | 'PROVIDER_DISABLED'
   | 'MISSING_KEY'
+  | 'MISSING_BASE_URL'
   | 'UNKNOWN_PROVIDER';
 
 /** Thrown for configuration problems. Messages name the provider, NEVER the key. */
@@ -22,40 +21,33 @@ export class ProviderConfigError extends Error {
 }
 
 export interface ActiveModel {
-  model: LanguageModel;
+  /** A LangChain chat-model INSTANCE, built from the descriptor's static constructor. */
+  model: BaseChatModel;
   provider: ProviderId;
   modelId: string;
-  /** Whether the active model accepts image input. If false, attachments still work for
-   *  setting/replacing media (by id), we just don't send the image bytes to the model. */
+  /**
+   * Whether the active model accepts image input, from the descriptor's DECLARED rule
+   * (contracts/provider-layer.md §3). If false, attachments still work for setting/replacing media
+   * by ordinal — we simply never send the image bytes to the model.
+   */
   supportsVision: boolean;
 }
 
 /**
- * Conservative image-input capability check. Default-deny: only models we're confident accept
- * images return true, so an image is NEVER sent to a model that would reject it (which would break
- * the whole request). All Anthropic/Gemini chat models are multimodal; modern OpenAI gpt-4+/o-series
- * are too. Text-only/audio/embedding models return false.
+ * Resolves the active provider from persisted configuration, on EVERY request.
+ *
+ * There is deliberately no `switch` on provider identity here any more: the descriptor comes from
+ * the table in `providers.ts`, which is the only file that knows a provider's name (FR-001,
+ * contracts/provider-layer.md §1, §2). Adding a provider does not touch this file.
+ *
+ * All five `ProviderConfigError` codes are raised BEFORE generation begins (FR-010), so the editor
+ * gets a configuration-shaped message rather than a truncated stream.
  */
-export function modelSupportsVision(provider: string, model: string): boolean {
-  const m = model.toLowerCase();
-  if (provider === 'anthropic') {
-    return m.startsWith('claude-');
-  }
-  if (provider === 'google') {
-    return m.startsWith('gemini-');
-  }
-  if (provider === 'openai') {
-    if (m.startsWith('gpt-3.5')) return false;
-    if (/embedding|tts|whisper|moderation|audio|realtime/.test(m)) return false;
-    return m.startsWith('gpt-4') || m.startsWith('gpt-5') || /^o\d/.test(m);
-  }
-  return false;
-}
-
 const registryService = ({ strapi }: { strapi: Core.Strapi }) => ({
   /**
    * Builds the active language model from the persisted config, per request.
-   * Rebuilt every call so a rotated key / changed model takes effect on the next message.
+   * Rebuilt every call so a rotated key / changed model takes effect on the next message with no
+   * restart and no redeploy (FR-007, SC-001).
    */
   async getActiveModel(): Promise<ActiveModel> {
     const configSvc = strapi.plugin('ai-content-studio').service('config');
@@ -69,7 +61,18 @@ const registryService = ({ strapi }: { strapi: Core.Strapi }) => ({
       );
     }
 
-    const entry = providers?.[activeProvider as ProviderId];
+    // The table is the allow-list: an id absent from it is refused, so an administrator cannot
+    // introduce a provider the layer does not know (FR-002). A provider the adapter layer supports
+    // but this distribution does not carry is simply ABSENT rather than offered and broken (FR-011).
+    const descriptor = getDescriptor(activeProvider);
+    if (!descriptor) {
+      throw new ProviderConfigError(
+        `Unknown provider "${activeProvider}". It is not available in this build.`,
+        'UNKNOWN_PROVIDER'
+      );
+    }
+
+    const entry = providers?.[activeProvider];
     if (!entry || entry.enabled === false) {
       throw new ProviderConfigError(
         `Provider "${activeProvider}" is not enabled. Enable it in AI Content Studio settings.`,
@@ -78,7 +81,7 @@ const registryService = ({ strapi }: { strapi: Core.Strapi }) => ({
     }
 
     // Decrypt ONLY the active provider's key.
-    const apiKey = await configSvc.getDecryptedKey(activeProvider as ProviderId);
+    const apiKey = await configSvc.getDecryptedKey(activeProvider);
     if (!apiKey) {
       throw new ProviderConfigError(
         `Provider "${activeProvider}" has no API key set. Add it in AI Content Studio settings.`,
@@ -86,27 +89,21 @@ const registryService = ({ strapi }: { strapi: Core.Strapi }) => ({
       );
     }
 
-    const factories: Record<string, ReturnType<typeof createAnthropic>> = {};
-    switch (activeProvider) {
-      case 'anthropic':
-        factories.anthropic = createAnthropic({ apiKey });
-        break;
-      case 'openai':
-        factories.openai = createOpenAI({ apiKey }) as never;
-        break;
-      case 'google':
-        factories.google = createGoogleGenerativeAI({ apiKey }) as never;
-        break;
-      default:
-        throw new ProviderConfigError(`Unknown provider "${activeProvider}".`, 'UNKNOWN_PROVIDER');
+    const baseUrl = entry.baseUrl ?? null;
+    if (descriptor.requiresBaseUrl && !baseUrl) {
+      throw new ProviderConfigError(
+        `Provider "${activeProvider}" requires a Base URL. Add it in the Base URL field in AI Content Studio settings.`,
+        'MISSING_BASE_URL'
+      );
     }
 
-    const registry = createProviderRegistry(factories as never);
+    // The descriptor's constructor performs NO network call, so a configuration error stays
+    // distinguishable from a provider error (FR-010).
     return {
-      model: registry.languageModel(`${activeProvider}:${activeModel}` as never),
-      provider: activeProvider as ProviderId,
+      model: descriptor.create({ apiKey, model: activeModel, baseUrl }),
+      provider: activeProvider,
       modelId: activeModel,
-      supportsVision: modelSupportsVision(activeProvider, activeModel),
+      supportsVision: descriptor.supportsVision(activeModel),
     };
   },
 });

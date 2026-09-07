@@ -1,9 +1,9 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import * as React from "react";
 import { useRef, useCallback, useSyncExternalStore, useEffect } from "react";
-import { useAuth, useNotification, Page } from "@strapi/strapi/admin";
-import { Typography, Loader, Button, Checkbox, IconButton as IconButton$1, Field as Field$1, SingleSelect, SingleSelectOption } from "@strapi/design-system";
-import { Sparkle, Cross, Paperclip, Stop, ArrowUp, Plus, Check, Pencil, Trash } from "@strapi/icons";
+import { useClipboard, useAuth, useNotification, Page } from "@strapi/strapi/admin";
+import { IconButton as IconButton$1, useNotifyAT, Loader, Typography, Button, Checkbox } from "@strapi/design-system";
+import { Duplicate, Sparkle, Cross, Paperclip, Stop, ArrowUp, Plus, Check, Pencil, Trash } from "@strapi/icons";
 import { styled } from "styled-components";
 var marker = "vercel.ai.error";
 var symbol = Symbol.for(marker);
@@ -4801,11 +4801,11 @@ function object$1(shape, params) {
   };
   return new ZodObject(def);
 }
-function strictObject(shape, params) {
+function looseObject(shape, params) {
   return new ZodObject({
     type: "object",
     shape,
-    catchall: never(),
+    catchall: unknown(),
     ...normalizeParams(params)
   });
 }
@@ -5379,6 +5379,15 @@ class EventSourceParserStream extends TransformStream {
     });
   }
 }
+var initialGlobalFetch = globalThis.fetch;
+isNodeDefaultFetch(initialGlobalFetch);
+function isNodeDefaultFetch(fetch2) {
+  if (typeof fetch2 !== "function") {
+    return false;
+  }
+  const source = Function.prototype.toString.call(fetch2);
+  return source.includes("internal/deps/undici") || source.includes("lazy loading of undici");
+}
 var createIdGenerator = ({
   prefix,
   size = 16,
@@ -5475,7 +5484,8 @@ function secureJsonParse(text2) {
 }
 function addAdditionalPropertiesToJsonSchema(jsonSchema2) {
   if (jsonSchema2.type === "object" || Array.isArray(jsonSchema2.type) && jsonSchema2.type.includes("object")) {
-    jsonSchema2.additionalProperties = false;
+    const { additionalProperties } = jsonSchema2;
+    jsonSchema2.additionalProperties = additionalProperties != null && typeof additionalProperties !== "boolean" ? visit$1(additionalProperties) : false;
     const { properties } = jsonSchema2;
     if (properties != null) {
       for (const key of Object.keys(properties)) {
@@ -6629,15 +6639,26 @@ function isSchema(value) {
   return typeof value === "object" && value !== null && schemaSymbol in value && value[schemaSymbol] === true && "jsonSchema" in value && "validate" in value;
 }
 function asSchema(schema) {
-  return schema == null ? jsonSchema({ properties: {}, additionalProperties: false }) : isSchema(schema) ? schema : "~standard" in schema ? schema["~standard"].vendor === "zod" ? zodSchema(schema) : standardSchema(schema) : schema();
+  return schema == null ? jsonSchema({
+    type: "object",
+    properties: {},
+    additionalProperties: false
+  }) : isSchema(schema) ? schema : "~standard" in schema ? schema["~standard"].vendor === "zod" ? zodSchema(schema) : standardSchema(schema) : schema();
 }
 function standardSchema(standardSchema2) {
   return jsonSchema(
-    () => addAdditionalPropertiesToJsonSchema(
-      standardSchema2["~standard"].jsonSchema.input({
-        target: "draft-07"
-      })
-    ),
+    () => {
+      if (!hasStandardJsonSchema(standardSchema2)) {
+        throw new Error(
+          `Standard schema vendor '${standardSchema2["~standard"].vendor}' does not support JSON Schema conversion.`
+        );
+      }
+      return addAdditionalPropertiesToJsonSchema(
+        standardSchema2["~standard"].jsonSchema.input({
+          target: "draft-07"
+        })
+      );
+    },
     {
       validate: async (value) => {
         const result = await standardSchema2["~standard"].validate(value);
@@ -6651,6 +6672,9 @@ function standardSchema(standardSchema2) {
       }
     }
   );
+}
+function hasStandardJsonSchema(schema) {
+  return schema["~standard"].jsonSchema != null;
 }
 function zod3Schema(zodSchema2, options) {
   var _a2;
@@ -6775,13 +6799,14 @@ async function resolve(value) {
   }
   return Promise.resolve(value);
 }
+new TextDecoder();
 function getDefaultExportFromCjs(x) {
   return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
 }
 var __defProp = Object.defineProperty;
 var __export = (target, all2) => {
-  for (var name22 in all2)
-    __defProp(target, name22, { get: all2[name22], enumerable: true });
+  for (var name23 in all2)
+    __defProp(target, name23, { get: all2[name23], enumerable: true });
 };
 var name9 = "AI_NoObjectGeneratedError";
 var marker9 = `vercel.ai.error.${name9}`;
@@ -6808,26 +6833,60 @@ var NoObjectGeneratedError = class extends AISDKError {
   }
 };
 _a9 = symbol9;
-var name16 = "AI_UIMessageStreamError";
-var marker16 = `vercel.ai.error.${name16}`;
-var symbol16 = Symbol.for(marker16);
-var _a16;
+var name17 = "AI_UIMessageStreamError";
+var marker17 = `vercel.ai.error.${name17}`;
+var symbol17 = Symbol.for(marker17);
+var _a17;
 var UIMessageStreamError = class extends AISDKError {
   constructor({
     chunkType,
     chunkId,
     message
   }) {
-    super({ name: name16, message });
-    this[_a16] = true;
+    super({ name: name17, message });
+    this[_a17] = true;
     this.chunkType = chunkType;
     this.chunkId = chunkId;
   }
   static isInstance(error) {
-    return AISDKError.hasMarker(error, marker16);
+    return AISDKError.hasMarker(error, marker17);
   }
 };
-_a16 = symbol16;
+_a17 = symbol17;
+function mergeObjects(base, overrides) {
+  if (base === void 0 && overrides === void 0) {
+    return void 0;
+  }
+  if (base === void 0) {
+    return overrides;
+  }
+  if (overrides === void 0) {
+    return base;
+  }
+  const result = { ...base };
+  for (const key in overrides) {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") {
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(overrides, key)) {
+      const overridesValue = overrides[key];
+      if (overridesValue === void 0)
+        continue;
+      const baseValue = key in base ? base[key] : void 0;
+      const isSourceObject = overridesValue !== null && typeof overridesValue === "object" && !Array.isArray(overridesValue) && !(overridesValue instanceof Date) && !(overridesValue instanceof RegExp);
+      const isTargetObject = baseValue !== null && baseValue !== void 0 && typeof baseValue === "object" && !Array.isArray(baseValue) && !(baseValue instanceof Date) && !(baseValue instanceof RegExp);
+      if (isSourceObject && isTargetObject) {
+        result[key] = mergeObjects(
+          baseValue,
+          overridesValue
+        );
+      } else {
+        result[key] = overridesValue;
+      }
+    }
+  }
+  return result;
+}
 var dataContentSchema = union([
   string$2(),
   _instanceof(Uint8Array),
@@ -6835,8 +6894,8 @@ var dataContentSchema = union([
   custom(
     // Buffer might not be available in some environments such as CloudFlare:
     (value) => {
-      var _a22, _b2;
-      return (_b2 = (_a22 = globalThis.Buffer) == null ? void 0 : _a22.isBuffer(value)) != null ? _b2 : false;
+      var _a23, _b2;
+      return (_b2 = (_a23 = globalThis.Buffer) == null ? void 0 : _a23.isBuffer(value)) != null ? _b2 : false;
     },
     { message: "Must be a Buffer" }
   )
@@ -7031,40 +7090,6 @@ union([
   assistantModelMessageSchema,
   toolModelMessageSchema
 ]);
-function mergeObjects(base, overrides) {
-  if (base === void 0 && overrides === void 0) {
-    return void 0;
-  }
-  if (base === void 0) {
-    return overrides;
-  }
-  if (overrides === void 0) {
-    return base;
-  }
-  const result = { ...base };
-  for (const key in overrides) {
-    if (key === "__proto__" || key === "constructor" || key === "prototype") {
-      continue;
-    }
-    if (Object.prototype.hasOwnProperty.call(overrides, key)) {
-      const overridesValue = overrides[key];
-      if (overridesValue === void 0)
-        continue;
-      const baseValue = key in base ? base[key] : void 0;
-      const isSourceObject = overridesValue !== null && typeof overridesValue === "object" && !Array.isArray(overridesValue) && !(overridesValue instanceof Date) && !(overridesValue instanceof RegExp);
-      const isTargetObject = baseValue !== null && baseValue !== void 0 && typeof baseValue === "object" && !Array.isArray(baseValue) && !(baseValue instanceof Date) && !(baseValue instanceof RegExp);
-      if (isSourceObject && isTargetObject) {
-        result[key] = mergeObjects(
-          baseValue,
-          overridesValue
-        );
-      } else {
-        result[key] = overridesValue;
-      }
-    }
-  }
-  return result;
-}
 new TextEncoder();
 var output_exports = {};
 __export(output_exports, {
@@ -7438,7 +7463,7 @@ var text$6 = () => ({
 });
 var object = ({
   schema: inputSchema,
-  name: name22,
+  name: name23,
   description
 }) => {
   const schema = asSchema(inputSchema);
@@ -7447,7 +7472,7 @@ var object = ({
     responseFormat: resolve(schema.jsonSchema).then((jsonSchema2) => ({
       type: "json",
       schema: jsonSchema2,
-      ...name22 != null && { name: name22 },
+      ...name23 != null && { name: name23 },
       ...description != null && { description }
     })),
     async parseCompleteOutput({ text: text2 }, context2) {
@@ -7501,7 +7526,7 @@ var object = ({
 };
 var array = ({
   element: inputElementSchema,
-  name: name22,
+  name: name23,
   description
 }) => {
   const elementSchema = asSchema(inputElementSchema);
@@ -7521,7 +7546,7 @@ var array = ({
           required: ["elements"],
           additionalProperties: false
         },
-        ...name22 != null && { name: name22 },
+        ...name23 != null && { name: name23 },
         ...description != null && { description }
       };
     }),
@@ -7551,6 +7576,7 @@ var array = ({
           finishReason: context2.finishReason
         });
       }
+      const validatedElements = [];
       for (const element2 of outerValue.elements) {
         const validationResult = await safeValidateTypes({
           value: element2,
@@ -7566,8 +7592,9 @@ var array = ({
             finishReason: context2.finishReason
           });
         }
+        validatedElements.push(validationResult.value);
       }
-      return outerValue.elements;
+      return validatedElements;
     },
     async parsePartialOutput({ text: text2 }) {
       const result = await parsePartialJson(text2);
@@ -7613,7 +7640,7 @@ var array = ({
 };
 var choice = ({
   options: choiceOptions,
-  name: name22,
+  name: name23,
   description
 }) => {
   return {
@@ -7630,7 +7657,7 @@ var choice = ({
         required: ["result"],
         additionalProperties: false
       },
-      ...name22 != null && { name: name22 },
+      ...name23 != null && { name: name23 },
       ...description != null && { description }
     }),
     async parseCompleteOutput({ text: text2 }, context2) {
@@ -7691,14 +7718,14 @@ var choice = ({
   };
 };
 var json = ({
-  name: name22,
+  name: name23,
   description
 } = {}) => {
   return {
     name: "json",
     responseFormat: Promise.resolve({
       type: "json",
-      ...name22 != null && { name: name22 },
+      ...name23 != null && { name: name23 },
       ...description != null && { description }
     }),
     async parseCompleteOutput({ text: text2 }, context2) {
@@ -7758,27 +7785,27 @@ var toolMetadataSchema = record(
 var uiMessageChunkSchema = lazySchema(
   () => zodSchema(
     union([
-      strictObject({
+      looseObject({
         type: literal("text-start"),
         id: string$2(),
         providerMetadata: providerMetadataSchema.optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("text-delta"),
         id: string$2(),
         delta: string$2(),
         providerMetadata: providerMetadataSchema.optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("text-end"),
         id: string$2(),
         providerMetadata: providerMetadataSchema.optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("error"),
         errorText: string$2()
       }),
-      strictObject({
+      looseObject({
         type: literal("tool-input-start"),
         toolCallId: string$2(),
         toolName: string$2(),
@@ -7788,12 +7815,12 @@ var uiMessageChunkSchema = lazySchema(
         dynamic: boolean$1().optional(),
         title: string$2().optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("tool-input-delta"),
         toolCallId: string$2(),
         inputTextDelta: string$2()
       }),
-      strictObject({
+      looseObject({
         type: literal("tool-input-available"),
         toolCallId: string$2(),
         toolName: string$2(),
@@ -7804,7 +7831,7 @@ var uiMessageChunkSchema = lazySchema(
         dynamic: boolean$1().optional(),
         title: string$2().optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("tool-input-error"),
         toolCallId: string$2(),
         toolName: string$2(),
@@ -7816,13 +7843,14 @@ var uiMessageChunkSchema = lazySchema(
         errorText: string$2(),
         title: string$2().optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("tool-approval-request"),
         approvalId: string$2(),
         toolCallId: string$2(),
+        approvalDescriptor: unknown().optional(),
         signature: string$2().optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("tool-output-available"),
         toolCallId: string$2(),
         output: unknown(),
@@ -7832,7 +7860,7 @@ var uiMessageChunkSchema = lazySchema(
         dynamic: boolean$1().optional(),
         preliminary: boolean$1().optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("tool-output-error"),
         toolCallId: string$2(),
         errorText: string$2(),
@@ -7841,34 +7869,34 @@ var uiMessageChunkSchema = lazySchema(
         toolMetadata: toolMetadataSchema.optional(),
         dynamic: boolean$1().optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("tool-output-denied"),
         toolCallId: string$2()
       }),
-      strictObject({
+      looseObject({
         type: literal("reasoning-start"),
         id: string$2(),
         providerMetadata: providerMetadataSchema.optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("reasoning-delta"),
         id: string$2(),
         delta: string$2(),
         providerMetadata: providerMetadataSchema.optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("reasoning-end"),
         id: string$2(),
         providerMetadata: providerMetadataSchema.optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("source-url"),
         sourceId: string$2(),
         url: string$2(),
         title: string$2().optional(),
         providerMetadata: providerMetadataSchema.optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("source-document"),
         sourceId: string$2(),
         mediaType: string$2(),
@@ -7876,13 +7904,13 @@ var uiMessageChunkSchema = lazySchema(
         filename: string$2().optional(),
         providerMetadata: providerMetadataSchema.optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("file"),
         url: string$2(),
         mediaType: string$2(),
         providerMetadata: providerMetadataSchema.optional()
       }),
-      strictObject({
+      looseObject({
         type: custom(
           (value) => typeof value === "string" && value.startsWith("data-"),
           { message: 'Type must start with "data-"' }
@@ -7891,18 +7919,18 @@ var uiMessageChunkSchema = lazySchema(
         data: unknown(),
         transient: boolean$1().optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("start-step")
       }),
-      strictObject({
+      looseObject({
         type: literal("finish-step")
       }),
-      strictObject({
+      looseObject({
         type: literal("start"),
         messageId: string$2().optional(),
         messageMetadata: unknown().optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("finish"),
         finishReason: _enum([
           "stop",
@@ -7914,11 +7942,11 @@ var uiMessageChunkSchema = lazySchema(
         ]).optional(),
         messageMetadata: unknown().optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("abort"),
         reason: string$2().optional()
       }),
-      strictObject({
+      looseObject({
         type: literal("message-metadata"),
         messageMetadata: unknown()
       })
@@ -7978,12 +8006,33 @@ function processUIMessageStream({
     new TransformStream({
       async transform(chunk, controller) {
         await runUpdateMessageJob(async ({ state, write }) => {
-          var _a22, _b2, _c, _d;
+          var _a23, _b2, _c, _d;
+          function getCurrentStepParts() {
+            const parts = state.message.parts;
+            let currentStepStartIndex = parts.length - 1;
+            while (currentStepStartIndex >= 0 && parts[currentStepStartIndex].type !== "step-start") {
+              currentStepStartIndex--;
+            }
+            return parts.slice(currentStepStartIndex + 1);
+          }
+          function getCurrentStepToolInvocations() {
+            return getCurrentStepParts().filter(isToolUIPart);
+          }
           function getToolInvocation(toolCallId) {
-            const toolInvocations = state.message.parts.filter(isToolUIPart);
-            const toolInvocation = toolInvocations.find(
+            const toolInvocations = getCurrentStepToolInvocations();
+            let toolInvocation = toolInvocations.find(
               (invocation) => invocation.toolCallId === toolCallId
             );
+            if (toolInvocation == null) {
+              const parts = state.message.parts;
+              for (let i = parts.length - 1; i >= 0; i--) {
+                const part = parts[i];
+                if (isToolUIPart(part) && part.toolCallId === toolCallId) {
+                  toolInvocation = part;
+                  break;
+                }
+              }
+            }
             if (toolInvocation == null) {
               throw new UIMessageStreamError({
                 chunkType: "tool-invocation",
@@ -7993,9 +8042,9 @@ function processUIMessageStream({
             }
             return toolInvocation;
           }
-          function updateToolPart(options) {
-            var _a23;
-            const part = state.message.parts.find(
+          function updateToolPart(options, existingPart) {
+            var _a24;
+            const part = existingPart != null ? existingPart : getCurrentStepParts().find(
               (part2) => isStaticToolUIPart(part2) && part2.toolCallId === options.toolCallId
             );
             const anyOptions = options;
@@ -8013,7 +8062,7 @@ function processUIMessageStream({
               if (options.toolMetadata !== void 0) {
                 anyPart.toolMetadata = options.toolMetadata;
               }
-              anyPart.providerExecuted = (_a23 = anyOptions.providerExecuted) != null ? _a23 : part.providerExecuted;
+              anyPart.providerExecuted = (_a24 = anyOptions.providerExecuted) != null ? _a24 : part.providerExecuted;
               const providerMetadata = anyOptions.providerMetadata;
               if (providerMetadata != null) {
                 if (options.state === "output-available" || options.state === "output-error") {
@@ -8041,9 +8090,9 @@ function processUIMessageStream({
               });
             }
           }
-          function updateDynamicToolPart(options) {
-            var _a23, _b22;
-            const part = state.message.parts.find(
+          function updateDynamicToolPart(options, existingPart) {
+            var _a24, _b22;
+            const part = existingPart != null ? existingPart : getCurrentStepParts().find(
               (part2) => part2.type === "dynamic-tool" && part2.toolCallId === options.toolCallId
             );
             const anyOptions = options;
@@ -8054,7 +8103,7 @@ function processUIMessageStream({
               anyPart.input = anyOptions.input;
               anyPart.output = anyOptions.output;
               anyPart.errorText = anyOptions.errorText;
-              anyPart.rawInput = (_a23 = anyOptions.rawInput) != null ? _a23 : anyPart.rawInput;
+              anyPart.rawInput = (_a24 = anyOptions.rawInput) != null ? _a24 : anyPart.rawInput;
               anyPart.preliminary = anyOptions.preliminary;
               if (options.title !== void 0) {
                 anyPart.title = options.title;
@@ -8129,7 +8178,7 @@ function processUIMessageStream({
                 });
               }
               textPart.text += chunk.delta;
-              textPart.providerMetadata = (_a22 = chunk.providerMetadata) != null ? _a22 : textPart.providerMetadata;
+              textPart.providerMetadata = (_a23 = chunk.providerMetadata) != null ? _a23 : textPart.providerMetadata;
               write();
               break;
             }
@@ -8151,6 +8200,7 @@ function processUIMessageStream({
             case "reasoning-start": {
               const reasoningPart = {
                 type: "reasoning",
+                id: chunk.id,
                 text: "",
                 providerMetadata: chunk.providerMetadata,
                 state: "streaming"
@@ -8223,7 +8273,7 @@ function processUIMessageStream({
               break;
             }
             case "tool-input-start": {
-              const toolInvocations = state.message.parts.filter(isStaticToolUIPart);
+              const toolInvocations = getCurrentStepParts().filter(isStaticToolUIPart);
               state.partialToolCalls[chunk.toolCallId] = {
                 text: "",
                 toolName: chunk.toolName,
@@ -8326,7 +8376,7 @@ function processUIMessageStream({
               break;
             }
             case "tool-input-error": {
-              const existingPart = state.message.parts.filter(isToolUIPart).find((p) => p.toolCallId === chunk.toolCallId);
+              const existingPart = getCurrentStepParts().filter(isToolUIPart).find((p) => p.toolCallId === chunk.toolCallId);
               const isDynamic = existingPart != null ? existingPart.type === "dynamic-tool" : !!chunk.dynamic;
               if (isDynamic) {
                 updateDynamicToolPart({
@@ -8360,6 +8410,7 @@ function processUIMessageStream({
               toolInvocation.state = "approval-requested";
               toolInvocation.approval = {
                 id: chunk.approvalId,
+                ...chunk.approvalDescriptor != null ? { descriptor: chunk.approvalDescriptor } : {},
                 ...chunk.signature != null ? { signature: chunk.signature } : {}
               };
               write();
@@ -8374,31 +8425,37 @@ function processUIMessageStream({
             case "tool-output-available": {
               const toolInvocation = getToolInvocation(chunk.toolCallId);
               if (toolInvocation.type === "dynamic-tool") {
-                updateDynamicToolPart({
-                  toolCallId: chunk.toolCallId,
-                  toolName: toolInvocation.toolName,
-                  state: "output-available",
-                  input: toolInvocation.input,
-                  output: chunk.output,
-                  preliminary: chunk.preliminary,
-                  providerExecuted: chunk.providerExecuted,
-                  providerMetadata: chunk.providerMetadata,
-                  title: toolInvocation.title,
-                  toolMetadata: toolInvocation.toolMetadata
-                });
+                updateDynamicToolPart(
+                  {
+                    toolCallId: chunk.toolCallId,
+                    toolName: toolInvocation.toolName,
+                    state: "output-available",
+                    input: toolInvocation.input,
+                    output: chunk.output,
+                    preliminary: chunk.preliminary,
+                    providerExecuted: chunk.providerExecuted,
+                    providerMetadata: chunk.providerMetadata,
+                    title: toolInvocation.title,
+                    toolMetadata: toolInvocation.toolMetadata
+                  },
+                  toolInvocation
+                );
               } else {
-                updateToolPart({
-                  toolCallId: chunk.toolCallId,
-                  toolName: getStaticToolName(toolInvocation),
-                  state: "output-available",
-                  input: toolInvocation.input,
-                  output: chunk.output,
-                  providerExecuted: chunk.providerExecuted,
-                  preliminary: chunk.preliminary,
-                  providerMetadata: chunk.providerMetadata,
-                  title: toolInvocation.title,
-                  toolMetadata: toolInvocation.toolMetadata
-                });
+                updateToolPart(
+                  {
+                    toolCallId: chunk.toolCallId,
+                    toolName: getStaticToolName(toolInvocation),
+                    state: "output-available",
+                    input: toolInvocation.input,
+                    output: chunk.output,
+                    providerExecuted: chunk.providerExecuted,
+                    preliminary: chunk.preliminary,
+                    providerMetadata: chunk.providerMetadata,
+                    title: toolInvocation.title,
+                    toolMetadata: toolInvocation.toolMetadata
+                  },
+                  toolInvocation
+                );
               }
               write();
               break;
@@ -8406,30 +8463,36 @@ function processUIMessageStream({
             case "tool-output-error": {
               const toolInvocation = getToolInvocation(chunk.toolCallId);
               if (toolInvocation.type === "dynamic-tool") {
-                updateDynamicToolPart({
-                  toolCallId: chunk.toolCallId,
-                  toolName: toolInvocation.toolName,
-                  state: "output-error",
-                  input: toolInvocation.input,
-                  errorText: chunk.errorText,
-                  providerExecuted: chunk.providerExecuted,
-                  providerMetadata: chunk.providerMetadata,
-                  title: toolInvocation.title,
-                  toolMetadata: toolInvocation.toolMetadata
-                });
+                updateDynamicToolPart(
+                  {
+                    toolCallId: chunk.toolCallId,
+                    toolName: toolInvocation.toolName,
+                    state: "output-error",
+                    input: toolInvocation.input,
+                    errorText: chunk.errorText,
+                    providerExecuted: chunk.providerExecuted,
+                    providerMetadata: chunk.providerMetadata,
+                    title: toolInvocation.title,
+                    toolMetadata: toolInvocation.toolMetadata
+                  },
+                  toolInvocation
+                );
               } else {
-                updateToolPart({
-                  toolCallId: chunk.toolCallId,
-                  toolName: getStaticToolName(toolInvocation),
-                  state: "output-error",
-                  input: toolInvocation.input,
-                  rawInput: toolInvocation.rawInput,
-                  errorText: chunk.errorText,
-                  providerExecuted: chunk.providerExecuted,
-                  providerMetadata: chunk.providerMetadata,
-                  title: toolInvocation.title,
-                  toolMetadata: toolInvocation.toolMetadata
-                });
+                updateToolPart(
+                  {
+                    toolCallId: chunk.toolCallId,
+                    toolName: getStaticToolName(toolInvocation),
+                    state: "output-error",
+                    input: toolInvocation.input,
+                    rawInput: toolInvocation.rawInput,
+                    errorText: chunk.errorText,
+                    providerExecuted: chunk.providerExecuted,
+                    providerMetadata: chunk.providerMetadata,
+                    title: toolInvocation.title,
+                    toolMetadata: toolInvocation.toolMetadata
+                  },
+                  toolInvocation
+                );
               }
               write();
               break;
@@ -8449,7 +8512,7 @@ function processUIMessageStream({
               }
               await updateMessageMetadata(chunk.messageMetadata);
               if (chunk.messageId != null || chunk.messageMetadata != null) {
-                write();
+                write({ updateStatus: false });
               }
               break;
             }
@@ -8517,9 +8580,19 @@ function processUIMessageStream({
 }
 async function consumeStream({
   stream,
-  onError
+  onError,
+  abortSignal
 }) {
   const reader = stream.getReader();
+  const cancelOnAbort = () => {
+    reader.cancel().catch(() => {
+    });
+  };
+  if (abortSignal == null ? void 0 : abortSignal.aborted) {
+    cancelOnAbort();
+  } else {
+    abortSignal == null ? void 0 : abortSignal.addEventListener("abort", cancelOnAbort, { once: true });
+  }
   try {
     while (true) {
       const { done } = await reader.read();
@@ -8529,6 +8602,7 @@ async function consumeStream({
   } catch (error) {
     onError == null ? void 0 : onError(error);
   } finally {
+    abortSignal == null ? void 0 : abortSignal.removeEventListener("abort", cancelOnAbort);
     reader.releaseLock();
   }
 }
@@ -8540,6 +8614,7 @@ record(
   string$2(),
   jsonValueSchema.optional()
 );
+new TextEncoder();
 createIdGenerator({ prefix: "aiobj", size: 24 });
 var SerialJobExecutor = class {
   constructor() {
@@ -8581,12 +8656,12 @@ async function convertFileListToFileUIParts(files) {
   }
   return Promise.all(
     Array.from(files).map(async (file) => {
-      const { name: name22, type } = file;
+      const { name: name23, type } = file;
       const dataUrl = await new Promise((resolve3, reject) => {
         const reader = new FileReader();
         reader.onload = (readerEvent) => {
-          var _a22;
-          resolve3((_a22 = readerEvent.target) == null ? void 0 : _a22.result);
+          var _a23;
+          resolve3((_a23 = readerEvent.target) == null ? void 0 : _a23.result);
         };
         reader.onerror = (error) => reject(error);
         reader.readAsDataURL(file);
@@ -8594,7 +8669,7 @@ async function convertFileListToFileUIParts(files) {
       return {
         type: "file",
         mediaType: type,
-        filename: name22,
+        filename: name23,
         url: dataUrl
       };
     })
@@ -8622,7 +8697,7 @@ var HttpChatTransport = class {
     abortSignal,
     ...options
   }) {
-    var _a22, _b2, _c, _d, _e;
+    var _a23, _b2, _c, _d, _e;
     const resolvedBody = await resolve(this.body);
     const resolvedHeaders = await resolve(this.headers);
     const resolvedCredentials = await resolve(this.credentials);
@@ -8630,7 +8705,7 @@ var HttpChatTransport = class {
       ...normalizeHeaders(resolvedHeaders),
       ...normalizeHeaders(options.headers)
     };
-    const preparedRequest = await ((_a22 = this.prepareSendMessagesRequest) == null ? void 0 : _a22.call(this, {
+    const preparedRequest = await ((_a23 = this.prepareSendMessagesRequest) == null ? void 0 : _a23.call(this, {
       api: this.api,
       id: options.chatId,
       messages: options.messages,
@@ -8674,7 +8749,7 @@ var HttpChatTransport = class {
     return this.processResponseStream(response.body);
   }
   async reconnectToStream(options) {
-    var _a22, _b2, _c, _d, _e;
+    var _a23, _b2, _c, _d, _e;
     const resolvedBody = await resolve(this.body);
     const resolvedHeaders = await resolve(this.headers);
     const resolvedCredentials = await resolve(this.credentials);
@@ -8682,7 +8757,7 @@ var HttpChatTransport = class {
       ...normalizeHeaders(resolvedHeaders),
       ...normalizeHeaders(options.headers)
     };
-    const preparedRequest = await ((_a22 = this.prepareReconnectToStreamRequest) == null ? void 0 : _a22.call(this, {
+    const preparedRequest = await ((_a23 = this.prepareReconnectToStreamRequest) == null ? void 0 : _a23.call(this, {
       api: this.api,
       id: options.chatId,
       body: { ...resolvedBody, ...options.body },
@@ -8697,7 +8772,8 @@ var HttpChatTransport = class {
     const response = await fetch2(api, {
       method: "GET",
       headers,
-      credentials
+      credentials,
+      signal: options.abortSignal
     });
     if (response.status === 204) {
       return null;
@@ -8748,13 +8824,14 @@ var AbstractChat = class {
     sendAutomaticallyWhen
   }) {
     this.activeResponse = void 0;
+    this.activeResumeRequest = void 0;
     this.jobExecutor = new SerialJobExecutor();
     this.sendMessage = async (message, options) => {
-      var _a22, _b2, _c, _d;
+      var _a23, _b2, _c, _d;
       if (message == null) {
         await this.makeRequest({
           trigger: "submit-message",
-          messageId: (_a22 = this.lastMessage) == null ? void 0 : _a22.id,
+          messageId: (_a23 = this.lastMessage) == null ? void 0 : _a23.id,
           ...options
         });
         return;
@@ -8843,7 +8920,7 @@ var AbstractChat = class {
       const updatePart = (part) => isToolUIPart(part) && part.state === "approval-requested" && part.approval.id === id2 ? {
         ...part,
         state: "approval-responded",
-        approval: { id: id2, approved, reason }
+        approval: { ...part.approval, id: id2, approved, reason }
       } : part;
       this.state.replaceMessage(messages.length - 1, {
         ...lastMessage,
@@ -8854,11 +8931,11 @@ var AbstractChat = class {
       }
       if (this.status !== "streaming" && this.status !== "submitted" && this.sendAutomaticallyWhen) {
         this.shouldSendAutomatically().then((shouldSend) => {
-          var _a22;
+          var _a23;
           if (shouldSend) {
             this.makeRequest({
               trigger: "submit-message",
-              messageId: (_a22 = this.lastMessage) == null ? void 0 : _a22.id,
+              messageId: (_a23 = this.lastMessage) == null ? void 0 : _a23.id,
               ...options
             });
           }
@@ -8884,11 +8961,11 @@ var AbstractChat = class {
       }
       if (this.status !== "streaming" && this.status !== "submitted" && this.sendAutomaticallyWhen) {
         this.shouldSendAutomatically().then((shouldSend) => {
-          var _a22;
+          var _a23;
           if (shouldSend) {
             this.makeRequest({
               trigger: "submit-message",
-              messageId: (_a22 = this.lastMessage) == null ? void 0 : _a22.id,
+              messageId: (_a23 = this.lastMessage) == null ? void 0 : _a23.id,
               ...options
             });
           }
@@ -8897,12 +8974,9 @@ var AbstractChat = class {
     });
     this.addToolResult = this.addToolOutput;
     this.stop = async () => {
-      var _a22;
-      if (this.status !== "streaming" && this.status !== "submitted")
-        return;
-      if ((_a22 = this.activeResponse) == null ? void 0 : _a22.abortController) {
-        this.activeResponse.abortController.abort();
-      }
+      var _a23, _b2;
+      (_a23 = this.activeResumeRequest) == null ? void 0 : _a23.abortController.abort();
+      (_b2 = this.activeResponse) == null ? void 0 : _b2.abortController.abort();
     };
     this.id = id;
     this.transport = transport;
@@ -8966,25 +9040,60 @@ var AbstractChat = class {
     body,
     messageId
   }) {
-    var _a22, _b2, _c;
+    var _a23, _b2, _c;
+    const abortController = new AbortController();
+    const activeResumeRequest = trigger === "resume-stream" ? { abortController } : void 0;
+    if (activeResumeRequest) {
+      (_a23 = this.activeResumeRequest) == null ? void 0 : _a23.abortController.abort();
+      this.activeResumeRequest = activeResumeRequest;
+    }
+    const isCurrentRequest = () => activeResumeRequest == null || this.activeResumeRequest === activeResumeRequest;
+    const clearActiveResumeRequest = () => {
+      if (this.activeResumeRequest === activeResumeRequest) {
+        this.activeResumeRequest = void 0;
+      }
+    };
     let resumeStream;
     if (trigger === "resume-stream") {
       try {
         const reconnect = await this.transport.reconnectToStream({
           chatId: this.id,
+          abortSignal: abortController.signal,
           metadata,
           headers,
           body
         });
+        if (abortController.signal.aborted || !isCurrentRequest()) {
+          await (reconnect == null ? void 0 : reconnect.cancel().catch(() => {
+          }));
+          if (isCurrentRequest()) {
+            this.setStatus({ status: "ready" });
+          }
+          clearActiveResumeRequest();
+          return;
+        }
         if (reconnect == null) {
+          this.setStatus({ status: "ready" });
+          clearActiveResumeRequest();
           return;
         }
         resumeStream = reconnect;
       } catch (err) {
+        if (abortController.signal.aborted || err.name === "AbortError") {
+          if (isCurrentRequest()) {
+            this.setStatus({ status: "ready" });
+          }
+          clearActiveResumeRequest();
+          return;
+        }
+        if (!isCurrentRequest()) {
+          return;
+        }
         if (this.onError && err instanceof Error) {
           this.onError(err);
         }
         this.setStatus({ status: "error", error: err });
+        clearActiveResumeRequest();
         return;
       }
     }
@@ -8993,18 +9102,20 @@ var AbstractChat = class {
     let isAbort = false;
     let isDisconnect = false;
     let isError = false;
+    let activeResponse;
     try {
-      const activeResponse = {
+      const response = {
         state: createStreamingUIMessageState({
-          lastMessage: this.state.snapshot(lastMessage),
+          lastMessage: trigger === "resume-stream" || trigger === "regenerate-message" ? void 0 : this.state.snapshot(lastMessage),
           messageId: this.generateId()
         }),
-        abortController: new AbortController()
+        abortController
       };
-      activeResponse.abortController.signal.addEventListener("abort", () => {
+      activeResponse = response;
+      response.abortController.signal.addEventListener("abort", () => {
         isAbort = true;
       });
-      this.activeResponse = activeResponse;
+      this.activeResponse = response;
       let stream;
       if (trigger === "resume-stream") {
         stream = resumeStream;
@@ -9012,7 +9123,7 @@ var AbstractChat = class {
         stream = await this.transport.sendMessages({
           chatId: this.id,
           messages: this.state.messages,
-          abortSignal: activeResponse.abortController.signal,
+          abortSignal: response.abortController.signal,
           metadata,
           headers,
           body,
@@ -9022,24 +9133,32 @@ var AbstractChat = class {
       }
       const runUpdateMessageJob = (job) => (
         // serialize the job execution to avoid race conditions:
-        this.jobExecutor.run(
-          () => job({
-            state: activeResponse.state,
-            write: () => {
-              var _a23;
-              this.setStatus({ status: "streaming" });
-              const replaceLastMessage = activeResponse.state.message.id === ((_a23 = this.lastMessage) == null ? void 0 : _a23.id);
+        this.jobExecutor.run(() => {
+          if (response.abortController.signal.aborted) {
+            return Promise.resolve();
+          }
+          return job({
+            state: response.state,
+            write: ({ updateStatus = true } = {}) => {
+              var _a24;
+              if (response.abortController.signal.aborted) {
+                return;
+              }
+              if (updateStatus) {
+                this.setStatus({ status: "streaming" });
+              }
+              const replaceLastMessage = response.state.message.id === ((_a24 = this.lastMessage) == null ? void 0 : _a24.id);
               if (replaceLastMessage) {
                 this.state.replaceMessage(
                   this.state.messages.length - 1,
-                  activeResponse.state.message
+                  response.state.message
                 );
               } else {
-                this.state.pushMessage(activeResponse.state.message);
+                this.state.pushMessage(response.state.message);
               }
             }
-          })
-        )
+          });
+        })
       );
       await consumeStream({
         stream: processUIMessageStream({
@@ -9053,15 +9172,29 @@ var AbstractChat = class {
             throw error;
           }
         }),
+        abortSignal: response.abortController.signal,
         onError: (error) => {
           throw error;
         }
       });
-      this.setStatus({ status: "ready" });
+      if (isAbort) {
+        if (isCurrentRequest()) {
+          this.setStatus({ status: "ready" });
+        }
+        return null;
+      }
+      if (isCurrentRequest()) {
+        this.setStatus({ status: "ready" });
+      }
     } catch (err) {
       if (isAbort || err.name === "AbortError") {
         isAbort = true;
-        this.setStatus({ status: "ready" });
+        if (isCurrentRequest()) {
+          this.setStatus({ status: "ready" });
+        }
+        return null;
+      }
+      if (!isCurrentRequest()) {
         return null;
       }
       isError = true;
@@ -9074,18 +9207,22 @@ var AbstractChat = class {
       this.setStatus({ status: "error", error: err });
     } finally {
       try {
-        (_b2 = this.onFinish) == null ? void 0 : _b2.call(this, {
-          message: this.activeResponse.state.message,
-          messages: this.state.messages,
-          isAbort,
-          isDisconnect,
-          isError,
-          finishReason: (_a22 = this.activeResponse) == null ? void 0 : _a22.state.finishReason
-        });
-      } catch (err) {
-        console.error(err);
+        if (activeResponse) {
+          (_b2 = this.onFinish) == null ? void 0 : _b2.call(this, {
+            message: activeResponse.state.message,
+            messages: this.state.messages,
+            isAbort,
+            isDisconnect,
+            isError,
+            finishReason: activeResponse.state.finishReason
+          });
+        }
+      } finally {
+        if (this.activeResponse === activeResponse) {
+          this.activeResponse = void 0;
+        }
+        clearActiveResumeRequest();
       }
-      this.activeResponse = void 0;
     }
     if (!isError && await this.shouldSendAutomatically()) {
       await this.makeRequest({
@@ -9151,6 +9288,15 @@ var __privateSet = (obj, member, value, setter) => {
 function throttle(fn, waitMs) {
   return waitMs != null ? throttleFunction(fn, waitMs) : fn;
 }
+function cloneMetadata(metadata) {
+  if (Array.isArray(metadata)) {
+    return [...metadata];
+  }
+  if (metadata != null && typeof metadata === "object" && (Object.getPrototypeOf(metadata) === Object.prototype || Object.getPrototypeOf(metadata) === null)) {
+    return { ...metadata };
+  }
+  return metadata;
+}
 var _messages, _status, _error, _messagesCallbacks, _statusCallbacks, _errorCallbacks, _callMessagesCallbacks, _callStatusCallbacks, _callErrorCallbacks;
 var ReactChatState = class {
   constructor(initialMessages = []) {
@@ -9171,13 +9317,25 @@ var ReactChatState = class {
     this.replaceMessage = (index2, message) => {
       __privateSet(this, _messages, [
         ...__privateGet(this, _messages).slice(0, index2),
-        // We deep clone the message here to ensure the new React Compiler (currently in RC) detects deeply nested parts/metadata changes:
         this.snapshot(message),
         ...__privateGet(this, _messages).slice(index2 + 1)
       ]);
       __privateGet(this, _callMessagesCallbacks).call(this);
     };
-    this.snapshot = (value) => structuredClone(value);
+    this.snapshot = (value) => {
+      if (value == null || typeof value !== "object" || !("parts" in value) || !Array.isArray(value.parts)) {
+        return value;
+      }
+      const message = value;
+      const snapshot = {
+        ...message,
+        parts: message.parts.map((part) => ({ ...part }))
+      };
+      if ("metadata" in message) {
+        snapshot.metadata = cloneMetadata(message.metadata);
+      }
+      return snapshot;
+    };
     this["~registerMessagesCallback"] = (onChange, throttleWaitMs) => {
       const callback = throttleWaitMs ? throttle(onChange, throttleWaitMs) : onChange;
       __privateGet(this, _messagesCallbacks).add(callback);
@@ -9257,69 +9415,112 @@ function useChat({
   resume = false,
   ...options
 } = {}) {
-  const callbacksRef = useRef(
-    !("chat" in options) ? {
-      onToolCall: options.onToolCall,
-      onData: options.onData,
-      onFinish: options.onFinish,
-      onError: options.onError,
-      sendAutomaticallyWhen: options.sendAutomaticallyWhen
-    } : {}
-  );
+  const latestRef = useRef({});
   if (!("chat" in options)) {
-    callbacksRef.current = {
+    latestRef.current = {
       onToolCall: options.onToolCall,
       onData: options.onData,
       onFinish: options.onFinish,
       onError: options.onError,
-      sendAutomaticallyWhen: options.sendAutomaticallyWhen
+      sendAutomaticallyWhen: options.sendAutomaticallyWhen,
+      transport: options.transport
     };
   }
-  const optionsWithCallbacks = {
+  let defaultTransport;
+  const getTransport = () => {
+    var _a2;
+    return (_a2 = latestRef.current.transport) != null ? _a2 : defaultTransport != null ? defaultTransport : defaultTransport = new DefaultChatTransport();
+  };
+  const chatOptions = {
     ...options,
+    transport: {
+      sendMessages: (sendOptions) => getTransport().sendMessages(sendOptions),
+      reconnectToStream: (reconnectOptions) => getTransport().reconnectToStream(reconnectOptions)
+    },
     onToolCall: (arg) => {
       var _a2, _b2;
-      return (_b2 = (_a2 = callbacksRef.current).onToolCall) == null ? void 0 : _b2.call(_a2, arg);
+      return (_b2 = (_a2 = latestRef.current).onToolCall) == null ? void 0 : _b2.call(_a2, arg);
     },
     onData: (arg) => {
       var _a2, _b2;
-      return (_b2 = (_a2 = callbacksRef.current).onData) == null ? void 0 : _b2.call(_a2, arg);
+      return (_b2 = (_a2 = latestRef.current).onData) == null ? void 0 : _b2.call(_a2, arg);
     },
     onFinish: (arg) => {
       var _a2, _b2;
-      return (_b2 = (_a2 = callbacksRef.current).onFinish) == null ? void 0 : _b2.call(_a2, arg);
+      return (_b2 = (_a2 = latestRef.current).onFinish) == null ? void 0 : _b2.call(_a2, arg);
     },
     onError: (arg) => {
       var _a2, _b2;
-      return (_b2 = (_a2 = callbacksRef.current).onError) == null ? void 0 : _b2.call(_a2, arg);
+      return (_b2 = (_a2 = latestRef.current).onError) == null ? void 0 : _b2.call(_a2, arg);
     },
     sendAutomaticallyWhen: (arg) => {
       var _a2, _b2, _c;
-      return (_c = (_b2 = (_a2 = callbacksRef.current).sendAutomaticallyWhen) == null ? void 0 : _b2.call(_a2, arg)) != null ? _c : false;
+      return (_c = (_b2 = (_a2 = latestRef.current).sendAutomaticallyWhen) == null ? void 0 : _b2.call(_a2, arg)) != null ? _c : false;
     }
   };
   const chatRef = useRef(
-    "chat" in options ? options.chat : new Chat$1(optionsWithCallbacks)
+    "chat" in options ? options.chat : new Chat$1(chatOptions)
   );
-  const shouldRecreateChat = "chat" in options && options.chat !== chatRef.current || "id" in options && chatRef.current.id !== options.id;
+  const shouldRecreateChat = "chat" in options && options.chat !== chatRef.current || "id" in options && options.id != null && chatRef.current.id !== options.id;
   if (shouldRecreateChat) {
-    chatRef.current = "chat" in options ? options.chat : new Chat$1(optionsWithCallbacks);
+    chatRef.current = "chat" in options ? options.chat : new Chat$1(chatOptions);
+  }
+  const chat = chatRef.current;
+  const messagesSnapshotRef = useRef({
+    chat,
+    messages: chat.messages
+  });
+  if (messagesSnapshotRef.current.chat !== chat) {
+    messagesSnapshotRef.current = { chat, messages: chat.messages };
   }
   const subscribeToMessages = useCallback(
-    (update) => chatRef.current["~registerMessagesCallback"](update, throttleWaitMs),
-    // `chatRef.current.id` is required to trigger re-subscription when the chat ID changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [throttleWaitMs, chatRef.current.id]
+    (update) => {
+      let isSubscribed = true;
+      const updateMessages = () => {
+        if (!isSubscribed || messagesSnapshotRef.current.chat !== chat) {
+          return;
+        }
+        messagesSnapshotRef.current = { chat, messages: chat.messages };
+        update();
+      };
+      const unsubscribe = chat["~registerMessagesCallback"](
+        updateMessages,
+        throttleWaitMs
+      );
+      messagesSnapshotRef.current = { chat, messages: chat.messages };
+      return () => {
+        isSubscribed = false;
+        unsubscribe();
+      };
+    },
+    [chat, throttleWaitMs]
+  );
+  const getMessagesSnapshot = useCallback(
+    () => messagesSnapshotRef.current.messages,
+    []
   );
   const messages = useSyncExternalStore(
     subscribeToMessages,
-    () => chatRef.current.messages,
-    () => chatRef.current.messages
+    getMessagesSnapshot,
+    getMessagesSnapshot
   );
+  const subscribeToStatus = useCallback(
+    (update) => chat["~registerStatusCallback"](() => {
+      if (messagesSnapshotRef.current.chat !== chat) {
+        return;
+      }
+      if (chat.status === "ready" || chat.status === "error") {
+        messagesSnapshotRef.current = { chat, messages: chat.messages };
+      }
+      update();
+    }),
+    [chat]
+  );
+  const getStatusSnapshot = useCallback(() => chat.status, [chat]);
   const status = useSyncExternalStore(
-    chatRef.current["~registerStatusCallback"],
-    () => chatRef.current.status,
-    () => chatRef.current.status
+    subscribeToStatus,
+    getStatusSnapshot,
+    getStatusSnapshot
   );
   const error = useSyncExternalStore(
     chatRef.current["~registerErrorCallback"],
@@ -22136,166 +22337,81 @@ const LOADING_WORDS = [
   "Zesting",
   "Zigzagging"
 ];
-const Card$1 = styled.div`
-  align-self: stretch;
-  border: 1px solid ${({ theme }) => theme.colors.neutral200};
-  border-radius: 0.8rem;
-  overflow: hidden;
-`;
-const Head$2 = styled.div`
-  padding: 0.9rem 1.2rem;
-  background: ${({ theme }) => theme.colors.neutral100};
-  border-bottom: 1px solid ${({ theme }) => theme.colors.neutral150};
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.8rem;
-  justify-content: space-between;
-`;
-const Counts = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-`;
-const Count = styled.span`
-  font-size: 1.1rem;
-  padding: 0.2rem 0.7rem;
-  border-radius: 1rem;
-  color: ${({ theme, $severity }) => $severity === "critical" || $severity === "high" ? theme.colors.danger600 : $severity === "medium" ? theme.colors.warning600 : theme.colors.neutral600};
-  background: ${({ theme, $severity }) => $severity === "critical" || $severity === "high" ? theme.colors.danger100 : $severity === "medium" ? theme.colors.warning100 : theme.colors.neutral150};
-`;
-const Group = styled.div`
-  border-bottom: 1px solid ${({ theme }) => theme.colors.neutral150};
-`;
-const GroupHead = styled.div`
-  padding: 0.5rem 1.2rem;
-  font-size: 1.15rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: ${({ theme, $severity }) => $severity === "critical" || $severity === "high" ? theme.colors.danger700 : $severity === "medium" ? theme.colors.warning700 : theme.colors.neutral700};
-  background: ${({ theme }) => theme.colors.neutral0};
-`;
-const Finding = styled.div`
-  padding: 0.7rem 1.2rem;
-  border-top: 1px solid ${({ theme }) => theme.colors.neutral150};
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 1.2rem;
-`;
-const Where = styled.div`
-  color: ${({ theme }) => theme.colors.neutral800};
-  font-weight: 600;
-  word-break: break-word;
-`;
-const Line = styled.div`
-  color: ${({ theme }) => theme.colors.neutral700};
-  word-break: break-word;
-`;
-const Evidence = styled.code`
-  font-size: 1.1rem;
-  background: ${({ theme }) => theme.colors.neutral150};
-  padding: 0.1rem 0.4rem;
-  border-radius: 3px;
-  word-break: break-all;
-`;
-const Coverage = styled.div`
-  padding: 0.8rem 1.2rem;
-  font-size: 1.15rem;
-  color: ${({ theme }) => theme.colors.neutral700};
-  background: ${({ theme }) => theme.colors.neutral100};
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-`;
-const Warn = styled.span`
-  color: ${({ theme }) => theme.colors.warning700};
-`;
-const Clean = styled.div`
-  padding: 0.9rem 1.2rem;
-  font-size: 1.2rem;
-  color: ${({ theme }) => theme.colors.success600};
-`;
-const ORDER = ["critical", "high", "medium", "low"];
-const locationOf = (location) => [
-  location.contentTypeUid,
-  location.documentId ? `doc ${location.documentId}` : null,
-  location.field,
-  location.configPath
-].filter(Boolean).join(" · ") || "project configuration";
-const AuditReportCard = ({ report }) => {
-  const total = report.findings.length;
-  const partial2 = report.coverage.skippedForBudget.length > 0 || report.coverage.skippedForPermissions.length > 0;
-  return /* @__PURE__ */ jsxs(Card$1, { children: [
-    /* @__PURE__ */ jsxs(Head$2, { children: [
-      /* @__PURE__ */ jsx(Typography, { variant: "delta", children: report.kind === "security" ? "Security audit" : "Functional QA pass" }),
-      /* @__PURE__ */ jsxs(Counts, { children: [
-        ORDER.filter((s) => report.counts[s] > 0).map((severity) => /* @__PURE__ */ jsxs(Count, { $severity: severity, children: [
-          report.counts[severity],
-          " ",
-          severity
-        ] }, severity)),
-        total === 0 ? /* @__PURE__ */ jsx(Count, { $severity: "low", children: "no findings" }) : null
-      ] })
-    ] }),
-    total === 0 ? /* @__PURE__ */ jsxs(Clean, { children: [
-      "No problems found for the checks that ran",
-      partial2 ? " — see the coverage note below" : "",
-      "."
-    ] }) : ORDER.filter((severity) => report.findings.some((f) => f.severity === severity)).map(
-      (severity) => /* @__PURE__ */ jsxs(Group, { children: [
-        /* @__PURE__ */ jsxs(GroupHead, { $severity: severity, children: [
-          severity,
-          " · ",
-          report.findings.filter((f) => f.severity === severity).length
-        ] }),
-        report.findings.filter((f) => f.severity === severity).map((finding, index2) => /* @__PURE__ */ jsxs(Finding, { children: [
-          /* @__PURE__ */ jsxs(Where, { children: [
-            finding.category,
-            " — ",
-            locationOf(finding.location)
-          ] }),
-          /* @__PURE__ */ jsx(Line, { children: /* @__PURE__ */ jsx(Evidence, { children: finding.evidence }) }),
-          /* @__PURE__ */ jsxs(Line, { children: [
-            /* @__PURE__ */ jsx("strong", { children: "Why it matters:" }),
-            " ",
-            finding.impact
-          ] }),
-          /* @__PURE__ */ jsxs(Line, { children: [
-            /* @__PURE__ */ jsx("strong", { children: "Fix:" }),
-            " ",
-            finding.remediation
-          ] })
-        ] }, `${finding.category}-${index2}`))
-      ] }, severity)
-    ),
-    /* @__PURE__ */ jsxs(Coverage, { children: [
-      /* @__PURE__ */ jsxs("span", { children: [
-        /* @__PURE__ */ jsx("strong", { children: "Coverage" }),
-        " · ",
-        report.coverage.inspected.length,
-        " inspected ·",
-        " ",
-        new Date(report.runAt).toLocaleString()
-      ] }),
-      report.coverage.skippedForPermissions.length > 0 ? /* @__PURE__ */ jsxs(Warn, { children: [
-        "Skipped for permissions (",
-        report.coverage.skippedForPermissions.length,
-        "):",
-        " ",
-        report.coverage.skippedForPermissions.join(", ")
-      ] }) : null,
-      report.coverage.skippedForBudget.length > 0 ? /* @__PURE__ */ jsxs(Warn, { children: [
-        "Not reached within the time budget (",
-        report.coverage.skippedForBudget.length,
-        "):",
-        " ",
-        report.coverage.skippedForBudget.join(", ")
-      ] }) : null,
-      report.kind === "security" ? /* @__PURE__ */ jsx("span", { children: "Remediations are advice. Applying one goes through the normal change plan and your normal permission checks." }) : null
-    ] })
-  ] });
+const copyViaExecCommand = (value) => {
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.setAttribute("aria-hidden", "true");
+  textarea.tabIndex = -1;
+  textarea.style.position = "fixed";
+  textarea.style.top = "0";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  try {
+    textarea.select();
+    textarea.setSelectionRange(0, value.length);
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    document.body.removeChild(textarea);
+  }
+};
+function useCopy() {
+  const { copy: strapiCopy } = useClipboard();
+  const copy = React.useCallback(
+    async (value) => {
+      if (typeof value !== "string" || value === "") {
+        return { ok: false, message: "There is nothing to copy." };
+      }
+      if (await strapiCopy(value)) {
+        return { ok: true, message: "Copied to the clipboard." };
+      }
+      if (copyViaExecCommand(value)) {
+        return { ok: true, message: "Copied to the clipboard." };
+      }
+      return {
+        ok: false,
+        message: "Could not copy to the clipboard. Your browser blocked it — this usually happens when the admin panel is not served over HTTPS. Select the text and copy it manually."
+      };
+    },
+    [strapiCopy]
+  );
+  return { copy };
+}
+const CopyButton = ({ value, label, announce }) => {
+  const { copy } = useCopy();
+  const [copied, setCopied] = React.useState(false);
+  const timer = React.useRef(null);
+  React.useEffect(
+    () => () => {
+      if (timer.current !== null) {
+        window.clearTimeout(timer.current);
+      }
+    },
+    []
+  );
+  const onClick = async () => {
+    const result = await copy(value);
+    announce(result.message, result.ok);
+    if (result.ok) {
+      setCopied(true);
+      if (timer.current !== null) {
+        window.clearTimeout(timer.current);
+      }
+      timer.current = window.setTimeout(() => setCopied(false), 2e3);
+    }
+  };
+  return /* @__PURE__ */ jsx(
+    IconButton$1,
+    {
+      label: copied ? "Copied" : label,
+      "aria-label": copied ? "Copied" : label,
+      variant: "ghost",
+      onClick: () => void onClick(),
+      children: /* @__PURE__ */ jsx(Duplicate, {})
+    }
+  );
 };
 const COLUMN_WIDTH = "46rem";
 const Shell = styled.div`
@@ -22494,6 +22610,29 @@ const MarkdownBody = styled.div`
     text-align: left;
   }
 `;
+const RiskyConfirm = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem 1.2rem;
+  background: ${({ theme }) => theme.colors.danger100};
+  border-top: 2px solid ${({ theme }) => theme.colors.danger500};
+  color: ${({ theme }) => theme.colors.danger700};
+  font-size: 1.2rem;
+`;
+const RiskyHeading = styled.div`
+  font-weight: 700;
+`;
+const RiskyDetail = styled.p`
+  margin: 0;
+  line-height: 1.45;
+`;
+const RiskyActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 0.2rem;
+`;
 const ToolPill = styled.div`
   display: inline-flex;
   align-items: center;
@@ -22615,9 +22754,29 @@ const changeSetIdOf = (part) => {
   const output = part.output;
   return output?.ok && typeof output.changeSetId === "string" ? output.changeSetId : null;
 };
-const auditReportOf = (part) => {
-  const output = part.output;
-  return output?.ok && output.report?.coverage ? output.report : null;
+const CopyBar = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  align-self: stretch;
+`;
+const CodeBlockWrap = styled.div`
+  align-self: stretch;
+  position: relative;
+`;
+const codeTextOf = (node2) => {
+  if (typeof node2 === "string") {
+    return node2;
+  }
+  if (typeof node2 === "number") {
+    return String(node2);
+  }
+  if (Array.isArray(node2)) {
+    return node2.map(codeTextOf).join("");
+  }
+  if (React.isValidElement(node2)) {
+    return codeTextOf(node2.props.children);
+  }
+  return "";
 };
 const ReportBox = styled.div`
   border: 1px solid ${({ theme }) => theme.colors.neutral200};
@@ -22640,6 +22799,22 @@ const REPORT_TONE = {
   stale: "warning",
   skipped: "neutral"
 };
+const publishLine = (publish) => {
+  switch (publish.state) {
+    case "published":
+      return "published";
+    case "not_applicable":
+      return "live on save (this type does not use draft & publish)";
+    case "blocked":
+      return `publish blocked${publish.message ? `: ${publish.message}` : ""}`;
+    case "failed":
+      return `publish failed${publish.message ? `: ${publish.message}` : ""}`;
+    case "skipped":
+      return null;
+    default:
+      return publish.state;
+  }
+};
 const showValue = (value) => {
   if (value === null || value === void 0 || value === "") {
     return "(empty)";
@@ -22658,22 +22833,29 @@ const ApplyReport = ({ report }) => /* @__PURE__ */ jsxs(ReportBox, { children: 
     "Applied ",
     new Date(report.appliedAt).toLocaleString()
   ] }),
-  report.items.map((item) => /* @__PURE__ */ jsxs(ReportRow, { $tone: REPORT_TONE[item.state] ?? "neutral", children: [
-    /* @__PURE__ */ jsx("strong", { children: item.state }),
-    " — ",
-    item.field ? `${item.field} on ` : "",
-    item.documentLabel,
-    item.state === "applied" ? /* @__PURE__ */ jsxs(Fragment, { children: [
-      ": ",
-      showValue(item.oldValue),
-      " → ",
-      showValue(item.newValue),
-      item.resultingState === "unchanged" ? "" : ` (${item.resultingState})`
-    ] }) : item.message ? /* @__PURE__ */ jsxs(Fragment, { children: [
-      ": ",
-      item.message
-    ] }) : null
-  ] }, item.id))
+  report.items.map((item) => {
+    const publish = item.publish ? publishLine(item.publish) : null;
+    return /* @__PURE__ */ jsxs(ReportRow, { $tone: REPORT_TONE[item.state] ?? "neutral", children: [
+      /* @__PURE__ */ jsx("strong", { children: item.state }),
+      " — ",
+      item.field ? `${item.field} on ` : "",
+      item.documentLabel,
+      item.state === "applied" ? /* @__PURE__ */ jsxs(Fragment, { children: [
+        ": ",
+        showValue(item.oldValue),
+        " → ",
+        showValue(item.newValue),
+        item.resultingState === "unchanged" ? "" : ` (${item.resultingState})`
+      ] }) : item.message ? /* @__PURE__ */ jsxs(Fragment, { children: [
+        ": ",
+        item.message
+      ] }) : null,
+      publish ? /* @__PURE__ */ jsxs(Fragment, { children: [
+        " — ",
+        publish
+      ] }) : null
+    ] }, item.id);
+  })
 ] });
 const MessageList = ({
   messages,
@@ -22684,6 +22866,30 @@ const MessageList = ({
 }) => {
   const busy = status === "submitted" || status === "streaming";
   const loadingWord = useCyclingWord(busy, LOADING_WORDS);
+  const { notifyStatus, notifyAlert } = useNotifyAT();
+  const announce = React.useCallback(
+    (message, ok2) => {
+      if (ok2) {
+        notifyStatus(message);
+      } else {
+        notifyAlert(message);
+      }
+    },
+    [notifyStatus, notifyAlert]
+  );
+  const markdownSourceOf = (message) => message.parts.filter((part) => part.type === "text").map((part) => part.text).join("\n\n").trim();
+  const markdownComponents = React.useMemo(
+    () => ({
+      pre: ({ children }) => {
+        const code2 = codeTextOf(children);
+        return /* @__PURE__ */ jsxs(CodeBlockWrap, { children: [
+          code2 ? /* @__PURE__ */ jsx(CopyBar, { children: /* @__PURE__ */ jsx(CopyButton, { value: code2, label: "Copy this code block", announce }) }) : null,
+          /* @__PURE__ */ jsx("pre", { children })
+        ] });
+      }
+    }),
+    [announce]
+  );
   const renderImageParts = (message) => message.parts.map(
     (part, index2) => isFileUIPart(part) && part.mediaType?.startsWith("image/") ? /* @__PURE__ */ jsx(MsgImage, { src: part.url, alt: part.filename ?? "attachment" }, `img-${index2}`) : null
   );
@@ -22696,7 +22902,7 @@ const MessageList = ({
   }
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     messages.map(
-      (message) => message.role === "user" ? /* @__PURE__ */ jsx(UserRow, { children: /* @__PURE__ */ jsxs(UserBubble, { children: [
+      (message, messageIndex) => message.role === "user" ? /* @__PURE__ */ jsx(UserRow, { children: /* @__PURE__ */ jsxs(UserBubble, { children: [
         renderImageParts(message),
         message.parts.map(
           (part, index2) => part.type === "text" ? /* @__PURE__ */ jsx("span", { children: part.text }, index2) : null
@@ -22715,46 +22921,50 @@ const MessageList = ({
         ] }) : null
       ] }) }, message.id) : /* @__PURE__ */ jsxs(AssistantRow, { children: [
         /* @__PURE__ */ jsx(Avatar, { children: /* @__PURE__ */ jsx(Sparkle, {}) }),
-        /* @__PURE__ */ jsx(AssistantContent, { children: message.parts.map((part, index2) => {
-          if (part.type === "text") {
-            return /* @__PURE__ */ jsx(MarkdownBody, { children: /* @__PURE__ */ jsx(Markdown, { remarkPlugins: [remarkGfm], children: part.text }) }, index2);
-          }
-          if (part.type === "reasoning") {
-            return /* @__PURE__ */ jsx(Working, { style: { fontStyle: "italic" }, children: part.text }, index2);
-          }
-          if (part.type === "data-apply-report") {
-            return /* @__PURE__ */ jsx(ApplyReport, { report: part.data }, index2);
-          }
-          if (part.type === "data-interrupted") {
-            const data = part.data;
-            return /* @__PURE__ */ jsxs(Interrupted, { children: [
-              /* @__PURE__ */ jsx("strong", { children: "Stopped." }),
-              " ",
-              data.applied?.length ? `${data.applied.length} change${data.applied.length === 1 ? "" : "s"} had already been applied in this turn: ${data.applied.map((a) => `${a.field ?? "entry"} on ${a.documentLabel}`).join("; ")}.` : "Nothing was applied in this turn."
-            ] }, index2);
-          }
-          if (isToolUIPart(part)) {
-            const name2 = String(getToolName(part));
-            if (name2 === "proposeChanges" && part.state === "output-available") {
-              const changeSetId = changeSetIdOf(part);
-              if (changeSetId && renderChangeSet) {
-                return /* @__PURE__ */ jsx(React.Fragment, { children: renderChangeSet(changeSetId) }, index2);
-              }
+        /* @__PURE__ */ jsxs(AssistantContent, { children: [
+          message.parts.map((part, index2) => {
+            if (part.type === "text") {
+              return /* @__PURE__ */ jsx(MarkdownBody, { children: /* @__PURE__ */ jsx(Markdown, { remarkPlugins: [remarkGfm], components: markdownComponents, children: part.text }) }, index2);
             }
-            if ((name2 === "runQaScan" || name2 === "runSecurityAudit") && part.state === "output-available") {
-              const report = auditReportOf(part);
-              if (report) {
-                return /* @__PURE__ */ jsx(AuditReportCard, { report }, index2);
-              }
+            if (part.type === "reasoning") {
+              return /* @__PURE__ */ jsx(Working, { style: { fontStyle: "italic" }, children: part.text }, index2);
             }
-            const { text: text2, danger } = toolLabel(part.state, name2);
-            return /* @__PURE__ */ jsx(ToolPill, { $danger: danger, children: text2 }, index2);
-          }
-          if (isFileUIPart(part) && part.mediaType?.startsWith("image/")) {
-            return /* @__PURE__ */ jsx(MsgImage, { src: part.url, alt: part.filename ?? "image" }, index2);
-          }
-          return null;
-        }) })
+            if (part.type === "data-apply-report") {
+              return /* @__PURE__ */ jsx(ApplyReport, { report: part.data }, index2);
+            }
+            if (part.type === "data-interrupted") {
+              const data = part.data;
+              return /* @__PURE__ */ jsxs(Interrupted, { children: [
+                /* @__PURE__ */ jsx("strong", { children: "Stopped." }),
+                " ",
+                data.applied?.length ? `${data.applied.length} change${data.applied.length === 1 ? "" : "s"} had already been applied in this turn: ${data.applied.map((a) => `${a.field ?? "entry"} on ${a.documentLabel}`).join("; ")}.` : "Nothing was applied in this turn."
+              ] }, index2);
+            }
+            if (isToolUIPart(part)) {
+              const name2 = String(getToolName(part));
+              if (name2 === "proposeChanges" && part.state === "output-available") {
+                const changeSetId = changeSetIdOf(part);
+                if (changeSetId && renderChangeSet) {
+                  return /* @__PURE__ */ jsx(React.Fragment, { children: renderChangeSet(changeSetId) }, index2);
+                }
+              }
+              const { text: text2, danger } = toolLabel(part.state, name2);
+              return /* @__PURE__ */ jsx(ToolPill, { $danger: danger, children: text2 }, index2);
+            }
+            if (isFileUIPart(part) && part.mediaType?.startsWith("image/")) {
+              return /* @__PURE__ */ jsx(MsgImage, { src: part.url, alt: part.filename ?? "image" }, index2);
+            }
+            return null;
+          }),
+          (() => {
+            const source = markdownSourceOf(message);
+            const streamingThis = busy && messageIndex === messages.length - 1;
+            if (!source || streamingThis) {
+              return null;
+            }
+            return /* @__PURE__ */ jsx(CopyBar, { children: /* @__PURE__ */ jsx(CopyButton, { value: source, label: "Copy this reply", announce }) });
+          })()
+        ] })
       ] }, message.id)
     ),
     status === "submitted" ? /* @__PURE__ */ jsxs(AssistantRow, { children: [
@@ -23052,7 +23262,7 @@ const Composer = ({
         }
       )
     ] }),
-    /* @__PURE__ */ jsx(Hint, { children: hint ?? "AI Content Studio can edit live content — review important changes." })
+    /* @__PURE__ */ jsx(Hint, { children: hint ?? "Changes are proposed for your approval — nothing is written until you approve." })
   ] }) });
 };
 const backendURL = () => {
@@ -23100,7 +23310,6 @@ function useThreads() {
   }, [token]);
   const [threads, setThreads] = React.useState([]);
   const [currentThreadId, setCurrentThreadId] = React.useState(null);
-  const [mode, setMode] = React.useState("content");
   const [loading, setLoading] = React.useState(false);
   const [nextCursor, setNextCursor] = React.useState(null);
   const [error, setError] = React.useState(null);
@@ -23108,10 +23317,6 @@ function useThreads() {
   React.useEffect(() => {
     threadIdRef.current = currentThreadId;
   }, [currentThreadId]);
-  const modeRef = React.useRef(mode);
-  React.useEffect(() => {
-    modeRef.current = mode;
-  }, [mode]);
   const refresh = React.useCallback(async (cursor) => {
     setLoading(true);
     setError(null);
@@ -23137,27 +23342,22 @@ function useThreads() {
       void refresh();
     }
   }, [token, refresh]);
-  const createThread = React.useCallback(
-    async (nextMode = "content") => {
-      const thread = await adminFetch("/threads", tokenRef.current, {
-        method: "POST",
-        body: JSON.stringify({ mode: nextMode })
-      });
-      threadIdRef.current = thread.id;
-      setCurrentThreadId(thread.id);
-      setMode(thread.mode);
-      setThreads((current) => [thread, ...current.filter((t) => t.id !== thread.id)]);
-      return thread;
-    },
-    []
-  );
+  const createThread = React.useCallback(async () => {
+    const thread = await adminFetch("/threads", tokenRef.current, {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    threadIdRef.current = thread.id;
+    setCurrentThreadId(thread.id);
+    setThreads((current) => [thread, ...current.filter((t) => t.id !== thread.id)]);
+    return thread;
+  }, []);
   const loadHistory = React.useCallback(async (threadId) => {
     setError(null);
     try {
       const history = await adminFetch(`/threads/${threadId}`, tokenRef.current);
       threadIdRef.current = history.id;
       setCurrentThreadId(history.id);
-      setMode(history.mode);
       return history;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not open that conversation.");
@@ -23193,31 +23393,11 @@ function useThreads() {
     },
     []
   );
-  const changeMode = React.useCallback(
-    async (nextMode) => {
-      setMode(nextMode);
-      modeRef.current = nextMode;
-      const id = threadIdRef.current;
-      if (!id) {
-        return;
-      }
-      setThreads((current) => current.map((t) => t.id === id ? { ...t, mode: nextMode } : t));
-      try {
-        await adminFetch(`/threads/${id}`, tokenRef.current, {
-          method: "PATCH",
-          body: JSON.stringify({ mode: nextMode })
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not change the mode.");
-      }
-    },
-    []
-  );
   const ensureThread = React.useCallback(async () => {
     if (threadIdRef.current) {
       return threadIdRef.current;
     }
-    const thread = await createThread(modeRef.current);
+    const thread = await createThread();
     return thread.id;
   }, [createThread]);
   return {
@@ -23227,10 +23407,6 @@ function useThreads() {
     currentThreadId,
     setCurrentThreadId,
     threadIdRef,
-    mode,
-    setMode,
-    modeRef,
-    changeMode,
     loading,
     hasMore: nextCursor !== null,
     loadMore: () => refresh(nextCursor),
@@ -23297,7 +23473,9 @@ function useChangeSet(changeSetId) {
     async ({
       itemIds,
       confirmDestructive = false,
-      attachmentResolutions = {}
+      attachmentResolutions = {},
+      publish = false,
+      confirmPublish = false
     }) => {
       if (!changeSet) {
         return null;
@@ -23307,7 +23485,13 @@ function useChangeSet(changeSetId) {
       try {
         const result = await adminFetch(`/change-sets/${changeSet.id}/apply`, tokenRef.current, {
           method: "POST",
-          body: JSON.stringify({ itemIds, confirmDestructive, attachmentResolutions })
+          body: JSON.stringify({
+            itemIds,
+            confirmDestructive,
+            attachmentResolutions,
+            publish,
+            confirmPublish
+          })
         });
         await load(changeSet.id);
         return result;
@@ -23645,18 +23829,27 @@ const ChangePlanCard = ({
   } = useChangeSet(changeSetId);
   const [confirmDestructive, setConfirmDestructive] = React.useState(false);
   const [localError, setLocalError] = React.useState(null);
+  const [publishIntent, setPublishIntent] = React.useState(null);
   React.useEffect(() => {
     if (!selectionHasDestructive) {
       setConfirmDestructive(false);
     }
   }, [selectionHasDestructive]);
+  React.useEffect(() => {
+    setPublishIntent(null);
+  }, [selected]);
   if (!changeSet) {
     return error ? /* @__PURE__ */ jsx(Note, { children: error }) : null;
   }
   const resolved = changeSet.status !== "pending";
   const allowedIds = changeSet.items.filter((i) => i.permissionVerdict === "allowed").map((i) => i.id);
   const expired = new Date(changeSet.expiresAt).getTime() <= Date.now();
-  const runApply = async (itemIds) => {
+  const documentsToPublish = new Set(
+    (publishIntent ?? []).map((id) => changeSet.items.find((i) => i.id === id)).filter(
+      (i) => Boolean(i) && i.operation !== "publish" && Boolean(i.documentId)
+    ).map((i) => `${i.contentTypeUid}::${i.documentId}`)
+  ).size;
+  const runApply = async (itemIds, withPublish = false) => {
     setLocalError(null);
     if (itemIds.length === 0) {
       return;
@@ -23675,7 +23868,15 @@ const ChangePlanCard = ({
         return;
       }
     }
-    const report = await apply({ itemIds, confirmDestructive, attachmentResolutions });
+    const report = await apply({
+      itemIds,
+      confirmDestructive,
+      attachmentResolutions,
+      // The confirmation is the ONLY path that sets these, and it sets both together — the server
+      // refuses `publish` without `confirmPublish` before writing anything (FR-045).
+      publish: withPublish,
+      confirmPublish: withPublish
+    });
     if (report) {
       const byId = new Map(changeSet.items.map((i) => [i.id, i]));
       onApplied?.({
@@ -23691,7 +23892,8 @@ const ChangePlanCard = ({
             state: outcome?.state ?? "skipped",
             message: outcome?.message ?? null,
             oldValue: outcome?.oldValue ?? null,
-            newValue: outcome?.newValue ?? null
+            newValue: outcome?.newValue ?? null,
+            publish: outcome?.publish ?? null
           };
         })
       });
@@ -23768,6 +23970,38 @@ const ChangePlanCard = ({
         " will remove content. Confirm explicitly to include them."
       ] })
     ] }) : null,
+    !resolved && publishIntent ? /* @__PURE__ */ jsxs(RiskyConfirm, { children: [
+      /* @__PURE__ */ jsxs(RiskyHeading, { children: [
+        "Publish ",
+        documentsToPublish,
+        " document",
+        documentsToPublish === 1 ? "" : "s",
+        "?"
+      ] }),
+      /* @__PURE__ */ jsx(RiskyDetail, { children: "Publishing makes this content publicly visible immediately." }),
+      /* @__PURE__ */ jsxs(RiskyDetail, { children: [
+        "It publishes each affected document’s ",
+        /* @__PURE__ */ jsx("strong", { children: "entire current draft" }),
+        " — not only the fields this plan reviewed. Any unreviewed draft edit already sitting on those documents will go live with it."
+      ] }),
+      /* @__PURE__ */ jsxs(RiskyActions, { children: [
+        /* @__PURE__ */ jsx(
+          Button,
+          {
+            variant: "danger",
+            onClick: () => {
+              const ids = publishIntent;
+              setPublishIntent(null);
+              void runApply(ids, true);
+            },
+            disabled: busy,
+            loading: busy,
+            children: "Yes, apply and publish"
+          }
+        ),
+        /* @__PURE__ */ jsx(Button, { variant: "tertiary", onClick: () => setPublishIntent(null), disabled: busy, children: "Cancel" })
+      ] })
+    ] }) : null,
     !resolved ? /* @__PURE__ */ jsxs(Actions, { children: [
       /* @__PURE__ */ jsx(
         Button,
@@ -23789,6 +24023,15 @@ const ChangePlanCard = ({
             selected.length,
             ")"
           ]
+        }
+      ),
+      /* @__PURE__ */ jsx(
+        Button,
+        {
+          variant: "danger",
+          onClick: () => setPublishIntent(selected.length > 0 ? selected : allowedIds),
+          disabled: busy || expired || allowedIds.length === 0 || publishIntent !== null,
+          children: "Approve & Publish (Risky)"
         }
       ),
       /* @__PURE__ */ jsx(
@@ -23926,8 +24169,7 @@ const ThreadSidebar = ({
   onNew,
   onRename,
   onDelete,
-  onLoadMore,
-  header
+  onLoadMore
 }) => {
   const [renamingId, setRenamingId] = React.useState(null);
   const [draft, setDraft] = React.useState("");
@@ -23943,10 +24185,7 @@ const ThreadSidebar = ({
     setDraft("");
   };
   return /* @__PURE__ */ jsxs(Aside, { children: [
-    /* @__PURE__ */ jsxs(Head, { children: [
-      /* @__PURE__ */ jsx(Button, { startIcon: /* @__PURE__ */ jsx(Plus, {}), onClick: onNew, fullWidth: true, children: "New conversation" }),
-      header
-    ] }),
+    /* @__PURE__ */ jsx(Head, { children: /* @__PURE__ */ jsx(Button, { startIcon: /* @__PURE__ */ jsx(Plus, {}), onClick: onNew, fullWidth: true, children: "New conversation" }) }),
     /* @__PURE__ */ jsxs(List, { children: [
       threads.length === 0 && !loading ? /* @__PURE__ */ jsx(Empty, { children: "No conversations yet. Ask something to start one." }) : null,
       threads.map((thread) => /* @__PURE__ */ jsx(Item, { $active: thread.id === currentThreadId, children: renamingId === thread.id ? /* @__PURE__ */ jsxs(Fragment, { children: [
@@ -23986,29 +24225,6 @@ const ThreadSidebar = ({
     ] })
   ] });
 };
-const MODE_LABELS = {
-  content: "Content Editing",
-  layout: "Layout Mapping",
-  audit: "Code Audit"
-};
-const MODE_HINTS = {
-  content: "Propose text, media and publish changes for your approval.",
-  layout: "Map page sections and place media into the slots that exist.",
-  audit: "Read-only. QA and security findings; no content change is possible."
-};
-const ModeSelect = ({ mode, onChange, disabled = false }) => /* @__PURE__ */ jsxs(Field$1.Root, { hint: MODE_HINTS[mode], children: [
-  /* @__PURE__ */ jsx(Field$1.Label, { children: "Mode" }),
-  /* @__PURE__ */ jsx(
-    SingleSelect,
-    {
-      value: mode,
-      disabled,
-      onChange: (value) => onChange(String(value)),
-      children: Object.keys(MODE_LABELS).map((value) => /* @__PURE__ */ jsx(SingleSelectOption, { value, children: MODE_LABELS[value] }, value))
-    }
-  ),
-  /* @__PURE__ */ jsx(Field$1.Hint, {})
-] });
 const mb = (bytes) => Math.round(bytes / 1024 / 1024);
 function useAttachments(threadIdRef) {
   const token = useAuth("AiContentStudioAttachments", (state) => state.token);
@@ -24187,10 +24403,6 @@ const Chat2 = () => {
     currentThreadId,
     setCurrentThreadId,
     threadIdRef,
-    mode,
-    setMode,
-    modeRef,
-    changeMode,
     loading,
     hasMore,
     loadMore,
@@ -24206,13 +24418,15 @@ const Chat2 = () => {
       api: `${backendURL()}/ai-content-studio/chat`,
       credentials: "same-origin",
       headers: () => ({ Authorization: `Bearer ${tokenRef.current ?? ""}` }),
+      // `mode` has left the body (contracts/removals.md §1). Everything else about the
+      // transport — the path, the headers, the credentials — is unchanged: if the client had
+      // needed a change for the provider swap, the wire format would have moved.
       body: () => ({
         threadId: threadIdRef.current,
-        mode: modeRef.current,
         attachmentManifest: manifestRef.current
       })
     }),
-    [tokenRef, threadIdRef, modeRef]
+    [tokenRef, threadIdRef]
   );
   const { messages, sendMessage, setMessages, status, stop, error } = useChat({ transport });
   const attachments = useAttachments(threadIdRef);
@@ -24258,9 +24472,7 @@ const Chat2 = () => {
     setInput("");
     threadIdRef.current = null;
     setCurrentThreadId(null);
-    setMode("content");
-    modeRef.current = "content";
-  }, [setMessages, threadIdRef, setCurrentThreadId, setMode, modeRef, attachments]);
+  }, [setMessages, threadIdRef, setCurrentThreadId, attachments]);
   const onSend = async () => {
     const text2 = input.trim();
     if (!text2 && attachments.sendable.length === 0 || busy || preparing) {
@@ -24315,8 +24527,7 @@ const Chat2 = () => {
             }
           });
         },
-        onLoadMore: () => void loadMore(),
-        header: /* @__PURE__ */ jsx(ModeSelect, { mode, onChange: (next) => void changeMode(next), disabled: busy })
+        onLoadMore: () => void loadMore()
       }
     ),
     /* @__PURE__ */ jsx(Main, { children: /* @__PURE__ */ jsxs(Shell, { children: [
@@ -24357,7 +24568,7 @@ const Chat2 = () => {
           canSend,
           onSend: () => void onSend(),
           onStop: () => stop(),
-          hint: mode === "audit" ? "Code Audit is read-only — no content change is possible in this mode." : "Changes are proposed for your approval — nothing is written until you approve."
+          hint: "Changes are proposed for your approval — nothing is written until you approve."
         }
       )
     ] }) })

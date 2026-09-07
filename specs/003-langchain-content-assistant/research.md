@@ -24,15 +24,20 @@ prompt })`. `initChatModel` is **not** used. The AI SDK stays in the request pat
 original request named LangChain, and the specification's breadth clarification names it as the
 layer that owns which providers exist.
 
-**How it is reached**: `createAgent` accepts *either* `options.llm` (a chat-model instance) or
-`options.model` (a string identifier). Verified in `langchain@1.5.10`
-`dist/agents/index.d.ts:63-64`:
+**How it is reached**: `createAgent`'s `model` option accepts *either* a chat-model **instance** or
+a string identifier, and only the string branch resolves through `initChatModel`. Passing the
+instance is what makes D2's packaging problem avoidable.
 
-> `@param options.llm - The language model as an instance of a chat model`
-> `@param options.model - The language model as a string identifier`
-
-Taking the `llm` branch is what makes D2's packaging problem avoidable: the string branch resolves
-through `initChatModel`, the `llm` branch never does.
+> **CORRECTED 2026-09-07 (implementation).** This entry previously quoted an `options.llm` /
+> `options.model` pair from `dist/agents/index.d.ts:63-64`. **No `llm` option exists** in
+> `langchain@1.5.10` as installed: `CreateAgentParams` declares `model: string |
+> AgentLanguageModelLike` (`dist/agents/types.d.ts:422`) and `systemPrompt?: string | SystemMessage`
+> (`:514`), and a grep for `llm?:` / `prompt?:` across `dist/agents/*.d.ts` returns nothing. The
+> quoted lines were presumably read from a different version or a stale doc block.
+>
+> **The decision is unaffected** — an instance still bypasses `initChatModel`, so D2's structural
+> objection and Principle IV both still hold. Only the option names change: `model` and
+> `systemPrompt`.
 
 **Alternatives considered**:
 
@@ -194,7 +199,65 @@ Those options exist only on `streamText`'s **result method** of the same name, w
 `toUIMessageStream`'s own `onFinish` is **not** a substitute: its argument is the LangGraph final
 state, not an assembled UI message (`ToUIMessageStreamOptions.onFinish?: (finalState: TState | undefined) => …`).
 
-**Decision**: `tee()` the `UIMessageChunk` stream. One branch goes to
+> **CORRECTED 2026-09-07 — the decision below was wrong, and the finding above was right about the
+> wrong function.** Every fact quoted above still holds: `pipeUIMessageStreamToResponse` really is
+> consumer-only, and the bridge's `onFinish(finalState)` really is LangGraph state rather than an
+> assembled message. The error was **one of scope**: the search covered the *consumer* side of the
+> pipe and concluded the options existed nowhere in `ai@6.0.208`, when they live on the **producer**
+> side.
+>
+> `createUIMessageStream` carries both — `node_modules/ai/dist/index.d.ts:4308-4326`:
+>
+> ```ts
+> declare function createUIMessageStream<UI_MESSAGE extends UIMessage>({
+>   execute, onError, originalMessages, onStepFinish, onFinish, generateId,
+> }: {
+>   execute: (options: { writer: UIMessageStreamWriter<UI_MESSAGE> }) => Promise<void> | void;
+>   onError?: (error: unknown) => string;
+>   originalMessages?: UI_MESSAGE[];
+>   onFinish?: UIMessageStreamOnFinishCallback<UI_MESSAGE>;
+>   …
+> }): ReadableStream<InferUIMessageChunk<UI_MESSAGE>>;
+> ```
+>
+> and `UIMessageStreamOnFinishCallback` yields `{ messages, isContinuation, isAborted,
+> responseMessage, finishReason }` (`dist/index.d.ts:2225-2248`) — **field-for-field the object
+> `chat.ts:222` destructures today**.
+>
+> **Corrected decision**: no `tee`, no drain.
+>
+> ```ts
+> pipeUIMessageStreamToResponse({
+>   response: ctx.res,
+>   stream: createUIMessageStream({
+>     originalMessages: messages,
+>     onError,
+>     execute: ({ writer }) => { writer.merge(toUIMessageStream(agentStream)); },
+>     async onFinish({ responseMessage }) { /* today's body, verbatim */ },
+>   }),
+> });
+> ```
+>
+> Three things make this strictly better than the `tee`:
+>
+> 1. **It is the same assembler.** `createUIMessageStream` ends in `handleUIMessageStreamFinish` →
+>    `createStreamingUIMessageState` + `processUIMessageStream`, which is exactly what
+>    `readUIMessageStream` calls. FR-013 holds by construction rather than by comparing two turns.
+> 2. **It is today's code path.** `streamText`'s result method is literally
+>    `pipeUIMessageStreamToResponse({ response, stream: this.toUIMessageStream({ originalMessages,
+>    onFinish, … }) })` (`node_modules/ai/src/generate-text/stream-text.ts:2884-2913`), reaching the
+>    same `handleUIMessageStreamFinish` at line 2874. So this is not an analogue of the current
+>    controller — it is the same topology with the model swapped underneath.
+> 3. **The `tee` had a latent defect.** The bridge emits a bare `{ type: 'start' }` with no
+>    `messageId`, and `processUIMessageStream` only sets `state.message.id` when `chunk.messageId !=
+>    null` — so the teed `readUIMessageStream` branch would have yielded a message with `id: ''`, and
+>    the standalone pipe would have sent no message id to the browser. `originalMessages` restores
+>    both.
+>
+> The rest of this entry is kept because its facts are load-bearing elsewhere, and because the way it
+> failed is worth remembering: a correct observation about one export, generalized to a package.
+
+**Superseded decision (kept for the record)**: `tee()` the `UIMessageChunk` stream. One branch goes to
 `pipeUIMessageStreamToResponse`; the other is consumed by `readUIMessageStream({ stream })`, whose
 last yielded `UIMessage` is the assembled assistant turn. Persist `that.parts`.
 
@@ -204,15 +267,32 @@ it is being completed" (`dist/index.d.ts:4368-4383`). Because it is the AI SDK's
 stored shape stays byte-compatible with what the current code writes — which is precisely what makes
 FR-013 hold for conversations written before *and* after this change.
 
-**Consequences to build deliberately, because they were free before**:
+**Consequences that survive the correction**:
 
-- **Abort.** The interrupted marker (`data-interrupted`) and the `appliedSince` report are appended
-  by our own code, not by an SDK callback. The Koa `close`/`aborted` wiring in
-  `chat.ts:180-191` is kept as-is and `abort.signal` is passed to `agent.stream({ signal })`.
-- **Both branches must be drained.** An unread `tee` branch applies backpressure and will stall the
-  response. The persistence branch is consumed unconditionally, including on error and abort.
+- **Abort is still ours to detect.** `onFinish`'s `isAborted` is set **only** by an `{ type: 'abort' }`
+  chunk, and `@ai-sdk/langchain@3.0.93` never emits one — on an `AbortError` it calls `onAbort()` and
+  enqueues `{ type: 'error', errorText }` instead. So the interrupted branch keeps reading the Koa
+  `close`/`aborted` flag `chat.ts:179-191` already maintains, and `abort.signal` is still passed to
+  `agent.stream({ signal })`. A stop will also surface an **error chunk** to the editor unless the
+  bridge's `onAbort` suppresses it — a stop must not read as a failure.
+- **`data-interrupted` can now be written, not spliced.** `writer.write({ type: 'data-interrupted',
+  … })` puts the part into the assembled `responseMessage` for free, replacing the
+  `[...parts]`-copy-and-push and its `as never` cast at `chat.ts:227-241`. It must be written after
+  the merged stream drains, and `appliedSince`'s failure must be caught locally — an error thrown
+  inside `execute` becomes an `{type:'error'}` chunk the editor sees, which is exactly the
+  "persistence failure surfacing as a provider error" the contract forbids.
 - **A persistence failure must never surface as a provider error** — the existing try/catch
   discipline at `chat.ts:254-259` carries over.
+- **The drain rule is gone.** One stream, so backpressure is the pipe's own; `onFinish` fires from
+  the transform's `flush()` and `cancel()`, guarded against double-calling.
+
+**Also checked and confirmed unreachable** (recorded because it is a D2-shaped trap):
+`createAgentUIStream`, `pipeAgentUIStreamToResponse` and `createAgentUIStreamResponse`
+(`dist/index.d.ts:3619, 4407, 4433`) carry the full option set including `onFinish` — but each
+requires an `Agent<CALL_OPTIONS, TOOLS, OUTPUT>` with `version: 'agent-v1'` and a `stream()` returning
+a `StreamTextResult`. Satisfying that over a LangGraph agent means synthesizing a whole
+`StreamTextResult`, which is more hand-rolled code than it removes. Present in the package, not
+reachable through the surface this plugin uses.
 
 **Alternatives considered**:
 
@@ -514,6 +594,75 @@ The amendment lands **before** the implementation commits that contradict the cu
 commit is made against a constitution it violates. Principle III's substantive clauses are unchanged
 and still hold under this design: nothing branches on provider identity for core behaviour, model
 lists stay curated and hardcoded in one file, and no catalog is ever fetched.
+
+---
+
+## D17. The bridge's own packaging is an open risk — three hits, none of them in the plan
+
+*Added 2026-09-07. Verified by downloading `@ai-sdk/langchain@3.0.93`'s published tarball into the
+scratchpad and reading its `package.json`, `dist/` and `src/`. Nothing was installed; `node_modules`,
+`package.json` and the lockfile were untouched.*
+
+`@ai-sdk/langchain` is the load-bearing dependency of D4 — it is what keeps the wire format and the
+storage shape still. Its packaging was never checked against this repo's constraints. It fails, or
+may fail, three of them:
+
+| # | Finding | Against | Severity |
+|---|---|---|---|
+| 1 | **ESM-only.** `"type": "module"`, `exports["."]` has `types`/`import`/`default` and **no `require` condition**; `dist/` contains only `index.d.ts`, `index.js`, `index.js.map`, and `index.js` is ESM (`import { SystemMessage } from "@langchain/core/messages"` … `export { … }`) | This repo is `"type": "commonjs"` and publishes `"./strapi-server"` with `"require": "./dist/server/index.js"` | **Probably survivable** — the package is *bundled* by esbuild into the committed `dist/`, not `require`d at runtime, and ESM→CJS conversion is what a bundler does. But "probably" is not verification |
+| 2 | **`engines: node >= 22`** | The repo declares Node `>=20.0.0 <=24.x.x`, and Strapi v5 supports Node 20 | **Real.** Either the floor moves to 22 — a documented breaking change for consumers — or the dependency is installed against a declared-unsupported engine |
+| 3 | **A hard dependency on `ai@7.0.93`**, while this repo pins `ai@6.0.208` | Principle IV (one bundled `dist/`) and FR-013 | **The sharp one.** Two copies of `ai` in one bundle: size, and two incompatible `UIMessageChunk` type identities. If v7's chunk or part shapes differ from v6's, the stored `parts` shape moves — the one thing FR-013 cannot absorb |
+
+> **RESOLVED 2026-09-07 at install time. The bridge ships as `@ai-sdk/langchain@2.0.285`.**
+>
+> All three findings are real in `3.0.93`, and all three are absent from the 2.x line — which the
+> decision below lists as the second-preference fallback and which turns out to be the cheapest of
+> the three options:
+>
+> | # | `3.0.93` | `2.0.285` |
+> |---|---|---|
+> | 1 | ESM-only, no `require` condition | dual-format; `exports["."]` carries `require` |
+> | 2 | `engines: node >= 22` | `engines: node >= 18` |
+> | 3 | hard `ai@7.0.93` — an *exact* pin, so it can never dedupe with `^6` | `ai@6.0.277`, same major |
+>
+> Finding 3 was the sharp one and it is now moot: `ai` and `@ai-sdk/react` are pinned to the exact
+> versions the bridge pins (`6.0.277` / `3.0.280`), so `pnpm why ai` reports **one** v6 copy shared
+> by the plugin, the bridge and the React client — one `UIMessageChunk` identity, which is what
+> FR-013 needs. The two remaining `ai@5.x` copies in the tree arrive via
+> `@strapi/content-type-builder` and predate this feature.
+>
+> The 2.x API surface is unchanged in every respect this design depends on: `toBaseMessages`,
+> `toUIMessageStream`, and `StreamCallbacks` with `onError(Error)` and `onAbort()`. The full tool
+> lifecycle — `tool-input-start`, `tool-input-delta`, `tool-input-available`,
+> `tool-output-available`, `tool-output-error` — is still emitted on the LangGraph stream path, and
+> the degraded `streamEvents` path still emits only two of them, so the stream-mode note below
+> stands.
+>
+> Also answered: esbuild bundles the whole tree into a **CommonJS** bundle cleanly (4.4 MB, no
+> externals), the bundle loads, and all three providers construct offline with
+> `useResponsesApi === false` confirmed at runtime rather than from a type declaration.
+>
+> One finding D17 did not anticipate: **`@langchain/openai@1.5.11` also declares `node >= 22`**.
+> `1.5.5` is the newest release still declaring `>= 20`, and it is pinned, keeping the repo's Node 20
+> floor intact for consumers. Its `configuration?: ClientOptions` option and its
+> `useResponsesApi ?? false` default were both verified in that version.
+
+**Decision**: this is a **blocking prerequisite of T002**, not a footnote. Before any code is written
+against the bridge, the install must answer: does esbuild bundle it cleanly into the CJS server
+bundle; does the engine floor actually break a Node 20 install; and does `ai@7` arrive as a second
+copy or does the tree dedupe. If the answer to the third is "second copy", the options are, in order
+of preference: upgrade this repo to `ai@7` and re-verify the stored `parts` shape against a
+pre-change turn (FR-013's check, run for real); pin an older `@ai-sdk/langchain` whose peer is `ai@6`;
+or drop the bridge and convert `AIMessageChunk`s directly — which D5's alternatives already rejected,
+and which would now also violate the maintainer's zero-hand-rolled rule.
+
+**Also recorded — a stream-mode dependency §6 does not state.** If the agent is consumed via
+`agent.streamEvents()` rather than the LangGraph `streamMode: ['values','messages']` path, the bridge
+emits only `tool-input-start` and `tool-output-available` — **no `tool-input-available` and no
+`tool-input-delta`**. Tool *inputs* would never reach the UI or storage. The change-plan card keys on
+`output.changeSetId` and would survive, but the tool pills would lose their arguments.
+`contracts/chat-stream.md` §6's tool-lifecycle claim is only defensible for the LangGraph stream mode,
+and the contract must name which mode it uses.
 
 ---
 

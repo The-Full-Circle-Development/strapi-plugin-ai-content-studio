@@ -11,7 +11,12 @@
  *                    option that opens a non-admin HTTP surface, so a project must opt in. With it
  *                    off, the panel shows the in-panel field-by-field comparison instead (FR-014).
  *   attachments.*  — per-conversation budget for files held in the browser before ingestion.
- *   audit.*        — deadline for a QA / security pass, so a scan inside a chat turn is bounded.
+ *   grounding.*    — the generated description of THIS install's schema, embedded in the
+ *                    assistant's instructions. ON by default (see below).
+ *
+ * REMOVED: `audit.*`. The QA scan and security audit capabilities are retired, so the key is
+ * ignored. An unknown key is harmless, but remove it from `config/plugins.ts` — it no longer does
+ * anything (see README → Breaking changes).
  *
  * Configure via env or per consumer in config/plugins.ts:
  *
@@ -26,7 +31,7 @@
  *         paths: { 'api::page.page': '/:slug', 'api::blog-post.blog-post': '/blog/:slug' },
  *       },
  *       attachments: { totalBudgetMb: 50 },
- *       audit: { timeBudgetSeconds: 120 },
+ *       grounding: { enabled: true, maxChars: 24000 },
  *     },
  *   }
  */
@@ -47,9 +52,25 @@ export default {
       /** Total size of files held in the browser for one conversation, in megabytes. */
       totalBudgetMb: 50,
     },
-    audit: {
-      /** Wall-clock deadline for one QA / security pass. Whatever it misses is reported uncovered. */
-      timeBudgetSeconds: 120,
+    grounding: {
+      /**
+       * The HARD off-switch, set by the host application's developer at deploy time. An install
+       * that must never carry a generated prompt section sets this `false`, and the runtime
+       * settings Toggle can then only narrow it — never re-enable it
+       * (contracts/install-description.md §7). With it off, the Toggle renders disabled and names
+       * this key.
+       *
+       * ON by default (FR-036), justified: the description is deterministic, size-bounded,
+       * permission-filtered and inspectable — the four properties that make an on-by-default
+       * generated prompt section safe for an existing install.
+       */
+      enabled: true,
+      /**
+       * Declared character budget, clamped to 2,000..80,000. Chosen so the description cannot
+       * crowd out a long conversation on a large install (SC-011) while comfortably fitting an
+       * ordinary project in full. Exceeding it degrades by tier, deterministically, and says so.
+       */
+      maxChars: 24000,
     },
   },
   validator() {},

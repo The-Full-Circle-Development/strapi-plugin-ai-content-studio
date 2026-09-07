@@ -25,15 +25,14 @@ const bootstrap = async ({ strapi }: { strapi: Core.Strapi }) => {
       uid: 'settings.update',
       pluginName: 'ai-content-studio',
     },
-    {
-      // A list of a project's permission leaks and weak configuration is itself sensitive
-      // (spec decision D3), so the security audit gets its own grantable action rather than
-      // riding on chat.use. Assign it to super-admin only unless you mean to delegate it.
-      section: 'plugins',
-      displayName: 'Run AI Content Studio security audit',
-      uid: 'audit.run',
-      pluginName: 'ai-content-studio',
-    },
+    /*
+     * `audit.run` is NO LONGER REGISTERED. The QA scan and security audit capabilities are retired
+     * (contracts/removals.md §2).
+     *
+     * A role that was granted it does NOT break the upgrade: a stored grant for a
+     * no-longer-registered action is inert, so there is nothing to migrate and nothing to clean up.
+     * It is documented as a breaking change in the README naming the version.
+     */
   ];
 
   await strapi.admin.services.permission.actionProvider.registerMany(actions);

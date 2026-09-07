@@ -7,6 +7,7 @@ import type {
   ChangeItemOutcome,
   ChangeOperation,
   ChangeSetStatus,
+  PublishOutcome,
   ResultingState,
 } from '../types';
 
@@ -514,6 +515,8 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
       itemIds,
       confirmDestructive = false,
       attachmentResolutions = {},
+      publish = false,
+      confirmPublish = false,
     }: {
       changeSetId: string;
       ownerId: number;
@@ -521,6 +524,10 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
       itemIds: string[];
       confirmDestructive?: boolean;
       attachmentResolutions?: Record<string, number>;
+      /** `true` only from the Approve & Publish action (FR-044). */
+      publish?: boolean;
+      /** Must be `true` when `publish` is — refused at the top of the gate (FR-045). */
+      confirmPublish?: boolean;
     }): Promise<ApplyResult> {
       // --- gate 1: the set itself
       const set = await service.getOwned(changeSetId, ownerId);
@@ -566,6 +573,22 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
           };
         }
         selected.push(item);
+      }
+
+      /**
+       * --- gate 3 (new): publish requires its own explicit confirmation.
+       *
+       * Refused HERE, at the top of the gate, BEFORE any write. A single activation of the risky
+       * action must publish nothing AND write nothing — otherwise "activate once, then navigate
+       * away" would leave content changed (FR-045, US6-7).
+       */
+      if (publish && !confirmPublish) {
+        return {
+          ok: false,
+          error: 'publish_confirmation_required',
+          message:
+            'Publishing was requested without confirmation. Nothing has been written and nothing has been published.',
+        };
       }
 
       // --- gate 5: destructive confirmation, before anything is written
@@ -718,8 +741,106 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
         }
       }
 
+      /**
+       * --- PUBLISH PHASE (FR-046..FR-050, contracts/apply-and-publish.md §5).
+       *
+       * Runs only when requested, and only AFTER every write above has completed, so a document is
+       * never published against a half-written draft.
+       *
+       * It operates on DISTINCT DOCUMENTS, not items: two field changes on one document produce one
+       * publish call, whose outcome is then attributed to every contributing item so the report
+       * still reads per item (FR-050) without publishing twice.
+       */
+      if (publish) {
+        /** `(uid, documentId)` -> the items that contributed to it. */
+        const targets = new Map<string, { uid: string; documentId: string; itemIds: string[] }>();
+
+        for (const item of selected) {
+          const outcome = outcomes.get(item.id);
+          // A `stale`, `blocked` or `failed` write NEVER causes a publish (FR-049).
+          if (outcome?.state !== 'applied') {
+            outcomes.set(item.id, { ...(outcome as ChangeItemOutcome), publish: { state: 'skipped' } });
+            continue;
+          }
+          // An item whose operation was already `publish` is excluded: it published itself in the
+          // write phase, and publishing again would be a second call for one decision.
+          if (item.operation === 'publish') {
+            continue;
+          }
+          if (!item.documentId) {
+            continue;
+          }
+          const key = `${item.contentTypeUid}::${item.documentId}`;
+          const existing = targets.get(key);
+          if (existing) {
+            existing.itemIds.push(item.id);
+          } else {
+            targets.set(key, {
+              uid: item.contentTypeUid,
+              documentId: item.documentId,
+              itemIds: [item.id],
+            });
+          }
+        }
+
+        for (const target of targets.values()) {
+          let result: PublishOutcome;
+
+          if (!usesDraftAndPublish(target.uid)) {
+            // Live on save — no publish is attempted (FR-047).
+            result = {
+              state: 'not_applicable',
+              message: `${target.uid} does not use draft & publish; the change is already live.`,
+            };
+          } else if (!can(target.uid, 'publish', userAbility)) {
+            /**
+             * `publish` is a SEPARATE action from the `update` already checked in the write phase,
+             * and is never inherited from it — a caller may hold one without the other. Checked per
+             * document at the MOMENT OF APPLICATION against the caller's live ability (FR-046,
+             * Principle II). A refusal is REPORTED, never skipped silently.
+             */
+            result = {
+              state: 'blocked',
+              message: `Your account cannot publish ${target.uid}.`,
+            };
+          } else {
+            try {
+              await docs(target.uid).publish({ documentId: target.documentId });
+              result = { state: 'published' };
+            } catch (err) {
+              // e.g. required fields empty. The host's reason is reported, never silently dropped.
+              result = {
+                state: 'failed',
+                message: `Could not publish this document. It may have required fields that are still empty.`,
+              };
+              strapi.log.error(
+                `[ai-content-studio] publish failed for ${target.uid} ${target.documentId}: ${plugin()
+                  .service('redact')
+                  .describeError(err)}`
+              );
+            }
+          }
+
+          // One document, one publish — reported on every item that contributed to it.
+          for (const itemId of target.itemIds) {
+            const outcome = outcomes.get(itemId) as ChangeItemOutcome;
+            outcomes.set(itemId, { ...outcome, publish: result });
+          }
+        }
+      }
+
       const applied = [...outcomes.values()].filter((o) => o.state === 'applied').length;
-      const status: ChangeSetStatus = applied === selected.length ? 'applied' : 'partially_applied';
+      /**
+       * `applied` ONLY when every selected item's write reached `applied` AND every publish outcome
+       * is `published` or `not_applicable`. Anything else — a BLOCKED PUBLISH INCLUDED — is
+       * `partially_applied`, so a mixed outcome is reported as partially applied and never as a
+       * success (FR-052).
+       */
+      const publishFellShort = [...outcomes.values()].some(
+        (o) => o.publish && o.publish.state !== 'published' && o.publish.state !== 'not_applicable'
+      );
+      const status: ChangeSetStatus =
+        applied === selected.length && !publishFellShort ? 'applied' : 'partially_applied';
       const appliedAt = new Date().toISOString();
 
       const mergedItems = allItems.map((i) =>
@@ -735,6 +856,8 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
           approvedByUserId: ownerId,
           approvedItemIds: itemIds,
           destructiveConfirmed: destructive.length > 0 ? true : Boolean(set.destructiveConfirmed),
+          publishRequested: publish,
+          publishConfirmed: publish ? confirmPublish : Boolean(set.publishConfirmed),
         },
       });
 

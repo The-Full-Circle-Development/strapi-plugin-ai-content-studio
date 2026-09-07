@@ -51,8 +51,10 @@ const STANDING_RULE = [
   'The list is curated and hardcoded by design; it is never fetched from a provider /models endpoint.',
   '',
   'A change to that file moves the README and the committed `dist/` **in the same commit**',
-  '(`corepack pnpm@10 run build`), with `corepack pnpm@10 run typecheck` clean. There is no test',
-  'suite: verification is one live send per changed provider in a running Strapi admin panel.',
+  '(`corepack pnpm@10 run build`), with `corepack pnpm@10 run typecheck` and',
+  '`corepack pnpm@10 run test` clean. The suite covers pure functions only and never calls a',
+  'provider, so it does NOT verify an identifier: that is still one live send per changed provider',
+  'in a running Strapi admin panel.',
 ].join('\n');
 
 /**

@@ -65,6 +65,16 @@
       "type": "boolean",
       "default": false
     },
+    "publishRequested": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the Approve & Publish action was used for this set."
+    },
+    "publishConfirmed": {
+      "type": "boolean",
+      "default": false,
+      "description": "The explicit publish confirmation. A set with publishRequested true and publishConfirmed false is refused before anything is written, so a single activation publishes nothing AND writes nothing."
+    },
     "previewSessions": {
       "type": "relation",
       "relation": "oneToMany",

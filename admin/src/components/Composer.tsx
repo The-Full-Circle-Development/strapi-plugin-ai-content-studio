@@ -358,7 +358,10 @@ export const Composer = ({
             }}
           />
         </Box>
-        <Hint>{hint ?? 'AI Content Studio can edit live content — review important changes.'}</Hint>
+        {/* Always about APPROVAL, never about which mode is active (FR-017). */}
+        <Hint>
+          {hint ?? 'Changes are proposed for your approval — nothing is written until you approve.'}
+        </Hint>
       </Column>
     </ComposerWrap>
   );

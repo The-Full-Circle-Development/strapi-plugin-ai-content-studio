@@ -33,7 +33,8 @@
       "type": "enumeration",
       "enum": ["content", "layout", "audit"],
       "required": true,
-      "default": "content"
+      "default": "content",
+      "description": "VESTIGIAL - no longer read or written. The plugin has a single mode; this column is left in place deliberately because it is a required enumeration on live consumer databases, so removing it is a migration risk for no behavioural gain. Legacy values are ignored, not migrated. Do not mistake it for live state."
     },
     "lastActivityAt": {
       "type": "datetime",

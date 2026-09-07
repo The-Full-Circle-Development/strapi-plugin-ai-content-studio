@@ -1,17 +1,19 @@
-import { convertToModelMessages, streamText, stepCountIs, type UIMessage } from 'ai';
+import { createUIMessageStream, pipeUIMessageStreamToResponse, type UIMessage, type UIMessageChunk } from 'ai';
+import { toBaseMessages, toUIMessageStream } from '@ai-sdk/langchain';
 import { z } from 'zod';
 import type { Core } from '@strapi/strapi';
 import { ProviderConfigError } from '../services/registry';
-import { CHAT_MODES, type ChatMode } from '../types';
 
 /**
  * Request body. `threadId` is REQUIRED: every turn belongs to a durable, owner-scoped conversation
  * (FR-016), and the thread is what makes the reply persist across a reload or a restart.
  * Ownership is checked against `ctx.state.user.id` — a thread id from another user is a 404.
+ *
+ * `mode` is GONE from the schema (contracts/removals.md §1). There is one mode, so there is nothing
+ * to select and nothing to send.
  */
 const bodySchema = z.object({
   threadId: z.string().min(1),
-  mode: z.enum(CHAT_MODES).optional(),
   messages: z.array(z.any()),
   /**
    * Files the user attached to THIS turn. Metadata only — the bytes stay in the browser until the
@@ -30,7 +32,7 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     if (!parsed.success) {
       return ctx.badRequest('Request body must be { threadId: string, messages: UIMessage[] }.');
     }
-    const { threadId, messages } = parsed.data as { threadId: string; mode?: string; messages: UIMessage[] };
+    const { threadId, messages } = parsed.data as { threadId: string; messages: UIMessage[] };
 
     const ownerId = ctx.state?.user?.id;
     if (!Number.isInteger(ownerId)) {
@@ -46,16 +48,6 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     if (!thread) {
       return ctx.notFound('That conversation does not exist.');
     }
-    /**
-     * The mode travels with the request, is persisted on the thread so it survives a reload
-     * (FR-028), and is recorded on each message as `modeAtSend` so history stays readable after a
-     * switch (FR-030's sibling requirement in US5-5). A mode only ever NARROWS the tool set; it
-     * can never grant a capability the caller lacks (FR-031).
-     */
-    const mode = (parsed.data.mode ?? thread.mode ?? 'content') as ChatMode;
-    if (parsed.data.mode && parsed.data.mode !== thread.mode) {
-      await threads().setMode(threadId, ownerId, mode);
-    }
 
     // Set by the admin auth strategy for type:'admin' routes — the CALLER's CASL ability.
     const userAbility = ctx.state.userAbility;
@@ -67,7 +59,8 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       model = active.model;
       supportsVision = active.supportsVision;
     } catch (err) {
-      // Config / key problems happen BEFORE streaming -> ordinary HTTP error (no key leaked).
+      // All five ProviderConfigError codes happen BEFORE generation -> ordinary HTTP error naming
+      // the provider, never the key (FR-010, contracts/chat-stream.md §8).
       if (err instanceof ProviderConfigError) {
         return ctx.badRequest(err.message, { code: err.code });
       }
@@ -83,11 +76,10 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     }
     const manifest = manifestResult.manifest;
 
-    // Tool set is derived per request from (caller ability, mode). `audit` mode never builds
-    // proposeChanges, so read-only is structural rather than a refusal at runtime (FR-029).
+    // Tool set is derived per request from the caller's live ability. There is no mode to narrow
+    // it any more — this is the one tool set (contracts/removals.md §1).
     const tools = plugin.service('tools').buildTools({
       userAbility,
-      mode,
       threadId,
       ownerId,
       // Placements are validated against the ordinals actually attached to THIS turn.
@@ -132,7 +124,6 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
         // held files were never ingested (FR-038).
         parts: (lastMessage.parts ?? []).filter((part: any) => part?.type !== 'file'),
         attachmentManifest: manifest.length > 0 ? manifest : null,
-        modeAtSend: mode,
       });
     }
 
@@ -151,9 +142,15 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     } | null;
     const history = context?.messages ?? [];
 
-    // Image handling that works with ALL models: keep file parts from the incoming last message
-    // ONLY if the active model accepts images, so a non-vision model never receives an image
-    // (which would error). Stored history never holds file parts, so nothing re-sends base64.
+    /**
+     * Image handling that works with ALL models (FR-006, FR-023): image bytes are dropped from the
+     * outgoing message BEFORE `toBaseMessages` converts anything, whenever the active model is not
+     * declared vision-capable. They never reach the provider, so a non-vision model cannot fail the
+     * whole request on an image it did not want.
+     *
+     * The ordinal manifest still reaches the model as text (above), so placement by filename keeps
+     * working on every provider. Stored history never holds file parts, so nothing re-sends base64.
+     */
     const incomingFileParts =
       supportsVision && lastMessage?.role === 'user'
         ? (lastMessage.parts ?? []).filter((part: any) => part?.type === 'file')
@@ -169,108 +166,221 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     })) as UIMessage[];
 
     /**
+     * The install description (FR-027..FR-037), resolved per request and per account.
+     *
+     * `groundingEnabled` is the EFFECTIVE value from `config.isGroundingEnabled()` — the AND of the
+     * deploy-time hard off-switch and the runtime toggle — never one of the two flags read directly
+     * (contracts/install-description.md §7).
+     */
+    const groundingSvc = plugin.service('grounding');
+    const groundingEnabled = await plugin.service('config').isGroundingEnabled();
+    let readableUids: string[] = [];
+    let schemaFingerprint = '';
+    let install: { text: string; partial: boolean } | null = null;
+    if (groundingEnabled) {
+      try {
+        readableUids = groundingSvc.readableUids(userAbility);
+        schemaFingerprint = groundingSvc.schemaFingerprint();
+        const description = groundingSvc.describe(userAbility);
+        install = description ? { text: description.text, partial: description.partial } : null;
+      } catch (err) {
+        // Grounding is an enhancement, never a prerequisite: if it fails, the turn proceeds with
+        // tool-based discovery instead of failing the request.
+        strapi.log.warn(
+          `[ai-content-studio] could not build the install description: ${redact().describeError(err)}`
+        );
+        install = null;
+      }
+    }
+
+    const instructions = plugin.service('prompt').build({
+      supportsVision,
+      hasAttachments: manifest.length > 0,
+      groundingEnabled,
+      readableUids,
+      schemaFingerprint,
+      contextSummary: context?.summary ?? null,
+      install,
+    });
+
+    /**
      * Stop must release the SERVER's work, not just the client's view (FR-025).
      *
      * The chat hook's `stop()` aborts the underlying fetch, which closes this request. Wiring an
-     * AbortController to the Koa request lifecycle turns that into a real `abortSignal`, so the
-     * provider call ends and no further tool step begins. Without it the server keeps working
-     * unobserved: with the write tools gone a stray step can no longer touch content, but it can
-     * still burn provider tokens and run reads.
+     * AbortController to the Koa request lifecycle turns that into a real signal, so the provider
+     * call ends and no further tool step begins.
      */
     const abort = new AbortController();
     let streamFinished = false;
+    /**
+     * A REAL stop, as distinct from a normal completion.
+     *
+     * `onFinish`'s `isAborted` cannot be used here: it is set only by an `{ type: 'abort' }` chunk,
+     * and the bridge never emits one. So the interrupted branch reads this flag, maintained from the
+     * Koa lifecycle (contracts/chat-stream.md §4).
+     */
+    let userStopped = false;
     const turnStartedAt = new Date().toISOString();
     const onClientGone = () => {
       // `close` also fires after a NORMAL completion, so only a close before the stream finished
       // is a real stop.
       if (!streamFinished && !abort.signal.aborted) {
+        userStopped = true;
         abort.abort();
       }
     };
     ctx.req.once('close', onClientGone);
     ctx.req.once('aborted', onClientGone);
 
-    const result = streamText({
-      model,
-      abortSignal: abort.signal,
-      system: [
-        plugin.service('prompt').build({ mode, supportsVision, hasAttachments: manifest.length > 0 }),
-        context?.summary
-          ? `## Earlier in this conversation (condensed)\nThese notes replace older turns that were summarized to stay inside the model's context. Treat them as fact.\n\n${context.summary}`
-          : null,
-      ]
-        .filter(Boolean)
-        .join('\n\n'),
-      messages: await convertToModelMessages(replayed),
-      tools,
-      stopWhen: stepCountIs(8),
-      onError({ error }) {
-        // Server-side only — redacted so a provider error that echoes a key/url can't leak it.
-        strapi.log.error(`[ai-content-studio] stream error: ${redact().describeError(error)}`);
+    let agentStream;
+    try {
+      agentStream = await plugin.service('agent').run({
+        model,
+        tools,
+        systemPrompt: instructions.text,
+        messages: await toBaseMessages(replayed),
+        signal: abort.signal,
+      });
+    } catch (err) {
+      strapi.log.error(`[ai-content-studio] failed to start generation: ${redact().describeError(err)}`);
+      return ctx.internalServerError('AI generation could not be started.');
+    }
+
+    /** The client-facing text for a provider failure. Nothing credential-shaped, on any path. */
+    const clientFacingError = (raw: unknown): string => {
+      if (raw instanceof ProviderConfigError) {
+        return raw.message;
+      }
+      if (showErrorDetails) {
+        return `AI provider error: ${redact().describeError(raw)}`;
+      }
+      return 'The AI provider returned an error. Please try again or check the provider settings.';
+    };
+
+    /**
+     * ⚠ THE MASK THAT ACTUALLY GUARDS THE CREDENTIAL PATH (FR-008, SC-009,
+     * contracts/chat-stream.md §8).
+     *
+     * `createUIMessageStream`'s `onError` only fires for errors that ESCAPE to it, and the bridge
+     * never lets one escape: on a provider failure it catches the throw itself and enqueues
+     * `{ type: 'error', errorText: errorObj.message }` — the provider's RAW message, straight to the
+     * browser, past every callback. Verified in the installed `@ai-sdk/langchain@2.0.285`
+     * (`src/adapter.ts`, the `catch` block): the enqueue is UNCONDITIONAL.
+     *
+     * So redaction has to be a transform over the merged chunks, not a callback.
+     *
+     * The same `catch` block is also why a STOP would otherwise read as a failure. The contract
+     * suggests suppressing that through the bridge's `onAbort`, but `onAbort` is `() => void` and
+     * the error chunk is enqueued regardless of which callback ran — so it CANNOT suppress
+     * anything. Dropping the chunk here is the only mechanism that works, and it is why a stop
+     * shows as interrupted rather than as an error.
+     *
+     * `flush` is also where `data-interrupted` is written, because `writer.merge()` returns `void`
+     * and cannot be awaited: the transform's flush is the one place that reliably runs after the
+     * merged stream has drained and before `onFinish` assembles the message.
+     */
+    const guardChunks = new TransformStream<UIMessageChunk, UIMessageChunk>({
+      transform(chunk, controller) {
+        if (chunk.type === 'error') {
+          if (userStopped || abort.signal.aborted) {
+            // A stop is not a failure. Swallow the bridge's abort-shaped error chunk.
+            return;
+          }
+          controller.enqueue({ ...chunk, errorText: clientFacingError(chunk.errorText) });
+          return;
+        }
+        controller.enqueue(chunk);
       },
-      onAbort({ steps }) {
-        strapi.log.info(
-          `[ai-content-studio] generation stopped by the user after ${steps.length} step(s); no further step will run`
-        );
+      async flush(controller) {
+        if (!userStopped) {
+          return;
+        }
+        /**
+         * A stopped turn must say which changes had ALREADY been applied earlier in the turn
+         * (FR-026). The assistant cannot apply anything itself, but the user may have approved a
+         * plan while this turn was still streaming, and silence about that is the one dishonest
+         * outcome available here.
+         *
+         * Written into the stream rather than spliced into the assembled parts array afterwards, so
+         * one typed call reaches both the wire and the database — and the notice becomes visible
+         * live rather than only on reload.
+         */
+        try {
+          const applied = await plugin
+            .service('change-sets')
+            .appliedSince({ threadId, ownerId, since: turnStartedAt });
+          controller.enqueue({
+            type: 'data-interrupted',
+            data: { at: new Date().toISOString(), applied },
+          } as UIMessageChunk);
+        } catch (err) {
+          // Caught LOCALLY: a throw here would become an `{type:'error'}` chunk the editor sees,
+          // which is exactly the "persistence failure surfacing as a provider error" the contract
+          // forbids (§3 rule 1).
+          strapi.log.error(
+            `[ai-content-studio] could not report changes applied during the interrupted turn: ${redact().describeError(err)}`
+          );
+        }
       },
     });
 
     // Take over the response so Koa does not serialize its own (empty) body and close the socket.
     ctx.respond = false;
-    result.pipeUIMessageStreamToResponse(ctx.res, {
-      // Persistence mode: the response message gets an id and arrives in `onFinish` already in
-      // the UI-part shape the chat replays, which is exactly what `chat-message.parts` stores.
-      originalMessages: messages,
-      async onFinish({ responseMessage, isAborted }) {
-        streamFinished = true;
-        try {
-          const parts = [...(responseMessage?.parts ?? [])];
-
-          if (isAborted) {
-            /**
-             * A stopped turn keeps its partial output, marked interrupted, and the thread stays
-             * usable (FR-024). It must also say which changes had ALREADY been applied earlier in
-             * the turn (FR-026) — the assistant cannot apply anything itself, but the user may
-             * have approved a plan while this turn was still streaming, and silence about that
-             * would be the one dishonest outcome here.
-             */
-            const applied = await plugin
-              .service('change-sets')
-              .appliedSince({ threadId, ownerId, since: turnStartedAt });
-            parts.push({
-              type: 'data-interrupted',
-              data: { at: new Date().toISOString(), applied },
-            } as never);
-          }
-
-          await threads().appendMessage({
-            threadId,
-            ownerId,
-            role: 'assistant',
-            parts,
-            modeAtSend: mode,
-            interrupted: isAborted,
-          });
-        } catch (err) {
-          // Never let a persistence failure surface as a provider error to the user.
-          strapi.log.error(
-            `[ai-content-studio] failed to persist assistant turn: ${redact().describeError(err)}`
-          );
-        }
-      },
-      onError(error: unknown) {
-        if (error instanceof ProviderConfigError) {
-          return error.message;
-        }
-        if (showErrorDetails) {
-          return `AI provider error: ${redact().describeError(error)}`;
-        }
-        return 'The AI provider returned an error. Please try again or check the provider settings.';
-      },
+    pipeUIMessageStreamToResponse({
+      response: ctx.res,
       headers: {
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
       },
+      stream: createUIMessageStream({
+        /**
+         * NOT OPTIONAL HERE (contracts/chat-stream.md §3 rule 5). The bridge emits a bare
+         * `{ type: 'start' }` with no `messageId`, and the assembler only sets the message id when
+         * the chunk carries one — so without this the stored turn gets `id: ''` and the browser is
+         * sent no id at all.
+         */
+        originalMessages: messages,
+        execute: ({ writer }) => {
+          writer.merge(
+            toUIMessageStream(agentStream, {
+              // The SERVER-SIDE logger. Redacted, so a provider error that echoes a key or a
+              // request URL cannot leak it into the host's logs.
+              onError: (error: Error) => {
+                strapi.log.error(`[ai-content-studio] stream error: ${redact().describeError(error)}`);
+              },
+              onAbort: () => {
+                strapi.log.info(
+                  '[ai-content-studio] generation stopped by the user; no further step will run'
+                );
+              },
+            }).pipeThrough(guardChunks)
+          );
+        },
+        /**
+         * The client-facing mapper for anything that DOES escape to the SDK. Kept alongside the
+         * transform above because they cover different paths and neither substitutes for the other.
+         */
+        onError: (error: unknown) => clientFacingError(error),
+        async onFinish({ responseMessage }) {
+          streamFinished = true;
+          try {
+            await threads().appendMessage({
+              threadId,
+              ownerId,
+              role: 'assistant',
+              parts: responseMessage?.parts ?? [],
+              // WHICH RULES this turn was run under (FR-019).
+              promptVersion: instructions.version,
+              interrupted: userStopped,
+            });
+          } catch (err) {
+            // Never let a persistence failure surface as a provider error to the user.
+            strapi.log.error(
+              `[ai-content-studio] failed to persist assistant turn: ${redact().describeError(err)}`
+            );
+          }
+        },
+      }),
     });
     return undefined;
   },

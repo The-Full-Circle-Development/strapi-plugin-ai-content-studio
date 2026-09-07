@@ -12,6 +12,9 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# Test output
+coverage/
+
 # NOTE: dist/ is intentionally NOT ignored.
 # Consumers install this package as a git dependency, so the built output is
 # committed to the repo (see README → "Releasing"). Rebuild before committing.

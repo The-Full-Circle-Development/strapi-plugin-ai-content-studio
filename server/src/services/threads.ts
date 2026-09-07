@@ -1,6 +1,8 @@
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { Core } from '@strapi/strapi';
 import { UID } from '../content-types';
-import type { AttachmentManifestEntry, ChatMode } from '../types';
+import type { AttachmentManifestEntry } from '../types';
 
 /**
  * Owner-scoped conversation storage.
@@ -17,7 +19,6 @@ import type { AttachmentManifestEntry, ChatMode } from '../types';
 export interface ThreadSummary {
   id: string;
   title: string;
-  mode: ChatMode;
   lastActivityAt: string;
   messageCount?: number;
 }
@@ -29,7 +30,8 @@ export interface StoredMessage {
   parts: unknown[];
   attachmentManifest: AttachmentManifestEntry[] | null;
   interrupted: boolean;
-  modeAtSend: ChatMode;
+  /** Null for turns stored before instruction versioning existed (FR-019). */
+  promptVersion: string | null;
   changeSetId: string | null;
 }
 
@@ -38,9 +40,10 @@ export interface AppendMessageInput {
   ownerId: number;
   role: 'user' | 'assistant';
   parts: unknown[];
-  modeAtSend: ChatMode;
   attachmentManifest?: AttachmentManifestEntry[] | null;
   interrupted?: boolean;
+  /** The InstructionSet.version this turn was produced under. Assistant turns only. */
+  promptVersion?: string | null;
   changeSetId?: string | null;
 }
 
@@ -121,11 +124,9 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
 
     async createThread({
       ownerId,
-      mode = 'content',
       title,
     }: {
       ownerId: number;
-      mode?: ChatMode;
       title?: string;
     }): Promise<ThreadSummary> {
       const now = new Date().toISOString();
@@ -133,14 +134,14 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
         data: {
           title: title ? service.deriveTitle(title) : DEFAULT_TITLE,
           ownerId,
-          mode,
+          // `mode` is deliberately NOT passed: the column is vestigial and takes its existing
+          // schema default (research D12).
           lastActivityAt: now,
         },
       });
       return {
         id: created.documentId,
         title: created.title,
-        mode: created.mode,
         lastActivityAt: created.lastActivityAt,
         messageCount: 0,
       };
@@ -187,7 +188,11 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
             parts: input.parts ?? [],
             attachmentManifest: input.attachmentManifest ?? null,
             interrupted: input.interrupted ?? false,
-            modeAtSend: input.modeAtSend,
+            // `promptVersion` records WHICH RULES this turn was run under (FR-019). Null is the
+            // honest value for anything that had none.
+            promptVersion: input.promptVersion ?? null,
+            // `modeAtSend` is deliberately NOT passed: the column is vestigial and takes its
+            // existing schema default, so nothing is migrated and nothing breaks (research D12).
             ...(input.changeSetId ? { changeSet: input.changeSetId } : {}),
           },
         });
@@ -219,7 +224,7 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
           parts: created.parts ?? [],
           attachmentManifest: created.attachmentManifest ?? null,
           interrupted: Boolean(created.interrupted),
-          modeAtSend: created.modeAtSend,
+          promptVersion: created.promptVersion ?? null,
           changeSetId: null,
         };
       });
@@ -326,7 +331,8 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
         parts: Array.isArray(m.parts) ? m.parts : [],
         attachmentManifest: Array.isArray(m.attachmentManifest) ? m.attachmentManifest : null,
         interrupted: Boolean(m.interrupted),
-        modeAtSend: m.modeAtSend,
+        // Null for turns stored before this column existed — never backfilled with a guess.
+        promptVersion: m.promptVersion ?? null,
         changeSetId: m.changeSet?.documentId ?? null,
       }));
     },
@@ -347,7 +353,6 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
     ): Promise<{
       id: string;
       title: string;
-      mode: ChatMode;
       lastActivityAt: string;
       contextCondensed: boolean;
       messages: StoredMessage[];
@@ -372,7 +377,6 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
       return {
         id: thread.documentId,
         title: thread.title,
-        mode: thread.mode,
         lastActivityAt: thread.lastActivityAt,
         contextCondensed: Boolean(thread.contextSummary),
         messages,
@@ -437,14 +441,20 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
         documentLabel: string;
         contentTypeUid: string;
         resultingState: string;
-        outcome: { state: string; message?: string; oldValue?: unknown; newValue?: unknown } | null;
+        outcome: {
+          state: string;
+          message?: string;
+          oldValue?: unknown;
+          newValue?: unknown;
+          /** Present only when the approve-and-publish action ran (FR-050). */
+          publish?: { state: string; message?: string } | null;
+        } | null;
       }>;
     }): Promise<void> {
       await service.appendMessage({
         threadId,
         ownerId,
         role: 'assistant',
-        modeAtSend: 'content',
         changeSetId,
         parts: [
           {
@@ -463,6 +473,9 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
                 message: i.outcome?.message ?? null,
                 oldValue: i.outcome?.oldValue ?? null,
                 newValue: i.outcome?.newValue ?? null,
+                // Persisted on the thread, so a reload REPLAYS the publish outcome rather than
+                // losing it to a toast (FR-050, US6-8).
+                publish: i.outcome?.publish ?? null,
               })),
             },
           },
@@ -479,14 +492,6 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
         documentId: messageId,
         data: { changeSet: changeSetId },
       });
-    },
-
-    async setMode(threadId: string, ownerId: number, mode: ChatMode): Promise<void> {
-      const thread = await service.getOwnedThread(threadId, ownerId);
-      if (!thread || thread.mode === mode) {
-        return;
-      }
-      await docs(UID.thread).update({ documentId: threadId, data: { mode } });
     },
 
     /**
@@ -556,17 +561,32 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
         return previousSummary;
       }
       try {
-        const { generateText } = await import('ai');
+        /**
+         * Condensing runs on the ACTIVE provider, so no second provider is introduced — and it now
+         * goes through the LangChain model instance directly.
+         *
+         * This used to `await import('ai')` and call `generateText({ model })`. That broke the
+         * moment `registry.getActiveModel()` started returning a `BaseChatModel`: the AI SDK cannot
+         * accept a LangChain instance. It typechecked only because the service lookup is untyped,
+         * and the failure would have been INVISIBLE — the catch below degrades to the verbatim tail,
+         * so condensation would simply never have worked again.
+         *
+         * The static import also matters for the distribution: the dynamic `import('ai')` split the
+         * server bundle into hash-named chunks, and a hashed filename churns the committed `dist/`
+         * on every build.
+         */
         const { model } = await strapi.plugin('ai-content-studio').service('registry').getActiveModel();
-        const { text } = await generateText({
-          model,
-          system:
-            'You compress a Strapi content-editing conversation into durable notes. Keep every concrete referent a later turn might need: content-type uids, documentIds, entry titles, field paths, values that were changed, decisions the user made, and anything still outstanding. Drop pleasantries and narration. No preamble — notes only, under 250 words.',
-          prompt: previousSummary
-            ? `Existing notes:\n${previousSummary}\n\nFold these newly-condensed turns into the notes:\n${transcript}`
-            : `Condense these turns into notes:\n${transcript}`,
-        });
-        const summary = text.trim();
+        const reply = await (model as BaseChatModel).invoke([
+          new SystemMessage(
+            'You compress a Strapi content-editing conversation into durable notes. Keep every concrete referent a later turn might need: content-type uids, documentIds, entry titles, field paths, values that were changed, decisions the user made, and anything still outstanding. Drop pleasantries and narration. No preamble — notes only, under 250 words.'
+          ),
+          new HumanMessage(
+            previousSummary
+              ? `Existing notes:\n${previousSummary}\n\nFold these newly-condensed turns into the notes:\n${transcript}`
+              : `Condense these turns into notes:\n${transcript}`
+          ),
+        ]);
+        const summary = reply.text.trim();
         return summary === '' ? previousSummary : summary;
       } catch (err) {
         strapi.log.warn(
@@ -583,7 +603,6 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
       return {
         id: thread.documentId,
         title: thread.title,
-        mode: thread.mode,
         lastActivityAt: thread.lastActivityAt,
       };
     },

@@ -21,10 +21,16 @@ export interface ChangeItemView {
   permissionVerdict: 'allowed' | 'denied';
   permissionReason?: string;
   outcome: {
+    /** The WRITE phase's result. */
     state: 'applied' | 'blocked' | 'stale' | 'failed' | 'skipped';
     message?: string;
     oldValue?: unknown;
     newValue?: unknown;
+    /** Present only when the approve-and-publish action ran (FR-050). */
+    publish?: {
+      state: 'published' | 'blocked' | 'failed' | 'not_applicable' | 'skipped';
+      message?: string;
+    } | null;
   } | null;
 }
 
@@ -121,10 +127,16 @@ export function useChangeSet(changeSetId: string | null) {
       itemIds,
       confirmDestructive = false,
       attachmentResolutions = {},
+      publish = false,
+      confirmPublish = false,
     }: {
       itemIds: string[];
       confirmDestructive?: boolean;
       attachmentResolutions?: Record<string, number>;
+      /** Set only by the Approve & Publish action (FR-044). */
+      publish?: boolean;
+      /** Must accompany `publish`; the server refuses the pair otherwise with a 409 (FR-045). */
+      confirmPublish?: boolean;
     }): Promise<ApplyResult | null> => {
       if (!changeSet) {
         return null;
@@ -134,7 +146,13 @@ export function useChangeSet(changeSetId: string | null) {
       try {
         const result = await adminFetch<ApplyResult>(`/change-sets/${changeSet.id}/apply`, tokenRef.current, {
           method: 'POST',
-          body: JSON.stringify({ itemIds, confirmDestructive, attachmentResolutions }),
+          body: JSON.stringify({
+            itemIds,
+            confirmDestructive,
+            attachmentResolutions,
+            publish,
+            confirmPublish,
+          }),
         });
         await load(changeSet.id);
         return result;

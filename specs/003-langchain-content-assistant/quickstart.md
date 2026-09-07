@@ -49,6 +49,25 @@ wc -c dist/server/index.js          # baseline measured 2026-09-07: 1600257
 du -sh dist/                        # baseline measured 2026-09-07: 4.5M
 ```
 
+**MEASURED AFTER THE CHANGE, 2026-09-07:**
+
+| | Before | After |
+|---|---|---|
+| server bundle (CJS) | 1,600,257 bytes in one `dist/server/index.js` | **4,732,463 bytes** across `index.js` + its chunks |
+| `dist/` total | 4.5 MB | **11 MB** |
+
+That is **+3,132,206 bytes / 2.96x** on the server bundle. The three `@ai-sdk/*` provider packages
+left, and `langchain`, `@langchain/core`, the three `@langchain/*` providers, `@langchain/langgraph`,
+`@langchain/langgraph-checkpoint`, `langsmith` and `@strapi/utils` arrived.
+
+**Note the shape change.** `dist/server/` previously held exactly `index.js` and `index.mjs`; it now
+also holds hash-named chunks, because `langsmith` performs environment-conditional dynamic imports
+that the bundler splits out. `dist/server/index.js` is now a small shim that requires the main
+chunk. This is idiomatic for this toolchain — `@strapi/sdk-plugin`'s own `dist/`, and this repo's
+`dist/admin/`, are already chunked the same way — and the built bundle was loaded and its exports
+checked to confirm the chunks resolve. **Practical consequence: stage `dist/` with deletions
+(`git add -A dist/`), or orphaned chunks from previous builds will accumulate.**
+
 The number is **recorded, not gated**: the growth is accepted as the price of the provider layer, on
 the maintainer's decision — a git dependency is fetched once and then cached, so the cost lands at
 install and not per use (plan → Risks). Record it anyway, so the cost is known rather than

@@ -1,14 +1,130 @@
 /**
- * Shared feature types for the change-plan / preview / attachment / audit surfaces.
+ * Shared feature types for the provider / instruction / grounding / change-plan / preview /
+ * attachment surfaces.
  *
  * These describe the JSON columns and tool payloads that cross the service -> controller ->
  * route boundary, so they live here rather than in any one service. Nothing here is `any`.
+ *
+ * The persisted-settings shapes (`StudioSettings`, `ProviderState`, and their masked views) stay
+ * in `services/config.ts`, which owns their normalization — they are imported from there rather
+ * than duplicated here.
  */
 
-/* ------------------------------------------------------------------ modes */
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
-export const CHAT_MODES = ['content', 'layout', 'audit'] as const;
-export type ChatMode = (typeof CHAT_MODES)[number];
+/*
+ * `CHAT_MODES` and `ChatMode` are GONE (contracts/removals.md §1). There is one mode, so there is
+ * nothing to name. The two enumeration COLUMNS remain — `chat-thread.mode` and
+ * `chat-message.modeAtSend` — because they are required enumerations on live consumer databases and
+ * removing one is a migration risk for no behavioural gain. They are marked vestigial in their own
+ * schema descriptions; nothing reads them, so the types go (research D12).
+ */
+
+/* -------------------------------------------------------------- providers */
+
+/**
+ * One provider the adapter layer can reach AND the distribution ships (data-model §1).
+ *
+ * The table of these in `services/providers.ts` is the whole provider surface: nothing else in the
+ * repository knows a provider's name, and adding one is a static import plus one row (FR-002).
+ * `create` is the ONLY provider-shaped code in the repository.
+ */
+export interface ProviderDescriptor {
+  /** Stable, lowercase, kebab-case. Persisted in settings and used as the map key. NEVER renamed
+   *  once shipped — a rename orphans an install's saved selection. */
+  id: string;
+  /** English display name (FR-025). */
+  label: string;
+  /**
+   * Statically imported constructor, wrapped. Receives an ALREADY-DECRYPTED key and returns
+   * immediately: it performs no network call, so a configuration error stays distinguishable from
+   * a provider error (FR-010). Never a dynamic import (research D2).
+   */
+  create: (input: { apiKey: string; model: string; baseUrl: string | null }) => BaseChatModel;
+  /** `true` only for the OpenAI-compatible provider. A saved configuration without a valid base
+   *  URL is then a configuration failure surfaced BEFORE generation (FR-010). */
+  requiresBaseUrl: boolean;
+  /**
+   * Declared per provider, DEFAULT-DENY (FR-006). Replaces the single prefix-matching
+   * `modelSupportsVision()`. The rules are ported verbatim from it — image input works on all
+   * three first-party providers today, and a descriptor left at bare default-deny would remove
+   * that silently while passing every negative test.
+   */
+  supportsVision: (model: string) => boolean;
+}
+
+/* ----------------------------------------------------------- instructions */
+
+/** The declared section ids, in the fixed order of contracts/instructions.md §1. */
+export const INSTRUCTION_SECTION_IDS = [
+  'role',
+  'discovery',
+  'permissions',
+  'ambiguity',
+  'proposing',
+  'tool-honesty',
+  'retired',
+  'style',
+  'attachments',
+  'attachments-blind',
+  'install',
+  'condensed',
+] as const;
+
+export type InstructionSectionId = (typeof INSTRUCTION_SECTION_IDS)[number];
+
+/**
+ * The composed system instructions for one request (data-model §4).
+ *
+ * `text` is byte-for-byte identical for identical request inputs (FR-018), and `version` is
+ * DERIVED from the behavioural section text rather than maintained by hand, which is how FR-026 is
+ * satisfied structurally: a single changed character changes it, and it cannot be changed without
+ * editing the text.
+ */
+export interface InstructionSet {
+  /** `v<N>-<first 8 hex of sha256(behavioural sections)>`, computed at module load. The install
+   *  description is EXCLUDED from the hash (research D10). */
+  version: string;
+  text: string;
+  /** Which sections were included, in order — the inspector renders this alongside the text. */
+  sections: readonly InstructionSectionId[];
+  /** False when grounding is off (FR-036) or the caller can read nothing. */
+  groundingIncluded: boolean;
+  /** True when the description was shortened to fit its budget (FR-032). */
+  groundingPartial: boolean;
+}
+
+/* -------------------------------------------------------------- grounding */
+
+/** Deterministic degradation tiers, applied by the same rule every time (FR-032). */
+export type GroundingTier = 'full' | 'no-components' | 'names-only';
+
+/**
+ * Generated structural facts about the running install (data-model §5).
+ *
+ * Contains NO content, no entry values, no media URLs, no user data, nothing secret-like (FR-029).
+ * Derived only from the running instance's schema and the plugin's own configuration — never from
+ * the host application's source code (FR-028).
+ */
+export interface InstallDescription {
+  /** The exact text embedded in the instructions, and the exact text the inspector shows (FR-035). */
+  text: string;
+  /** True when a tier below `full` was applied. */
+  partial: boolean;
+  tier: GroundingTier;
+  /** sha256 over the canonically serialized `api::*` schemas plus components. Changes when the
+   *  schema changes — the cache key that makes FR-033 work with no restart. */
+  schemaFingerprint: string;
+  /** sha256 over the caller's SORTED readable-uid list. The only ability input that can change the
+   *  output, so the pair is an exact cache key. */
+  readableFingerprint: string;
+  /** Must never exceed the declared budget (SC-011). */
+  charCount: number;
+  /** How many content types the caller can read and the description describes. */
+  contentTypeCount: number;
+  /** How many were dropped from the end of the sorted order to fit the budget. */
+  omittedContentTypeCount: number;
+}
 
 /* --------------------------------------------------------- change sets */
 
@@ -32,11 +148,41 @@ export interface ChangeFingerprint {
   fieldHash: string;
 }
 
+/**
+ * The outcome of one document's publish attempt (data-model §7).
+ *
+ * Publish is DOCUMENT-scoped but reported PER ITEM: two field changes on one document produce one
+ * publish call, whose outcome is attributed to each contributing item, so the report reads per item
+ * as FR-050 requires without publishing twice.
+ */
+export type PublishOutcomeState =
+  /** Published successfully. */
+  | 'published'
+  /** The caller may not publish this content type — reported with the permission reason, never
+   *  skipped silently (FR-046). */
+  | 'blocked'
+  /** The host refused the publish (e.g. required fields empty) — carries the host's reason. */
+  | 'failed'
+  /** The content type does not use draft & publish: live on save, no publish attempted (FR-047). */
+  | 'not_applicable'
+  /** The write phase did not reach `applied`, so no publish was attempted (FR-049). */
+  | 'skipped';
+
+export interface PublishOutcome {
+  state: PublishOutcomeState;
+  /** The permission reason for `blocked` (FR-046) or the host's reason for `failed`. Never
+   *  silently dropped. */
+  message?: string;
+}
+
 export interface ChangeItemOutcome {
+  /** The WRITE phase's result. */
   state: ChangeItemOutcomeState;
   message?: string;
   oldValue?: unknown;
   newValue?: unknown;
+  /** Present only when the approve-and-publish action ran. */
+  publish?: PublishOutcome;
 }
 
 /** One proposed modification. Elements of `change-set.items` (a JSON column, not a content type). */
@@ -115,62 +261,4 @@ export interface StagedFileMeta {
   filename: string;
   mimeType: string;
   sizeBytes: number;
-}
-
-/* -------------------------------------------------------------- audit */
-
-export type AuditKind = 'qa' | 'security';
-
-export type AuditSeverity = 'critical' | 'high' | 'medium' | 'low';
-
-export type AuditCategory =
-  // functional QA (US7)
-  | 'dangling-relation'
-  | 'missing-media'
-  | 'required-empty'
-  | 'enum-out-of-range'
-  | 'component-broken'
-  | 'single-type-missing'
-  | 'published-required-empty'
-  // security (US8)
-  | 'public-write-permission'
-  | 'unauthenticated-endpoint'
-  | 'role-overbroad'
-  | 'unsafe-upload-types'
-  | 'debug-setting'
-  | 'secret-like-value';
-
-export interface AuditLocation {
-  contentTypeUid?: string;
-  documentId?: string;
-  field?: string;
-  configPath?: string;
-}
-
-export interface AuditFinding {
-  category: AuditCategory;
-  severity: AuditSeverity;
-  location: AuditLocation;
-  /** ALWAYS passed through the redaction helper before the result leaves the tool (FR-049). */
-  evidence: string;
-  impact: string;
-  remediation: string;
-}
-
-/**
- * Mandatory coverage statement. A pass that ran out of budget must not read as a clean bill of
- * health (FR-044), and one limited by permissions must say so (FR-043).
- */
-export interface AuditCoverage {
-  inspected: string[];
-  skippedForPermissions: string[];
-  skippedForBudget: string[];
-}
-
-export interface AuditReport {
-  kind: AuditKind;
-  runAt: string;
-  coverage: AuditCoverage;
-  counts: Record<AuditSeverity, number>;
-  findings: AuditFinding[];
 }

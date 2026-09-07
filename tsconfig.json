@@ -17,5 +17,6 @@
     "noEmit": true
   },
   "include": ["admin", "server", "package.json"],
-  "exclude": ["node_modules", "build", "dist", ".cache", ".tmp", "**/*.test.ts", "**/*.test.tsx"]
+  "//": "Test suites are INCLUDED here on purpose: jest transpiles them without typechecking (see jest.config.js), so this is the only pass that checks them — and it checks them under the same module resolution the build uses. tsconfig.build.json still excludes them from emitted output.",
+  "exclude": ["node_modules", "build", "dist", ".cache", ".tmp"]
 }

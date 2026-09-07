@@ -17,11 +17,20 @@ So, before any identifier ships:
    repository's own history. Past verification is evidence about the past.
 2. **Confirm it is reachable through the surface the plugin actually uses.** Existing in a provider's
    catalog is necessary but not sufficient: an id documented as available only on a non-default API
-   surface will fail here, because `server/src/services/registry.ts` resolves the provider's default
-   language-model surface. This has already cost one candidate id.
-3. **Check the image-input rule.** `modelSupportsVision()` in `server/src/services/registry.ts` is
-   prefix-based. Check each new id against those prefixes rather than assuming — a false positive
-   sends image bytes to a model that rejects them and breaks the whole request.
+   surface will fail here. `server/src/services/registry.ts` resolves the active provider from
+   persisted config and builds a chat-model instance through the declarative table in
+   `server/src/services/providers.ts`; the OpenAI-compatible provider in particular deliberately
+   keeps `useResponsesApi` at `false`, so anything that needs the Responses surface will not work
+   there. This has already cost one candidate id.
+3. **Check the image-input rule.** Image support is declared **per provider** as `supportsVision` in
+   the table in `server/src/services/providers.ts` — one prefix/shape rule per descriptor, replacing
+   the old single `modelSupportsVision()` that branched on provider identity. Check each new id
+   against its own provider's rule rather than assuming: a false positive sends image bytes to a
+   model that rejects them and breaks the whole request, and a false negative silently withholds
+   images from a model that could read them. `server/src/services/providers.test.ts` covers the rules
+   themselves, but it asserts *shapes* and knows no real identifier — so it cannot tell you whether a
+   given id is vision-capable. That is still a judgement to make against the provider's catalog.
+   Note `openai-compatible` returns `false` for everything, by design.
 
 If an id cannot be verified, it does not ship. Omitting a model is a small, reversible loss;
 shipping an unverified one is the exact defect this rule exists to prevent.
@@ -53,10 +62,13 @@ Editing `models.ts` is never a one-file change:
 - **`dist/`** — the built bundles are committed so consumers need no build step. Run
   `corepack pnpm@10 run build` and stage `dist/` alongside the source. Stale `dist/` is a shipped
   regression, not a follow-up.
-- **`corepack pnpm@10 run typecheck`** must be clean before committing.
+- **`corepack pnpm@10 run typecheck`** and **`corepack pnpm@10 run test`** must both be clean before
+  committing.
 
-There is no test suite. Verification is manual, in a running Strapi admin panel: one live send per
-provider whose list changed. A model that has not answered a real message has not been verified.
+The test suite (jest, four suites over pure functions) does **not** verify a model identifier: no
+test calls a provider, opens a socket or boots a host. So verification of the list itself is still
+manual, in a running Strapi admin panel: one live send per provider whose list changed. A model that
+has not answered a real message has not been verified.
 
 ## Repository shape
 

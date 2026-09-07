@@ -14,6 +14,12 @@ const applySchema = z.object({
   itemIds: z.array(z.string().min(1)).min(1),
   confirmDestructive: z.boolean().optional(),
   attachmentResolutions: z.record(z.string(), z.number().int()).optional(),
+  /**
+   * The Approve & Publish action (FR-044, FR-045). `publish: true` without `confirmPublish: true`
+   * is refused with `409 publish_confirmation_required`, before anything is written.
+   */
+  publish: z.boolean().optional(),
+  confirmPublish: z.boolean().optional(),
 });
 
 const NOT_FOUND = 'That change plan does not exist.';
@@ -28,6 +34,7 @@ const STATUS_FOR: Record<string, number> = {
   permission_denied: 403,
   destructive_confirmation_required: 409,
   attachment_not_resolved: 409,
+  publish_confirmation_required: 409,
 };
 
 /**
@@ -108,7 +115,9 @@ const changeSetsController = ({ strapi }: { strapi: Core.Strapi }) => {
       }
       const parsed = applySchema.safeParse(ctx.request.body ?? {});
       if (!parsed.success) {
-        return ctx.badRequest('Request body must be { itemIds: string[], confirmDestructive?: boolean }.');
+        return ctx.badRequest(
+          'Request body must be { itemIds: string[], confirmDestructive?: boolean, publish?: boolean, confirmPublish?: boolean }.'
+        );
       }
       const result = await changeSets().apply({
         changeSetId: String(ctx.params.id),
@@ -118,6 +127,8 @@ const changeSetsController = ({ strapi }: { strapi: Core.Strapi }) => {
         itemIds: parsed.data.itemIds,
         confirmDestructive: parsed.data.confirmDestructive ?? false,
         attachmentResolutions: parsed.data.attachmentResolutions ?? {},
+        publish: parsed.data.publish ?? false,
+        confirmPublish: parsed.data.confirmPublish ?? false,
       });
       if (!result.ok) {
         if (result.error === 'not_found') {

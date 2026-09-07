@@ -45,11 +45,16 @@
       "type": "boolean",
       "default": false
     },
+    "promptVersion": {
+      "type": "string",
+      "description": "The InstructionSet.version that produced this turn, so a stored reply is traceable to the rules it was run under. NULLABLE on purpose: turns stored before instruction versioning existed honestly have none, and a null is honest where a backfilled guess would not be."
+    },
     "modeAtSend": {
       "type": "enumeration",
       "enum": ["content", "layout", "audit"],
       "required": true,
-      "default": "content"
+      "default": "content",
+      "description": "VESTIGIAL — no longer read or written. The plugin has a single mode; this column is left in place deliberately because it is a required enumeration on live consumer databases, so removing it is a migration risk for no behavioural gain. New rows take the default. Do not mistake it for live state."
     },
     "changeSet": {
       "type": "relation",

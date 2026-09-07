@@ -67,6 +67,29 @@ export default {
           policies: ['admin::isAuthenticatedAdmin', 'plugin::ai-content-studio.is-super-admin'],
         },
       },
+
+      /**
+       * The grounding inspector (FR-035). A NARROWER gate than the super-admin-only `/settings`
+       * routes above, and the only new non-super-admin surface in this feature.
+       *
+       * It is scoped to the CALLING account: it returns the description that account's own requests
+       * carry, so it is not a way to read a schema they cannot otherwise read. It exposes no
+       * credential and no content — the description is schema-only by construction.
+       */
+      {
+        method: 'GET',
+        path: '/settings/grounding',
+        handler: 'settings.grounding',
+        config: {
+          policies: [
+            'admin::isAuthenticatedAdmin',
+            {
+              name: 'admin::hasPermissions',
+              config: { actions: ['plugin::ai-content-studio.settings.read'] },
+            },
+          ],
+        },
+      },
     ],
   },
 

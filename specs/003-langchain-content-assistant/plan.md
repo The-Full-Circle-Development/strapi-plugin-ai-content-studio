@@ -7,7 +7,9 @@
 ## Summary
 
 Language-model access moves behind **LangChain** (`langchain` v1 `createAgent`), with chat models
-built as instances from a declarative table of statically-imported providers — Anthropic, OpenAI and
+built as instances from a declarative table of statically-imported providers and handed to
+`createAgent` through its `model` option (**not** `llm`: that option does not exist in
+`langchain@1.5.10` — see tasks.md → Deviations) — Anthropic, OpenAI and
 Google Generative AI, plus one generic **OpenAI-compatible** provider whose configuration carries an
 administrator-supplied base URL, which is what makes the long tail (Groq, Mistral, DeepSeek,
 Together, Fireworks, Ollama, vLLM, self-hosted…) reachable with no per-provider code. `initChatModel`
@@ -18,9 +20,21 @@ The AI SDK stays in the request path as the **wire and storage format only** —
 `@ai-sdk/langchain`'s `toBaseMessages` / `toUIMessageStream` bridge LangChain's stream into the UI
 message protocol the browser already speaks and the database already stores. That is what keeps
 FR-009's chat contract and FR-013's replay of pre-existing conversations true through a provider-layer
-rewrite. The one real gap in that bridge — no assembled `responseMessage` for persistence — is closed
-by teeing the chunk stream into `readUIMessageStream`, the AI SDK's own assembler, so the stored
-`parts` shape stays byte-compatible (D5).
+rewrite. Persistence needs no hand-built plumbing at all: the bridge's chunks are merged into
+`createUIMessageStream`, whose `onFinish({ responseMessage })` is field-for-field the callback the
+controller already uses, and whose assembler is the same one `streamText` reaches today — so the
+stored `parts` shape stays byte-compatible **by construction** (D5, corrected).
+
+One open risk sat under all of this as a **blocking prerequisite of the dependency install**:
+`@ai-sdk/langchain@3.0.93` is ESM-only, declares `engines: node >= 22` against this repo's Node 20
+floor, and hard-depends on `ai@7.0.93` while this repo pinned `ai@6.0.208` (D17).
+
+**RESOLVED at install time.** All three findings are real in 3.0.93 and all three are absent from
+the 2.x line, which D17 lists as the preferred fallback: `2.0.285` is dual-format (CJS + ESM with a
+`require` condition), declares `node >= 18`, and depends on `ai@6.0.277` — the same major this repo
+uses. Pinning it avoids upgrading to `ai@7`, which would have moved the wire and storage format
+FR-013 exists to freeze. Verified by bundling the whole tree into a CommonJS bundle with esbuild,
+loading it, and constructing all three providers offline.
 
 Around that: the three-mode selector and the read-only audit capability are removed outright; the
 instructions become explicit, sectioned and **version-derived-from-their-own-text** so an edit cannot
@@ -41,11 +55,11 @@ of application.
 | `langchain` | 1.5.10 | `createAgent` (ReAct tool loop), `tool()` |
 | `@langchain/core` | 1.2.9 | peer of the above; message and tool primitives |
 | `@langchain/anthropic` | 1.5.9 | `ChatAnthropic` |
-| `@langchain/openai` | 1.5.11 | `ChatOpenAI` — also the OpenAI-compatible path via `configuration.baseURL` |
+| `@langchain/openai` | **1.5.5** (pinned) | `ChatOpenAI` — also the OpenAI-compatible path via `configuration.baseURL`. 1.5.10+ declares `node >= 22`, which would break this repo's Node 20 floor, so the newest `>= 20` release is pinned |
 | `@langchain/google-genai` | 2.3.0 | `ChatGoogleGenerativeAI` |
-| `@ai-sdk/langchain` | 3.0.93 | `toBaseMessages`, `toUIMessageStream` |
-| `ai` | 6.0.208 (already present) | `pipeUIMessageStreamToResponse`, `readUIMessageStream`, `UIMessage`/`UIMessageChunk` types |
-| `@ai-sdk/react` | ^3 (already present, unchanged) | `useChat` on the admin side |
+| `@ai-sdk/langchain` | **2.0.285** (pinned) | `toBaseMessages`, `toUIMessageStream`. NOT 3.0.93 — see Risks, all three D17 findings resolved |
+| `ai` | **6.0.277** (pinned, was `^6`) | `createUIMessageStream`, `pipeUIMessageStreamToResponse`, `UIMessage`/`UIMessageChunk` types. Pinned to the version the bridge pins, so exactly ONE copy of `ai` exists |
+| `@ai-sdk/react` | **3.0.280** (pinned, was `^3`) | `useChat` on the admin side, unchanged in use. Pinned only so it shares the one `ai@6.0.277` copy |
 | `zod` | ^4 (already present) | tool input and settings validation |
 | `@strapi/design-system` / `@strapi/icons` | v2 (already present) | all new UI |
 | `jest` + a TS transform | to be pinned in T005a | the four pure-function suites (FR-055). Chosen because Strapi's own packages run jest — verified in the installed `@strapi/strapi` and `@strapi/sdk-plugin`. `devDependencies`, never shipped in `dist/` |
@@ -272,9 +286,10 @@ deviation from the list above: items 4 and 5 land as a **single** commit, becaus
 
 | Risk | Why it matters | Mitigation |
 |---|---|---|
-| The bridged stream diverges from the current UI part shapes | Silently corrupts stored history — the one failure FR-013 cannot absorb | `readUIMessageStream` is the AI SDK's own assembler (D5), so the shape is not hand-derived. Verification compares a freshly stored turn's `parts` against a pre-change turn's before item 3 is committed. |
-| An unread `tee` branch stalls the response | Looks like a hung provider; hard to diagnose | The persistence branch is drained unconditionally — including on error and abort — and this is an explicit item in [contracts/chat-stream.md](contracts/chat-stream.md). |
-| `recursionLimit` counts super-steps, not model calls | A silently tighter ceiling truncates multi-tool turns; a looser one burns tokens | The arithmetic is written down in [contracts/chat-stream.md](contracts/chat-stream.md) and confirmed by observing a turn that needs several discovery calls. |
+| **`@ai-sdk/langchain@3.0.93`'s packaging fights this repo's** — ESM-only, `engines: node >= 22`, and a hard `ai@7.0.93` dependency against our `ai@6.0.208` (D17) | A second major of `ai` in one bundle means two `UIMessageChunk` identities and a possible move in the stored `parts` shape — the one failure FR-013 cannot absorb. The engine floor would be a breaking change for consumers on Node 20 | **Answered at install time, before any code is written against the bridge** (T002): bundle it, run `pnpm why ai`, read the lockfile. If `ai@7` is a second copy, either upgrade this repo to `ai@7` and re-run the FR-013 shape diff for real, or pin an older bridge whose peer is `ai@6`. |
+| The bridged stream diverges from the current UI part shapes | Silently corrupts stored history | The stream is assembled by the SDK's own `createUIMessageStream` → `handleUIMessageStreamFinish`, the same path `streamText` takes today (D5, corrected), so the shape is not hand-derived. Verification still compares a freshly stored turn's `parts` against a pre-change turn's before item 3 is committed — that diff is also what would catch the `ai@7` problem above. |
+| **A provider's raw error text reaches the browser past every mask** — the bridge enqueues `{type:'error', errorText}` itself rather than throwing, so no `onError` callback ever sees it | Straight at FR-008 and SC-009: whatever the provider put in that message is echoed to the editor | Redaction is a `TransformStream` over the merged chunks, not a callback ([contracts/chat-stream.md](contracts/chat-stream.md) §8, T022). SC-009's sweep is what proves it. |
+| The model-call ceiling moves silently | A tighter ceiling truncates multi-tool turns; a looser one burns tokens | `modelCallLimitMiddleware({ runLimit: 8 })` counts model calls directly, so there is no super-step arithmetic to get wrong, and it ends the turn cleanly instead of raising `GraphRecursionError` mid-stream. Confirmed by observing a turn that needs several discovery calls. |
 | Bundle growth in a committed `dist/` | Every consumer pays it on install | Measured before and after (baseline recorded: `dist/server/index.js` = 1,600,257 bytes), with the three `@ai-sdk/*` provider packages removed as an offset. **No size gate, on the maintainer's explicit decision**: the growth is accepted as the price of the provider layer, because a git dependency is fetched once and then cached — the cost lands at install, not per use, and no editor pays it again. The number is still recorded and stated in the commit body, so the cost is known rather than discovered later. |
 | `langsmith` arrives as a `langchain` dependency | Tracing would send prompts and run data to a third party — a Principle I failure, not just a performance one | No `LANGSMITH_*` / `LANGCHAIN_*` tracing is enabled by this plugin; verified absent from the request path and stated in the README. |
 | A compatible endpoint that only implements `/chat/completions` | The provider appears configured and fails on every send | `useResponsesApi` stays `false` (verified default — D3) and no feature that forces the Responses surface is requested. Each shipped provider gets one live send. |

@@ -1,10 +1,9 @@
-import { tool, type ToolSet } from 'ai';
+import { tool } from 'langchain';
 import { z } from 'zod';
 import type { Core } from '@strapi/strapi';
-import type { ChatMode } from '../types';
 
 /**
- * Tools passed to `streamText`, rebuilt per request from (caller ability, mode). Every tool:
+ * Tools handed to `createAgent`, rebuilt per request from the CALLER's live ability. Every tool:
  *   1. validates the content-type uid against a live `api::*` allow-list,
  *   2. RBAC-checks the CALLER's ability via the content-manager permission-checker
  *      BEFORE touching the Document Service (which itself bypasses RBAC),
@@ -12,8 +11,22 @@ import type { ChatMode } from '../types';
  *   4. returns STRUCTURED errors instead of throwing, so the model relays a clear
  *      message and does not blindly retry.
  *
- * NO tool in any mode modifies content. The write tools were removed; `proposeChanges` records a
- * pending plan and the user applies it from the panel (R1, FR-001).
+ * PORTED SHAPE-FOR-SHAPE from the AI SDK's `tool()` onto LangChain's (research D7). Every
+ * constitutional property of these tools is a property of the FUNCTION BODY, not of the SDK
+ * wrapper — the uid allow-list, the permission check against the caller's live ability, the
+ * compact/truncated JSON and the structured returns are all unchanged. Only the wrapper moved, so
+ * Principle II is unaffected. The existing zod v4 schemas are reused verbatim: `tool()`'s installed
+ * overloads accept `ZodObjectV4` directly, so there is no second zod copy and no schema rewrite.
+ *
+ * NO tool modifies content. `proposeChanges` records a pending plan; the sole write path is
+ * `POST /change-sets/:id/apply`, driven by the user's click (FR-015).
+ *
+ * THERE IS NO `mode` PARAMETER. This is the single mode's tool set — exactly
+ * `listContentTypes`, `searchEntries`, `getEntry`, `describePageStructure`, `proposeChanges`
+ * (contracts/removals.md §1). `describePageStructure` is now UNCONDITIONAL: it used to be gated to
+ * `layout` and `audit`, and FR-014 requires structure discovery in the only mode there is, so a
+ * question about where a page's media or sections live is answerable with no mode switch.
+ * `runQaScan` and `runSecurityAudit` are deleted outright (research D11).
  */
 
 const MAX_FIELD_CHARS = 600;
@@ -24,7 +37,6 @@ type Action = 'read' | 'create' | 'update' | 'delete' | 'publish';
 export interface BuildToolsOptions {
   /** The CALLER's CASL ability. Never cached across requests or users. */
   userAbility: unknown;
-  mode?: ChatMode;
   /** The conversation a produced plan belongs to. */
   threadId?: string | null;
   ownerId?: number | null;
@@ -35,11 +47,10 @@ export interface BuildToolsOptions {
 const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
   buildTools({
     userAbility,
-    mode = 'content',
     threadId = null,
     ownerId = null,
     manifestOrdinals = [],
-  }: BuildToolsOptions): ToolSet {
+  }: BuildToolsOptions) {
     const changeSets = () => strapi.plugin('ai-content-studio').service('change-sets');
     const allowedUids = (): string[] =>
       Object.keys(strapi.contentTypes).filter((uid) => uid.startsWith('api::'));
@@ -91,11 +102,8 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
 
     const docs = (uid: string): any => strapi.documents(uid as any);
 
-    const listContentTypes = tool({
-      description:
-        'List the editable website content types (uid, kind, display name, draft&publish flag, and a summary of attributes). Call this first to discover valid content-type uids.',
-      inputSchema: z.object({}),
-      execute: async () => ({
+    const listContentTypes = tool(
+      async () => ({
         ok: true,
         contentTypes: allowedUids().map((uid) => {
           const ct = ctOf(uid);
@@ -115,20 +123,16 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
           };
         }),
       }),
-    });
+      {
+        name: 'listContentTypes',
+        description:
+          'List the editable website content types (uid, kind, display name, draft&publish flag, and a summary of attributes). Call this first to discover valid content-type uids.',
+        schema: z.object({}),
+      }
+    );
 
-    const searchEntries = tool({
-      description:
-        'Search a COLLECTION type. Supports Strapi filter operators (e.g. { title: { $contains: "bath" } }). For single types, use getEntry instead.',
-      inputSchema: z.object({
-        contentType: z.string().describe('Content-type uid, e.g. "api::blog-post.blog-post".'),
-        filters: z.record(z.string(), z.any()).optional().describe('Strapi filters object.'),
-        page: z.number().int().min(1).default(1),
-        pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE).default(10),
-        sort: z.string().optional().describe('e.g. "createdAt:desc".'),
-        status: z.enum(['draft', 'published']).optional(),
-      }),
-      execute: async ({ contentType, filters, page, pageSize, sort, status }) => {
+    const searchEntries = tool(
+      async ({ contentType, filters, page, pageSize, sort, status }) => {
         const bad = ensureAllowed(contentType);
         if (bad) return bad;
         if (isSingle(contentType)) {
@@ -155,18 +159,23 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
           entries: list.map(compact),
         };
       },
-    });
+      {
+        name: 'searchEntries',
+        description:
+          'Search a COLLECTION type. Supports Strapi filter operators (e.g. { title: { $contains: "bath" } }). For single types, use getEntry instead.',
+        schema: z.object({
+          contentType: z.string().describe('Content-type uid, e.g. "api::blog-post.blog-post".'),
+          filters: z.record(z.string(), z.any()).optional().describe('Strapi filters object.'),
+          page: z.number().int().min(1).default(1),
+          pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE).default(10),
+          sort: z.string().optional().describe('e.g. "createdAt:desc".'),
+          status: z.enum(['draft', 'published']).optional(),
+        }),
+      }
+    );
 
-    const getEntry = tool({
-      description:
-        'Fetch one entry. Collection types: pass documentId. Single types: omit documentId (the sole document is returned).',
-      inputSchema: z.object({
-        contentType: z.string(),
-        documentId: z.string().optional(),
-        populate: z.union([z.literal('*'), z.array(z.string())]).optional(),
-        status: z.enum(['draft', 'published']).optional(),
-      }),
-      execute: async ({ contentType, documentId, populate, status }) => {
+    const getEntry = tool(
+      async ({ contentType, documentId, populate, status }) => {
         const bad = ensureAllowed(contentType);
         if (bad) return bad;
         if (!can(contentType, 'read')) return denied('read', contentType);
@@ -185,25 +194,30 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
         if (!doc) return { ok: false, error: 'not_found' };
         return { ok: true, entry: compact(doc) };
       },
-    });
+      {
+        name: 'getEntry',
+        description:
+          'Fetch one entry. Collection types: pass documentId. Single types: omit documentId (the sole document is returned).',
+        schema: z.object({
+          contentType: z.string(),
+          documentId: z.string().optional(),
+          populate: z.union([z.literal('*'), z.array(z.string())]).optional(),
+          status: z.enum(['draft', 'published']).optional(),
+        }),
+      }
+    );
 
     /**
-     * Layout support (FR-030): report WHERE media and links can go, so a placement instruction can
-     * be resolved against slots that actually exist rather than guessed from field names that
-     * belong to some other project.
+     * Structure discovery (FR-014, FR-030): report WHERE media and links can go, so a placement
+     * instruction can be resolved against slots that actually exist rather than guessed from field
+     * names that belong to some other project.
      *
      * Read-only and RBAC-gated on `read`. Ambiguity is REPORTED, not resolved: if a page has
      * several media slots that could match "the hero image", all of them come back so the assistant
      * asks instead of choosing (FR-035).
      */
-    const describePageStructure = tool({
-      description:
-        "Describe a document's sections, components and the media / link / text slots inside them, with each slot's current value. Use this before proposing a placement so you target a slot that exists. Returns ALL candidate slots — if several could match what the user described, ask them which one; do not choose.",
-      inputSchema: z.object({
-        contentTypeUid: z.string().describe('Content-type uid, e.g. "api::page.page".'),
-        documentId: z.string().optional().describe('Omit for single types.'),
-      }),
-      execute: async ({ contentTypeUid, documentId }) => {
+    const describePageStructure = tool(
+      async ({ contentTypeUid, documentId }) => {
         const bad = ensureAllowed(contentTypeUid);
         if (bad) return bad;
         if (!can(contentTypeUid, 'read')) return denied('read', contentTypeUid);
@@ -321,7 +335,16 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
             'Every candidate slot is listed. If more than one could match what the user described, ask which one rather than choosing.',
         };
       },
-    });
+      {
+        name: 'describePageStructure',
+        description:
+          "Describe a document's sections, components and the media / link / text slots inside them, with each slot's current value. Use this before proposing a placement so you target a slot that exists. Returns ALL candidate slots — if several could match what the user described, ask them which one; do not choose.",
+        schema: z.object({
+          contentTypeUid: z.string().describe('Content-type uid, e.g. "api::page.page".'),
+          documentId: z.string().optional().describe('Omit for single types.'),
+        }),
+      }
+    );
 
     /**
      * The ONLY tool that can affect content — and it affects nothing until the user approves.
@@ -331,40 +354,8 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
      * Now the model can only persist a pending plan in the plugin's own table; the sole write path
      * is `POST /change-sets/:id/apply`, driven by the user's click.
      */
-    const proposeChanges = tool({
-      description:
-        'Propose content changes for the user to approve. This writes NOTHING — it records a pending plan and returns it for review. Call it ONCE per request with every field you intend to change. Items the caller may not perform come back under `blocked`. After it returns, tell the user plainly that nothing has changed yet and that the plan is waiting for their approval in the panel.',
-      inputSchema: z.object({
-        summary: z.string().describe('One short line describing the whole plan.'),
-        items: z
-          .array(
-            z.object({
-              operation: z
-                .enum(['create', 'update', 'publish', 'ingestAttachment'])
-                .describe('What this item does to the target.'),
-              contentTypeUid: z.string().describe('Content-type uid, e.g. "api::page.page".'),
-              documentId: z
-                .string()
-                .optional()
-                .describe('Target document. Omit for `create` and for single types.'),
-              field: z
-                .string()
-                .optional()
-                .describe('Dotted field path, e.g. "hero.headline". Omit for `publish`.'),
-              proposedValue: z
-                .any()
-                .optional()
-                .describe('The new value. Omit when using attachmentOrdinal.'),
-              attachmentOrdinal: z
-                .number()
-                .int()
-                .optional()
-                .describe('For a media field fed by an attached file: its ordinal (#1 => 1). NEVER a media library id.'),
-            })
-          )
-          .describe('Every change this plan should contain.'),
-      }),
-      execute: async ({ summary, items }) => {
+    const proposeChanges = tool(
+      async ({ summary, items }) => {
         if (!threadId || !Number.isInteger(ownerId)) {
           return {
             ok: false,
@@ -381,112 +372,50 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
           manifestOrdinals,
         });
       },
-    });
+      {
+        name: 'proposeChanges',
+        description:
+          'Propose content changes for the user to approve. This writes NOTHING — it records a pending plan and returns it for review. Call it ONCE per request with every field you intend to change. Items the caller may not perform come back under `blocked`. After it returns, tell the user plainly that nothing has changed yet and that the plan is waiting for their approval in the panel.',
+        schema: z.object({
+          summary: z.string().describe('One short line describing the whole plan.'),
+          items: z
+            .array(
+              z.object({
+                operation: z
+                  .enum(['create', 'update', 'publish', 'ingestAttachment'])
+                  .describe('What this item does to the target.'),
+                contentTypeUid: z.string().describe('Content-type uid, e.g. "api::page.page".'),
+                documentId: z
+                  .string()
+                  .optional()
+                  .describe('Target document. Omit for `create` and for single types.'),
+                field: z
+                  .string()
+                  .optional()
+                  .describe('Dotted field path, e.g. "hero.headline". Omit for `publish`.'),
+                proposedValue: z
+                  .any()
+                  .optional()
+                  .describe('The new value. Omit when using attachmentOrdinal.'),
+                attachmentOrdinal: z
+                  .number()
+                  .int()
+                  .optional()
+                  .describe('For a media field fed by an attached file: its ordinal (#1 => 1). NEVER a media library id.'),
+              })
+            )
+            .describe('Every change this plan should contain.'),
+        }),
+      }
+    );
 
     /**
-     * Read-only functional QA (FR-040..FR-045). Built only in `audit` mode.
+     * ONE tool set, for the one mode there is (contracts/removals.md §1).
      *
-     * The description forbids speculative findings on purpose: a clean project must come back with
-     * `findings: []` rather than plausible-sounding invention (FR-045).
+     * Nothing here adds an ability the caller's permissions do not already allow, because every
+     * tool still RBAC-checks the caller per call (Principle II).
      */
-    const runQaScan = tool({
-      description:
-        'Run a READ-ONLY functional QA pass over the running content setup: required fields empty on existing entries, relations pointing at missing documents, media fields referencing missing files, values outside an enumeration, component usage that cannot render, single types never created, and published entries failing their own required fields. Changes nothing. Report ONLY what the result contains — never infer or invent a finding, and if `findings` is empty say the project looks clean for the checks that ran. ALWAYS repeat the `coverage` block: a pass that skipped types for permissions or ran out of budget is not a clean bill of health.',
-      inputSchema: z.object({
-        contentTypeUids: z
-          .array(z.string())
-          .optional()
-          .describe('Limit the pass to these uids. Omit to inspect every type the caller can read.'),
-        maxEntriesPerType: z
-          .number()
-          .int()
-          .min(1)
-          .max(200)
-          .optional()
-          .describe('Sample cap per content type. Default 50, max 200.'),
-      }),
-      execute: async ({ contentTypeUids, maxEntriesPerType }) => {
-        const report = await strapi
-          .plugin('ai-content-studio')
-          .service('audit-qa')
-          .run({ userAbility, contentTypeUids, maxEntriesPerType });
-        return { ok: true, report };
-      },
-    });
-
-    /**
-     * Read-only security audit (FR-046..FR-050). Built only in `audit` mode, and gated inside on the
-     * caller's LIVE `audit.run` ability rather than on a route policy, so the check is re-derived
-     * per request (Constitution II).
-     *
-     * A refusal discloses NOTHING — no counts, no categories, no partial findings — because the
-     * report is itself a map of the project's weak points (FR-048, spec decision D3).
-     */
-    const runSecurityAudit = tool({
-      description:
-        'Run a READ-ONLY security audit of the running configuration: public-role write grants, unauthenticated content-API endpoints, roles holding permissions beyond their stated scope, upload rules accepting executable or script types, unsafe debug settings, and secret-like values stored in content. Changes nothing. Requires the audit.run permission; without it this returns permission_denied and you must relay that refusal WITHOUT speculating about what it would have found. Secret values are already masked — report the mask and its location, never attempt to reconstruct a value. Remediations are advice: applying one goes through proposeChanges and the normal permission checks.',
-      inputSchema: z.object({
-        areas: z
-          .array(z.enum(['permissions', 'endpoints', 'uploads', 'settings', 'content-secrets']))
-          .optional()
-          .describe('Limit the audit to these areas. Omit for all of them.'),
-      }),
-      execute: async ({ areas }) => {
-        const ability = userAbility as { can?: (action: string) => boolean } | null;
-        let permitted = false;
-        try {
-          permitted = Boolean(ability?.can?.('plugin::ai-content-studio.audit.run'));
-        } catch {
-          permitted = false;
-        }
-        if (!permitted) {
-          // Deliberately bare: no counts, no categories, no hint of what exists.
-          return {
-            ok: false as const,
-            error: 'permission_denied',
-            message: 'Your account is not allowed to run the security audit.',
-          };
-        }
-        const report = await strapi
-          .plugin('ai-content-studio')
-          .service('audit-security')
-          .run({ areas, userAbility });
-        return { ok: true, report };
-      },
-    });
-
-    /**
-     * The tool set per (caller ability, mode) — contracts/model-tools.md.
-     *
-     * | tool                  | content | layout | audit |
-     * | listContentTypes      |    y    |   y    |   y   |
-     * | searchEntries         |    y    |   y    |   y   |
-     * | getEntry              |    y    |   y    |   y   |
-     * | describePageStructure |    -    |   y    |   y   |
-     * | proposeChanges        |    y    |   y    |   -   |
-     * | runQaScan             |    -    |   -    |   y   |
-     * | runSecurityAudit      |    -    |   -    |   y (permission-gated inside)
-     *
-     * `audit` mode simply never BUILDS proposeChanges, so read-only is structural — there is no
-     * capability to refuse at runtime, which is the strongest form of FR-029. And a mode only ever
-     * narrows: nothing below adds an ability the caller's permissions do not already allow, because
-     * every tool still RBAC-checks the caller per call (FR-031).
-     */
-    const tools: ToolSet = { listContentTypes, searchEntries, getEntry };
-
-    if (mode === 'layout' || mode === 'audit') {
-      tools.describePageStructure = describePageStructure;
-    }
-    if (mode === 'content' || mode === 'layout') {
-      tools.proposeChanges = proposeChanges;
-    }
-    if (mode === 'audit') {
-      tools.runQaScan = runQaScan;
-      // Built in audit mode for everyone; the audit.run check lives INSIDE, against the caller's
-      // live ability, so a caller without it gets a refusal that discloses nothing (FR-048).
-      tools.runSecurityAudit = runSecurityAudit;
-    }
-    return tools;
+    return [listContentTypes, searchEntries, getEntry, describePageStructure, proposeChanges];
   },
 });
 

@@ -3,6 +3,7 @@ import { Button, Checkbox, Typography } from '@strapi/design-system';
 import { styled } from 'styled-components';
 import { useChangeSet, type ChangeItemView } from '../hooks/useChangeSet';
 import { PreviewPanel } from './PreviewPanel';
+import { RiskyActions, RiskyConfirm, RiskyDetail, RiskyHeading } from './styles';
 
 /**
  * The change plan, rendered per item so approval is a deliberate act (FR-002, FR-003).
@@ -179,6 +180,8 @@ export interface ApplyReportRow {
   message: string | null;
   oldValue: unknown;
   newValue: unknown;
+  /** Present only when the approve-and-publish action ran (FR-050). */
+  publish?: { state: string; message?: string | null } | null;
 }
 
 export interface ApplyReport {
@@ -223,6 +226,14 @@ export const ChangePlanCard = ({
 
   const [confirmDestructive, setConfirmDestructive] = React.useState(false);
   const [localError, setLocalError] = React.useState<string | null>(null);
+  /**
+   * The item ids awaiting publish confirmation, or null when the risky action is not armed.
+   *
+   * Holding the INTENT rather than acting on the click is what makes FR-045 true: a single
+   * activation writes nothing and publishes nothing, and dismissing this or navigating away leaves
+   * both undone.
+   */
+  const [publishIntent, setPublishIntent] = React.useState<string[] | null>(null);
 
   // Unticking the destructive items must also drop the confirmation — it is never sticky.
   React.useEffect(() => {
@@ -230,6 +241,11 @@ export const ChangePlanCard = ({
       setConfirmDestructive(false);
     }
   }, [selectionHasDestructive]);
+
+  // An armed publish confirmation must never outlive the selection it was armed for.
+  React.useEffect(() => {
+    setPublishIntent(null);
+  }, [selected]);
 
   if (!changeSet) {
     return error ? <Note>{error}</Note> : null;
@@ -239,7 +255,24 @@ export const ChangePlanCard = ({
   const allowedIds = changeSet.items.filter((i) => i.permissionVerdict === 'allowed').map((i) => i.id);
   const expired = new Date(changeSet.expiresAt).getTime() <= Date.now();
 
-  const runApply = async (itemIds: string[]) => {
+  /**
+   * How many DOCUMENTS the confirmation is about (FR-045).
+   *
+   * Counted the same way the server picks its publish targets: distinct
+   * `(contentTypeUid, documentId)` pairs, excluding items whose operation is already `publish`.
+   * Two field changes on one document are one publish, so they must read as one document here —
+   * counting items instead would overstate the consequence.
+   */
+  const documentsToPublish = new Set(
+    (publishIntent ?? [])
+      .map((id) => changeSet.items.find((i) => i.id === id))
+      .filter(
+        (i): i is ChangeItemView => Boolean(i) && i!.operation !== 'publish' && Boolean(i!.documentId)
+      )
+      .map((i) => `${i.contentTypeUid}::${i.documentId}`)
+  ).size;
+
+  const runApply = async (itemIds: string[], withPublish = false) => {
     setLocalError(null);
     if (itemIds.length === 0) {
       return;
@@ -264,7 +297,15 @@ export const ChangePlanCard = ({
       }
     }
 
-    const report = await apply({ itemIds, confirmDestructive, attachmentResolutions });
+    const report = await apply({
+      itemIds,
+      confirmDestructive,
+      attachmentResolutions,
+      // The confirmation is the ONLY path that sets these, and it sets both together — the server
+      // refuses `publish` without `confirmPublish` before writing anything (FR-045).
+      publish: withPublish,
+      confirmPublish: withPublish,
+    });
     if (report) {
       const byId = new Map(changeSet.items.map((i) => [i.id, i]));
       onApplied?.({
@@ -281,6 +322,7 @@ export const ChangePlanCard = ({
             message: outcome?.message ?? null,
             oldValue: outcome?.oldValue ?? null,
             newValue: outcome?.newValue ?? null,
+            publish: outcome?.publish ?? null,
           };
         }),
       });
@@ -384,6 +426,40 @@ export const ChangePlanCard = ({
         </Confirm>
       ) : null}
 
+      {/*
+        The Approve & Publish confirmation. It states BOTH consequences, because the second one —
+        that publication is document-scoped — is the one consequence of this action that is
+        invisible in the plan's own before/after rows above (FR-045).
+      */}
+      {!resolved && publishIntent ? (
+        <RiskyConfirm>
+          <RiskyHeading>Publish {documentsToPublish} document{documentsToPublish === 1 ? '' : 's'}?</RiskyHeading>
+          <RiskyDetail>Publishing makes this content publicly visible immediately.</RiskyDetail>
+          <RiskyDetail>
+            It publishes each affected document&rsquo;s <strong>entire current draft</strong> — not
+            only the fields this plan reviewed. Any unreviewed draft edit already sitting on those
+            documents will go live with it.
+          </RiskyDetail>
+          <RiskyActions>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const ids = publishIntent;
+                setPublishIntent(null);
+                void runApply(ids, true);
+              }}
+              disabled={busy}
+              loading={busy}
+            >
+              Yes, apply and publish
+            </Button>
+            <Button variant="tertiary" onClick={() => setPublishIntent(null)} disabled={busy}>
+              Cancel
+            </Button>
+          </RiskyActions>
+        </RiskyConfirm>
+      ) : null}
+
       {!resolved ? (
         <Actions>
           <Button
@@ -399,6 +475,19 @@ export const ChangePlanCard = ({
             disabled={busy || expired || selected.length === 0 || selected.length === allowedIds.length}
           >
             Approve selected ({selected.length})
+          </Button>
+          {/*
+            Visually distinct and labelled to signal its risk — a danger variant, never styled as
+            the safe default (FR-044). Activating it only ARMS the confirmation above; it applies
+            and publishes nothing on its own (FR-045). Disabled under exactly the same conditions as
+            the existing actions.
+          */}
+          <Button
+            variant="danger"
+            onClick={() => setPublishIntent(selected.length > 0 ? selected : allowedIds)}
+            disabled={busy || expired || allowedIds.length === 0 || publishIntent !== null}
+          >
+            Approve &amp; Publish (Risky)
           </Button>
           <Button
             variant="tertiary"

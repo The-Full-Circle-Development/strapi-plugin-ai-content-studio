@@ -1,12 +1,14 @@
+/**
+ * The providers this file curates model lists FOR — which is a different statement from the
+ * providers the plugin SHIPS. The shipped set lives in `admin/src/data/providers.ts` (client) and
+ * `server/src/services/providers.ts` (server), and it is larger: a provider may ship with no
+ * curated list at all, in which case the settings screen offers direct identifier entry (FR-004).
+ *
+ * The former `PROVIDERS` array and `PROVIDER_LABELS` map are GONE from this file. They had become a
+ * second copy of the shipped-provider list, which is the drift CLAUDE.md exists to prevent, and
+ * nothing reads them any more.
+ */
 export type ProviderId = 'anthropic' | 'google' | 'openai';
-
-export const PROVIDERS: ProviderId[] = ['anthropic', 'google', 'openai'];
-
-export const PROVIDER_LABELS: Record<ProviderId, string> = {
-  anthropic: 'Anthropic',
-  google: 'Google',
-  openai: 'OpenAI',
-};
 
 export interface ModelOption {
   id: string;
