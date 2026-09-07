@@ -61,7 +61,9 @@ functional requirement. Requirements say "the provider-adapter layer", so they s
 against behaviour rather than against a library choice.
 
 **Numbering.** FR-001 through FR-054 are contiguous with no gaps or duplicates; SC-001 through
-SC-012 likewise.
+SC-012 likewise. FR-055 (automated coverage of the deterministic behaviours) was appended later, on
+2026-09-07, when the maintainer placed code-quality practice above the project's own "no automated
+test suite" rule.
 
 **Constitution tension, resolved not waived.** Principle IV (self-contained distribution: committed
 `dist/`, no consumer build step) is the one real bound on "every provider the adapter layer

@@ -495,6 +495,18 @@ write still applies.
 - **FR-054**: Every removed permission action or removed capability MUST be documented as a breaking
   change, naming the version that removes it and what a consumer who granted it should do.
 
+**Verification**
+
+- **FR-055**: Every deterministic behaviour this feature requires — the byte-identical composition of
+  the instructions (FR-018), the deterministic derivation and bounded degradation of the install
+  description (FR-030, FR-032), the declared image-input rule (FR-006), and the configuration
+  normalization and validation rules (FR-008, FR-036) — MUST be covered by automated tests that run
+  as part of the pre-commit gate. Those tests MUST NOT call a language model, open a network
+  connection, or depend on a running host application: they cover pure functions whose determinism is
+  itself the requirement, so a failure is a defect and never a flake. Behaviour that only fails in
+  integration — streaming, tool activity, stop, permission denials, replay, and the interface —
+  remains verified manually in a running admin panel.
+
 ### Key Entities *(include if feature involves data)*
 
 - **Supported provider**: one provider the adapter layer can reach and the distribution ships —
@@ -586,9 +598,12 @@ write still applies.
   it must keep an explicit risk signal and must not read like the safe default.
 - **Copying uses the browser clipboard**, which a browser may refuse; a refusal must be reported
   rather than swallowed (FR-040).
-- **Verification is manual, in a running admin panel.** There is no automated test suite; the gate is
-  one live message per shipped provider whose path changed, plus one permission-denied path for the
-  new publish action.
+- **Verification is split by what can actually fail.** Deterministic pure logic is covered by
+  automated tests, which this feature introduces (FR-055) — none of them calls a model, so none of
+  them can flake on model output. Everything else is verified manually in a running admin panel: one
+  live message per shipped provider whose path changed, plus one permission-denied path for the new
+  publish action. Model *behaviour* is never asserted in a test; where it matters, the check is a
+  human reading a real reply.
 
 ## Dependencies
 
@@ -616,7 +631,9 @@ write still applies.
   or multi-locale publication policies.
 - Shared or team-visible conversations; conversations remain private to their owner.
 - Localizing the interface into any language other than English.
-- Introducing an automated test suite.
+- Asserting a language model's *output* in an automated test, and any evaluation harness for model
+  behaviour. The tests this feature adds (FR-055) cover deterministic pure logic only.
+- End-to-end browser automation of the admin panel, and automated tests that boot a Strapi host.
 
 ## Constitution Alignment
 
@@ -637,7 +654,16 @@ Four principles are load-bearing here, and two apparent tensions are resolved ra
 - **Principle I (secrets)** extends to a new configuration value: where a provider needs a base URL,
   FR-008 keeps it validated and distinct from the credential, and SC-009 keeps the no-echo guarantee
   measured across every shipped provider.
-- **Governance (complexity)** requires a new dependency to be justified against a concrete need. The
-  need is FR-002: making provider coverage someone else's maintained surface instead of a branch in
-  this repository's request path, which is what keeps Principle III's promise as the provider list
-  grows.
+- **Governance (complexity)** requires a new dependency to be justified against a concrete need in
+  this specification. The justification is the maintainer's **explicit product decision**, recorded
+  verbatim in the Input above and in the breadth clarification: language-model access moves to the
+  adapter layer named in the request, and provider coverage becomes that layer's maintained surface
+  instead of a branch in this repository's request path.
+
+  It is **not** a capability gap, and this specification does not claim one. Planning research found
+  that the existing SDK reaches the same provider breadth — one bundled package per provider plus a
+  single configurable compatible endpoint for the tail — at no dependency cost. The dependency
+  proceeds because the maintainer chose the layer after being shown that finding; the trade is on
+  the record in the plan's Complexity Tracking table rather than dressed up as a requirement only
+  one library can satisfy. FR-001, FR-002 and FR-011 stay written against "the provider-adapter
+  layer", so they remain verifiable against behaviour whichever layer is in place.
