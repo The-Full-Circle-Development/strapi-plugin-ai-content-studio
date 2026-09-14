@@ -1,4 +1,4 @@
-{
+const en = {
   "plugin.name": "AI Content Studio",
   "menu.label": "AI Studio",
   "settings.section": "AI Content Studio",
@@ -16,7 +16,6 @@
   "chat.condensed": "Earlier detail in this conversation was condensed into notes so it keeps fitting the model's context.",
   "chat.interrupted": "Stopped.",
   "chat.interruptedNothingApplied": "Nothing was applied in this turn.",
-
   "threads.new": "New conversation",
   "threads.empty": "No conversations yet. Ask something to start one.",
   "threads.loading": "Loading conversations…",
@@ -31,7 +30,6 @@
   "threads.openError": "Could not open that conversation.",
   "threads.renameError": "Could not rename that conversation.",
   "threads.deleteError": "Could not delete that conversation.",
-
   "plan.title": "Proposed changes",
   "plan.nothingWritten": "Nothing has been written yet.",
   "plan.expiresAt": "This plan expires at {time}.",
@@ -60,20 +58,16 @@
   "plan.applyError": "Could not apply the change plan.",
   "plan.rejectError": "Could not reject the change plan.",
   "plan.appliedAt": "Applied {time}",
-
   "preview.open": "Preview on the site",
   "preview.openError": "Could not open the preview.",
   "preview.active": "Preview open — it expires at {time} and stops working as soon as this plan is approved or rejected.",
   "preview.fallbackTitle": "Before / after",
   "preview.unavailable": "Preview is unavailable for this project. Showing the field comparison instead.",
-
   "preview.fallback.disabled": "Front-end preview is not enabled for this project. Showing the field comparison instead.",
   "preview.fallback.no_path": "No preview target is configured for {contentTypeUid}. Showing the field comparison instead.",
   "preview.fallback.missing_fields": "The preview path for {contentTypeUid} needs {fields}, which this entry does not have. Showing the field comparison instead.",
   "preview.fallback.nothing_previewable": "This plan has nothing a front-end page could render. Showing the field comparison instead.",
-
   "turn.limit_reached": "This turn reached its limit of {limit} steps. Ask a narrower follow-up to continue.",
-
   "focus.none": "No focus set — the assistant will ask which entry you mean.",
   "focus.setShort": "Set focus",
   "focus.change": "Change focus",
@@ -86,7 +80,6 @@
   "focus.locale": "Language version",
   "focus.set": "Set focus",
   "focus.cancel": "Cancel",
-
   "attachments.notUploaded": "{size} KB · not uploaded yet",
   "attachments.tooLarge": "Larger than this project's upload limit of {limit} MB.",
   "attachments.overBudget": "Would exceed the {budget} MB held per conversation.",
@@ -94,7 +87,6 @@
   "attachments.remove": "Remove {name}",
   "attachments.expired": "These files were never added to the Media Library and are no longer held. Re-attach them to continue.",
   "attachments.ingestError": "Could not add the files to the Media Library.",
-
   "settings.title": "AI Content Studio — Configuration",
   "settings.subtitle": "Choose the active provider and model, and manage API keys. Keys are encrypted at rest and never shown again.",
   "settings.activeProvider": "Active provider",
@@ -117,4 +109,7 @@
   "settings.loadError": "Failed to load AI settings.",
   "settings.saveSuccess": "AI settings saved.",
   "settings.saveError": "Could not save AI settings."
-}
+};
+export {
+  en as default
+};

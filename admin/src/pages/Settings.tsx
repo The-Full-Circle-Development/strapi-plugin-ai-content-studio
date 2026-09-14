@@ -67,7 +67,20 @@ interface BriefStatusResponse {
   readableCount: number;
   staleCount: number;
   missingCount: number;
-  estimate: { contentTypes: number; entriesPerType: number; modelCalls: number };
+  estimate: {
+    contentTypes: number;
+    entriesPerType: number;
+    modelCalls: number;
+    /** Rendered-page grounding (005 FR-024, SC-011). `modelCalls` above is UNCHANGED by it. */
+    pageReading?: {
+      enabled: boolean;
+      withPreviewTarget: number;
+      timeoutMs: number;
+      maxBytes: number;
+    };
+  };
+  /** Which content types fell back to an entry-only section on the last run, and why (SC-012). */
+  pageReadingFailures?: Array<{ uid: string; reason: string }>;
   sections: Array<{
     uid: string;
     text: string;
@@ -75,8 +88,22 @@ interface BriefStatusResponse {
     totalCount: number;
     generatedAt: string;
     stale: boolean;
+    locale?: string | null;
+    pageInformed?: boolean;
+    pageUrl?: string | null;
   }>;
 }
+
+/** Plain-language reasons for a page-reading fallback, so the panel names a cause, not a code. */
+const PAGE_READING_REASONS: Record<string, string> = {
+  not_configured: 'no preview target is configured for it',
+  origin_mismatch: 'its resolved URL left the configured front-end origin',
+  unreachable: 'the page could not be reached',
+  timeout: 'the request timed out',
+  too_large: 'the page exceeded the size limit',
+  not_html: 'the response was not HTML',
+  no_readable_text: 'the page carried no readable text — it is assembled in the browser',
+};
 
 /** Entries read per content type, per depth. Mirrors `BRIEF_DEPTH_SAMPLE` on the server. */
 const DEPTH_SAMPLE: Record<BriefDepth, number> = { light: 5, standard: 15, deep: 50 };
@@ -697,6 +724,56 @@ const SettingsForm = () => {
                       : 'One briefing, identical for every account that can use the chat — overview included — regardless of their own content permissions. It never describes a content type you cannot read yourself, and it changes nothing about what the assistant may do: every read and every change is still checked against the acting account. Set contentBrief.scopeToReader to true in the host application’s config/plugins.ts to serve each reader only their own sections instead.'}
                   </Typography>
                 </Box>
+                {/*
+                  ⚠ RENDERED-PAGE GROUNDING'S ADDED COST, stated in the SAME panel and before the
+                  same arm-then-confirm control (005 FR-024, SC-011). The panel is EXTENDED, not
+                  replaced: the model-call count above is what it always was, and the claim that
+                  makes SC-011 checkable is that page reading does not change it.
+                */}
+                {brief.estimate.pageReading?.enabled ? (
+                  <Box paddingTop={2}>
+                    <Typography variant="pi" textColor="neutral600">
+                      Rendered-page grounding is <strong>on</strong>.{' '}
+                      {brief.estimate.pageReading.withPreviewTarget} content type
+                      {brief.estimate.pageReading.withPreviewTarget === 1 ? ' has' : 's have'} a
+                      preview target configured, so the run additionally makes{' '}
+                      <strong>
+                        {brief.estimate.pageReading.withPreviewTarget} HTTP fetch
+                        {brief.estimate.pageReading.withPreviewTarget === 1 ? '' : 'es'}
+                      </strong>{' '}
+                      of your own front end — each bounded to{' '}
+                      {Math.round(brief.estimate.pageReading.timeoutMs / 1000)} second
+                      {brief.estimate.pageReading.timeoutMs === 1000 ? '' : 's'} and{' '}
+                      {Math.round(brief.estimate.pageReading.maxBytes / 1000)} kB, same-origin only,
+                      with no cookies and no credentials. Each fetch feeds the{' '}
+                      <strong>same single model call</strong> for that content type rather than
+                      adding one, so the number of billed calls above is unchanged. Nothing fetched
+                      is stored: only the model’s prose reaches a section. Content types with no
+                      preview target are described from their entries exactly as before.
+                    </Typography>
+                  </Box>
+                ) : null}
+                {/*
+                  Degradation is RECORDED, never hidden (FR-023, SC-012). An operator who turned
+                  page reading on and got no benefit must be able to see which content types it
+                  could not reach and what stopped it.
+                */}
+                {brief.pageReadingFailures && brief.pageReadingFailures.length > 0 ? (
+                  <Box paddingTop={2}>
+                    <Typography variant="pi" textColor="neutral600">
+                      On the last run, {brief.pageReadingFailures.length} content type
+                      {brief.pageReadingFailures.length === 1 ? '' : 's'} fell back to an entry-only
+                      section:{' '}
+                      {brief.pageReadingFailures
+                        .map(
+                          (failure) =>
+                            `${failure.uid} (${PAGE_READING_REASONS[failure.reason] ?? failure.reason})`
+                        )
+                        .join('; ')}
+                      .
+                    </Typography>
+                  </Box>
+                ) : null}
                 {brief.autoRefresh ? (
                   <Box paddingTop={2}>
                     <Typography variant="pi" textColor="neutral600">

@@ -193,7 +193,13 @@ describe('normalizeBriefRun — total by construction', () => {
       lastRunByUserId: 7,
       lastAutoRefreshAt: '2026-09-14T11:00:00.000Z',
     };
-    expect(normalizeBriefRun(record)).toEqual(record);
+    /*
+     * Every field it was given survives unchanged — and a field a LATER build added comes back at
+     * its default rather than absent. That pair IS the upgrade-safety rule: this record is exactly
+     * what a pre-005 install has in its store, and reading it must neither lose anything nor fail
+     * (005 FR-023, page-reading §7).
+     */
+    expect(normalizeBriefRun(record)).toEqual({ ...record, pageReadingFailures: [] });
   });
 });
 

@@ -1,8 +1,9 @@
-import { createAgent, modelCallLimitMiddleware } from 'langchain';
+import { createAgent } from 'langchain';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { BaseMessage } from '@langchain/core/messages';
 import type { ClientTool, ServerTool } from '@langchain/core/tools';
 import type { Core } from '@strapi/strapi';
+import { createTurnBudget } from './turn-budget';
 
 /**
  * Builds and runs the per-request agent (contracts/chat-stream.md §5).
@@ -30,31 +31,42 @@ import type { Core } from '@strapi/strapi';
  */
 
 /**
- * The ceiling on model calls, unchanged in effect from the `stopWhen: stepCountIs(8)` it replaces.
+ * The ceiling on model calls (005 FR-045, contracts/turn-budget.md §1).
  *
- * `modelCallLimitMiddleware` counts MODEL CALLS — the same thing `stepCountIs(8)` counted — so
- * there is no super-step arithmetic to get wrong, and `exitBehavior: 'end'` ends the turn cleanly
- * instead of raising a `GraphRecursionError` mid-stream that the editor would see.
+ * RAISED FROM 8 TO 12, because requiring a briefing retrieval before any briefing-derived claim
+ * added a round trip to ordinary turns. The turn FR-045 names — discover, retrieve a briefing
+ * section, read an entry, propose a change — is at minimum `listContentTypes`,
+ * `getContentBriefing`, `searchEntries`, `getEntry`, `describePageStructure`, `proposeChanges` and a
+ * closing reply: seven model calls with no ambiguity, no permission denial and no retry. Eight left
+ * no room at all. Twelve leaves room for one clarifying exchange and still bounds spend at a number
+ * an operator can reason about.
  *
- * Verified against `node_modules/langchain/dist/agents/middleware/modelCallLimit.d.ts` after the
- * install: `{ threadLimit?, runLimit?, exitBehavior?: 'error' | 'end' }`, exported from the package
- * root. Note the `'end'` path appends a synthetic English `AIMessage` naming the limit, which
- * streams to the client and is persisted — that is intended, and it is why the limit reads as an
- * explanation rather than as a truncation.
+ * EXPORTED so the suite can assert its invariant against the backstop below. The two numbers
+ * drifting apart is exactly how a turn gets cut short by the wrong limit, and that is a one-line
+ * test rather than a thing to remember.
+ *
+ * CORRECTION TO THIS FILE'S OWN HISTORY. The previous comment here recorded the shipped
+ * `modelCallLimitMiddleware`'s synthetic English `AIMessage` as intended behaviour — "it is why the
+ * limit reads as an explanation rather than as a truncation". Feature 005 makes that a defect: the
+ * message is hard-coded English an editor working in another language cannot read, and it says only
+ * that a limit was reached, never what the turn completed. See `turn-budget.ts`, which replaces it.
  */
-const MODEL_CALL_LIMIT = 8;
+export const MODEL_CALL_LIMIT = 12;
 
 /**
- * A BACKSTOP, not the mechanism.
+ * A BACKSTOP, not the mechanism — and it MOVES WITH the ceiling above (FR-045).
  *
  * `recursionLimit` counts LangGraph super-steps, so one ReAct iteration is a model node plus a tool
- * node and preserving 8 model calls would have meant `2 x 8 + 1 = 17`. That arithmetic is exactly
- * what made the old number fragile. With the middleware carrying the real ceiling, this only has to
- * guard a loop that never reaches a model node, so it is set generously above 17: it can never burn
- * provider tokens past `MODEL_CALL_LIMIT`, and it will not silently truncate a turn that needed
- * several discovery calls before proposing.
+ * node: preserving twelve model calls needs more than `2 x 12 + 1 = 25`. Leaving this at 25 while
+ * raising the ceiling would have made the BACKSTOP the thing that cuts a turn short, which is
+ * precisely the failure FR-045's second sentence names — "where more than one such limit exists,
+ * they MUST be raised together, so that none of them cuts a turn short ahead of the one intended to
+ * bound it."
+ *
+ * Its original job is unchanged: guard a loop that never reaches a model node. It can still never
+ * burn provider tokens past `MODEL_CALL_LIMIT`.
  */
-const RECURSION_LIMIT_BACKSTOP = 25;
+export const RECURSION_LIMIT_BACKSTOP = 40;
 
 /**
  * The LangGraph stream mode this plugin uses, and the contract names it rather than leaving it to
@@ -85,24 +97,29 @@ export interface RunTurnOptions {
 const agentService = ({ strapi: _strapi }: { strapi: Core.Strapi }) => ({
   /**
    * Build and run the agent for one turn, returning the LangGraph stream the bridge converts into
-   * UI message chunks.
+   * UI message chunks, alongside the turn-budget's hard-stop signal.
    *
    * Building and running are one method on purpose: the agent is per-request — it closes over the
    * caller's live ability through its tools — so nothing should hold one across requests or users,
    * and there is no reason to hand one out.
    */
   async run({ model, tools, systemPrompt, messages, signal }: RunTurnOptions) {
+    /**
+     * The plugin's own budget, built PER REQUEST so its hard-stop signal belongs to this turn
+     * (contracts/turn-budget.md §3). It replaces `modelCallLimitMiddleware`, whose English synthetic
+     * message no configuration could reach — the reasoning is in `turn-budget.ts`.
+     */
+    const budget = createTurnBudget({ runLimit: MODEL_CALL_LIMIT });
+
     const agent = createAgent({
       model,
       tools,
       systemPrompt,
-      middleware: [
-        modelCallLimitMiddleware({ runLimit: MODEL_CALL_LIMIT, exitBehavior: 'end' }),
-      ],
+      middleware: [budget.middleware],
     });
 
     // `agent.stream()` returns a Promise, so it is awaited before the stream is merged.
-    return agent.stream(
+    const stream = await agent.stream(
       { messages },
       {
         signal,
@@ -110,6 +127,13 @@ const agentService = ({ strapi: _strapi }: { strapi: Core.Strapi }) => ({
         recursionLimit: RECURSION_LIMIT_BACKSTOP,
       }
     );
+
+    /**
+     * The stop signal travels back with the stream rather than being returned from it, because the
+     * middleware runs inside the graph and the only place that reliably runs after it is the
+     * controller's stream-transform flush — the same seam `data-interrupted` already uses.
+     */
+    return { stream, turnLimitStop: budget.stopped };
   },
 });
 

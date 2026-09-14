@@ -2,7 +2,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { Core } from '@strapi/strapi';
 import { UID } from '../content-types';
-import type { AttachmentManifestEntry } from '../types';
+import type { AttachmentManifestEntry, ThreadFocus } from '../types';
 
 /**
  * Owner-scoped conversation storage.
@@ -77,6 +77,7 @@ const textOf = (message: StoredMessage): string =>
 
 const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
   const docs = (uid: string): any => strapi.documents(uid as never);
+  const plugin = () => strapi.plugin('ai-content-studio');
 
   /**
    * Per-thread write serialization (edge case: the same user sends from two browser tabs of one
@@ -269,6 +270,95 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
       };
     },
 
+    /* ------------------------------------------------------------------ focus (005) */
+
+    /**
+     * Set the conversation's Focus (005 contracts/situation-and-focus.md §1.3).
+     *
+     * The five steps, IN THIS ORDER, because each one leaks something if it runs after the next:
+     *   1. the uid must be in the live `api::*` allow-list — unknown is a 400, not a focus;
+     *   2. the CALLER's own `can.read(uid)` must hold — denied reveals nothing about the entry;
+     *   3. the document, and where the type is localized its locale version, must resolve;
+     *   4. the label is derived from the live document, never taken from the request;
+     *   5. only then is anything persisted.
+     *
+     * OWNER-SCOPED THROUGH `getOwnedThread`, so another user's thread answers **404, not 403**, and
+     * thread ids stay non-enumerable — the same rule every other thread method follows.
+     *
+     * SETTING A FOCUS GRANTS NOTHING (FR-017, FR-034). Step 2 is re-run on every turn that reads the
+     * focus back; this check is what stops an entry the caller cannot read from being recorded at
+     * all, not what authorizes anything later.
+     */
+    async setFocus(
+      threadId: string,
+      ownerId: number,
+      userAbility: unknown,
+      input: { uid: string; documentId?: string | null; locale?: string | null }
+    ): Promise<
+      | { ok: true; focus: ThreadFocus }
+      | { ok: false; error: 'not_found' | 'invalid_content_type' | 'permission_denied' | 'entry_not_found' | 'locale_not_found' }
+    > {
+      const thread = await service.getOwnedThread(threadId, ownerId);
+      if (!thread) {
+        return { ok: false, error: 'not_found' };
+      }
+
+      const focusSvc = plugin().service('focus');
+      const { uid } = input;
+
+      if (!focusSvc.isAllowed(uid)) {
+        return { ok: false, error: 'invalid_content_type' };
+      }
+      if (!focusSvc.canRead(uid, userAbility)) {
+        return { ok: false, error: 'permission_denied' };
+      }
+
+      const contentType = (strapi.contentTypes as Record<string, any>)[uid];
+      const isSingle = contentType?.kind === 'singleType';
+      const localized = plugin().service('locales').isLocalized(uid);
+      const locale = localized && typeof input.locale === 'string' && input.locale !== '' ? input.locale : null;
+      const documentId = isSingle ? null : (input.documentId ?? null);
+
+      if (!isSingle && !documentId) {
+        return { ok: false, error: 'entry_not_found' };
+      }
+
+      let doc: any = null;
+      try {
+        const target = strapi.documents(uid as never) as any;
+        const scope = locale ? { locale } : {};
+        doc = isSingle
+          ? await target.findFirst({ ...scope })
+          : await target.findOne({ documentId, ...scope });
+      } catch {
+        doc = null;
+      }
+
+      if (!doc) {
+        /*
+         * FR-044 distinguishes the two, and the distinction is what the editor needs: "that entry
+         * does not exist" and "that entry has no Ukrainian version yet" lead to different next
+         * actions. A requested locale that resolves nothing is reported as the locale being
+         * missing — never by silently focusing another version.
+         */
+        return { ok: false, error: locale ? 'locale_not_found' : 'entry_not_found' };
+      }
+
+      const focus: ThreadFocus = await focusSvc.build({ uid, documentId, locale, doc });
+      await docs(UID.thread).update({ documentId: threadId, data: { focus } });
+      return { ok: true, focus };
+    },
+
+    /** Clear the conversation's Focus. Owner-scoped, and a no-op on a thread with none. */
+    async clearFocus(threadId: string, ownerId: number): Promise<boolean> {
+      const thread = await service.getOwnedThread(threadId, ownerId);
+      if (!thread) {
+        return false;
+      }
+      await docs(UID.thread).update({ documentId: threadId, data: { focus: null } });
+      return true;
+    },
+
     /** Rename. The user's title wins over the automatic one from then on (FR-019). */
     async renameThread(threadId: string, ownerId: number, title: string): Promise<ThreadSummary | null> {
       const thread = await service.getOwnedThread(threadId, ownerId);
@@ -357,6 +447,14 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
       contextCondensed: boolean;
       messages: StoredMessage[];
       expiredAttachments: Array<{ messageId: string; ordinals: number[] }>;
+      /**
+       * The conversation's stored Focus, so reopening it shows what was last pointed at (US3-7).
+       *
+       * Returned AS STORED, not resolved: this is what the Focus bar renders, and the panel is a
+       * view rather than an authority. Whether the caller may still read it is re-checked on every
+       * turn, in `focus.resolve` — which is the only place that decision is made.
+       */
+      focus: ThreadFocus | null;
     } | null> {
       const thread = await service.getOwnedThread(threadId, ownerId);
       if (!thread) {
@@ -381,6 +479,9 @@ const threadsService = ({ strapi }: { strapi: Core.Strapi }) => {
         contextCondensed: Boolean(thread.contextSummary),
         messages,
         expiredAttachments,
+        // Normalized on the way out, so a column written by an older build reads back as "none"
+        // rather than reaching the panel as a shape it does not expect.
+        focus: plugin().service('focus').normalizeFocus(thread.focus),
       };
     },
 

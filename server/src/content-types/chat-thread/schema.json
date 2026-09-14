@@ -40,6 +40,10 @@
       "type": "datetime",
       "required": true
     },
+    "focus": {
+      "type": "json",
+      "description": "The conversation's Focus: the one entry the editor pointed at, as { uid, documentId, locale, label, setAt }. Null when none is set. NOT a grant of access - every use re-reads the entry through the caller's own live permissions, and a focus on an entry they may not read reveals nothing about it."
+    },
     "contextSummary": {
       "type": "text"
     },

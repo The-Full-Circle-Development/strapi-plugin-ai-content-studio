@@ -40,6 +40,31 @@ export default {
       chatRoute('PATCH', '/threads/:id', 'threads.update'),
       chatRoute('DELETE', '/threads/:id', 'threads.delete'),
 
+      /**
+       * Focus (005 contracts/situation-and-focus.md §1.2) — the one entry the editor is pointing
+       * at, scoped to one conversation.
+       *
+       * Behind the SAME gate every chat and thread route carries: `admin::isAuthenticatedAdmin`
+       * plus the grantable `chat.use` action. Nothing narrower is needed and nothing wider is safe.
+       *
+       * Owner scoping is NOT a route concern here either: the two `/threads/:id/focus` routes
+       * resolve through `threads.getOwnedThread`, which answers **404, not 403**, for another
+       * user's thread.
+       *
+       * The two `/focus/*` routes validate their uid against the live `api::*` allow-list and
+       * RBAC-check the CALLER through `content-manager`'s `permission-checker` before touching the
+       * Document Service — the same three steps every tool performs, in the same order. They are
+       * read-only and return no field values beyond a display label.
+       *
+       * FOCUS GRANTS NOTHING (FR-017, FR-034): it is re-resolved and re-permission-checked on every
+       * turn, it widens no tool, and it changes no write path. The apply route remains the sole
+       * writer.
+       */
+      chatRoute('PUT', '/threads/:id/focus', 'threads.setFocus'),
+      chatRoute('DELETE', '/threads/:id/focus', 'threads.clearFocus'),
+      chatRoute('GET', '/focus/content-types', 'focus.contentTypes'),
+      chatRoute('GET', '/focus/entries', 'focus.entries'),
+
       // Change plans. `apply` is the only route in this plugin that mutates content.
       chatRoute('GET', '/change-sets/:id', 'change-sets.findOne'),
       chatRoute('POST', '/change-sets/:id/apply', 'change-sets.apply'),

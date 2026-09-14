@@ -32,6 +32,20 @@ import type { Core } from '@strapi/strapi';
 const MAX_FIELD_CHARS = 600;
 const MAX_PAGE_SIZE = 50;
 
+/**
+ * Does this install offer a language-version choice at all? (005 FR-042, SC-018)
+ *
+ * MORE THAN ONE, not at least one: an install with exactly one locale is indistinguishable from one
+ * with none, because there is nothing to choose between.
+ *
+ * Exported and pure so the suite can assert SC-018's tool-schema half without a Strapi runtime.
+ * It is one line, and it is extracted rather than inlined precisely because SC-018 is a claim about
+ * what the model is NOT shown — the kind of requirement that is invisible when it regresses, since
+ * the extra parameter would simply start appearing and nothing would fail.
+ */
+export const offersLocaleChoice = (localeCodes: string[] | null | undefined): boolean =>
+  Array.isArray(localeCodes) && localeCodes.length > 1;
+
 type Action = 'read' | 'create' | 'update' | 'delete' | 'publish';
 
 export interface BuildToolsOptions {
@@ -42,6 +56,25 @@ export interface BuildToolsOptions {
   ownerId?: number | null;
   /** Ordinals the user actually attached to THIS turn, for validating placements. */
   manifestOrdinals?: number[];
+  /**
+   * The install's language versions, or null on a single-locale install (005 FR-042, SC-018).
+   *
+   * ⚠ THIS IS WHAT MAKES THE CAPABILITY STRUCTURALLY INVISIBLE, and structure is the whole
+   * mechanism — there is no prompt clause saying "do not mention locales". `buildTools` composes
+   * the schemas PER REQUEST, so on an install with one locale the `locale` parameter is not in the
+   * tool schema at all: there is no extra token, and nothing for the model to consider or get
+   * wrong. Null and a one-locale list are the same input.
+   */
+  localeCodes?: string[] | null;
+  /**
+   * Whether to offer `getContentBriefing` at all (005 contracts/briefing-retrieval.md §2).
+   *
+   * OFFERED ONLY WHERE THE BRIEFING WAS ALREADY AMBIENT — `source` of `brief` or `both`, the feature
+   * enabled, and at least one section stored. On `schema`, which is the default, nothing about the
+   * briefing reaches the model today; putting a tool DEFINITION on every request would spend tokens
+   * on every install that never opted in, straight through FR-027, SC-009 and SC-014.
+   */
+  offerBriefing?: boolean;
 }
 
 const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
@@ -50,8 +83,55 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
     threadId = null,
     ownerId = null,
     manifestOrdinals = [],
+    localeCodes = null,
+    offerBriefing = false,
   }: BuildToolsOptions) {
     const changeSets = () => strapi.plugin('ai-content-studio').service('change-sets');
+    const contentBrief = () => strapi.plugin('ai-content-studio').service('content-brief');
+    const locales = () => strapi.plugin('ai-content-studio').service('locales');
+
+    const multiLocale = offersLocaleChoice(localeCodes);
+
+    /**
+     * The optional `locale` parameter, or nothing at all (FR-042).
+     *
+     * Spread into a schema rather than added conditionally afterwards, so the single-locale case
+     * produces a schema that is byte-identical to the one this plugin shipped before language
+     * versions existed.
+     */
+    const localeParam: { locale?: z.ZodOptional<z.ZodString> } = multiLocale
+      ? {
+          locale: z
+            .string()
+            .optional()
+            .describe(
+              `Which language version to read. One of: ${(localeCodes as string[]).join(', ')}. Omit for the default. If the requested version does not exist this returns locale_not_found — it NEVER returns a different version.`
+            ),
+        }
+      : {};
+
+    /**
+     * Apply a requested locale to a Document Service call — and only where it means something.
+     *
+     * A `locale` on a content type that holds no language versions is silently dropped rather than
+     * erroring: the model was offered the parameter for the install, not for the type, and refusing
+     * the call would turn a harmless surplus argument into a failed turn.
+     */
+    const localeScope = (uid: string, locale: unknown): Record<string, string> =>
+      multiLocale && typeof locale === 'string' && locale !== '' && locales().isLocalized(uid)
+        ? { locale }
+        : {};
+
+    /**
+     * FR-044: a requested language version that does not exist returns this, and NEVER a different
+     * version. Answering from another locale is the failure this exists to prevent — it reads as a
+     * successful answer about content that is not there.
+     */
+    const localeNotFound = (uid: string, locale: string) => ({
+      ok: false as const,
+      error: 'locale_not_found',
+      message: `${uid} has no "${locale}" version of that entry. Tell the user that version does not exist — do not answer from another one.`,
+    });
     const allowedUids = (): string[] =>
       Object.keys(strapi.contentTypes).filter((uid) => uid.startsWith('api::'));
 
@@ -132,7 +212,7 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
     );
 
     const searchEntries = tool(
-      async ({ contentType, filters, page, pageSize, sort, status }) => {
+      async ({ contentType, filters, page, pageSize, sort, status, locale }) => {
         const bad = ensureAllowed(contentType);
         if (bad) return bad;
         if (isSingle(contentType)) {
@@ -143,12 +223,14 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
           };
         }
         if (!can(contentType, 'read')) return denied('read', contentType);
+        const scope = localeScope(contentType, locale);
         const results = await docs(contentType).findMany({
           filters,
           sort,
           status,
           start: (page - 1) * pageSize,
           limit: pageSize,
+          ...scope,
         });
         const list = Array.isArray(results) ? results : [];
         return {
@@ -156,6 +238,9 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
           page,
           pageSize,
           count: list.length,
+          // FR-039: every result reports the version it actually returned, so the model never has
+          // to infer which language it is reading.
+          ...(multiLocale ? { locale: scope.locale ?? null } : {}),
           entries: list.map(compact),
         };
       },
@@ -170,20 +255,22 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
           pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE).default(10),
           sort: z.string().optional().describe('e.g. "createdAt:desc".'),
           status: z.enum(['draft', 'published']).optional(),
+          ...localeParam,
         }),
       }
     );
 
     const getEntry = tool(
-      async ({ contentType, documentId, populate, status }) => {
+      async ({ contentType, documentId, populate, status, locale }) => {
         const bad = ensureAllowed(contentType);
         if (bad) return bad;
         if (!can(contentType, 'read')) return denied('read', contentType);
+        const scope = localeScope(contentType, locale);
         let doc: any = null;
         if (isSingle(contentType)) {
-          doc = await docs(contentType).findFirst({ populate, status });
+          doc = await docs(contentType).findFirst({ populate, status, ...scope });
         } else if (documentId) {
-          doc = await docs(contentType).findOne({ documentId, populate, status });
+          doc = await docs(contentType).findOne({ documentId, populate, status, ...scope });
         } else {
           return {
             ok: false,
@@ -191,8 +278,21 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
             message: 'documentId is required for collection types.',
           };
         }
-        if (!doc) return { ok: false, error: 'not_found' };
-        return { ok: true, entry: compact(doc) };
+        if (!doc) {
+          /*
+           * FR-044. A requested language version that resolved nothing is reported AS THAT, not as
+           * a missing entry and never by falling back to another version — "no Ukrainian version
+           * yet" and "no such entry" lead the editor to different next actions.
+           */
+          return scope.locale
+            ? localeNotFound(contentType, scope.locale)
+            : { ok: false, error: 'not_found' };
+        }
+        return {
+          ok: true,
+          ...(multiLocale ? { locale: (doc as { locale?: string }).locale ?? null } : {}),
+          entry: compact(doc),
+        };
       },
       {
         name: 'getEntry',
@@ -203,6 +303,7 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
           documentId: z.string().optional(),
           populate: z.union([z.literal('*'), z.array(z.string())]).optional(),
           status: z.enum(['draft', 'published']).optional(),
+          ...localeParam,
         }),
       }
     );
@@ -217,16 +318,17 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
      * asks instead of choosing (FR-035).
      */
     const describePageStructure = tool(
-      async ({ contentTypeUid, documentId }) => {
+      async ({ contentTypeUid, documentId, locale }) => {
         const bad = ensureAllowed(contentTypeUid);
         if (bad) return bad;
         if (!can(contentTypeUid, 'read')) return denied('read', contentTypeUid);
 
+        const scope = localeScope(contentTypeUid, locale);
         let doc: any = null;
         if (isSingle(contentTypeUid)) {
-          doc = await docs(contentTypeUid).findFirst({ populate: '*' });
+          doc = await docs(contentTypeUid).findFirst({ populate: '*', ...scope });
         } else if (documentId) {
-          doc = await docs(contentTypeUid).findOne({ documentId, populate: '*' });
+          doc = await docs(contentTypeUid).findOne({ documentId, populate: '*', ...scope });
         } else {
           return {
             ok: false,
@@ -234,7 +336,12 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
             message: 'documentId is required for collection types.',
           };
         }
-        if (!doc) return { ok: false, error: 'not_found' };
+        if (!doc) {
+          // FR-044, as in getEntry: never answer a language-version question from another version.
+          return scope.locale
+            ? localeNotFound(contentTypeUid, scope.locale)
+            : { ok: false, error: 'not_found' };
+        }
 
         const componentAttributes = (component: string): Record<string, any> =>
           (strapi.components as Record<string, any>)[component]?.attributes ?? {};
@@ -328,6 +435,7 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
           ok: true,
           contentTypeUid,
           documentId: doc.documentId,
+          ...(multiLocale ? { locale: (doc as { locale?: string }).locale ?? null } : {}),
           documentLabel: label,
           slots: allSlots,
           mediaSlots: allSlots.filter((s) => s.type === 'media').map((s) => s.field),
@@ -342,6 +450,7 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
         schema: z.object({
           contentTypeUid: z.string().describe('Content-type uid, e.g. "api::page.page".'),
           documentId: z.string().optional().describe('Omit for single types.'),
+          ...localeParam,
         }),
       }
     );
@@ -410,12 +519,89 @@ const toolsService = ({ strapi }: { strapi: Core.Strapi }) => ({
     );
 
     /**
+     * Retrieve one content type's stored briefing section, WITH ITS COVERAGE IN THE SAME PAYLOAD
+     * (005 contracts/briefing-retrieval.md §3).
+     *
+     * WHY COVERAGE TRAVELS WITH THE PROSE. FR-009 requires it alongside, in one payload, precisely
+     * so a section written from a fraction of a content type cannot read as a complete account.
+     * Two calls would mean one of them gets skipped — and the one that would get skipped is the one
+     * that makes the answer honest.
+     *
+     * PERMISSION AND VISIBILITY, stated plainly because this touches a NON-NEGOTIABLE principle.
+     * The tool validates its uid against the live `api::*` allow-list, then applies EXACTLY the
+     * visibility rule `content-brief.describeFor` applies today: shared by default, per-reader
+     * filtered under `scopeToReader`. The invariant is that it returns NO MORE than the ambient
+     * block it replaces already returned to the same caller.
+     *
+     * Principle II governs what the assistant can DO to content, and every content tool above still
+     * RBAC-checks the caller before touching the Document Service — unchanged. The briefing is not
+     * content: it is plugin-owned prose that feature 004 already decided is disclosed to every
+     * account with chat access, argued in its own contract, stated above the Run button in
+     * Settings, and switchable per install via `scopeToReader`. Making this tool STRICTER than the
+     * block it replaces would silently remove briefing that installs receive today, which FR-033
+     * and SC-009 forbid.
+     */
+    const getContentBriefing = tool(
+      async ({ contentType }) => {
+        const bad = ensureAllowed(contentType);
+        if (bad) return bad;
+
+        let retrieved: { section: any; coverage: any } | null = null;
+        try {
+          retrieved = await contentBrief().retrieve(contentType, userAbility);
+        } catch {
+          return {
+            ok: false,
+            error: 'brief_unavailable',
+            message:
+              'The stored briefing could not be read. Answer from the read tools instead, and say you could not reach the briefing.',
+          };
+        }
+
+        if (!retrieved) {
+          return {
+            ok: false,
+            error: 'no_section',
+            message: `No briefing section is stored for ${contentType}. Read entries with the tools instead, and say the briefing does not cover it.`,
+          };
+        }
+
+        return {
+          ok: true,
+          uid: contentType,
+          text: retrieved.section.text,
+          coverage: retrieved.coverage,
+          note:
+            'Briefing prose written from a sample at a point in time — not a live read. State that it came from the briefing and may be out of date. Where this and a tool result disagree, the tool result wins.',
+        };
+      },
+      {
+        name: 'getContentBriefing',
+        description:
+          "Retrieve the stored briefing section for ONE content type, with its coverage: how many entries it was written from, out of how many, when, and whether it is now out of date. Call this before making any statement that draws on the briefing. A section marked weak or out of date still comes back — say so when you rely on it.",
+        schema: z.object({
+          contentType: z.string().describe('Content-type uid, e.g. "api::page.page".'),
+        }),
+      }
+    );
+
+    /**
      * ONE tool set, for the one mode there is (contracts/removals.md §1).
      *
      * Nothing here adds an ability the caller's permissions do not already allow, because every
      * tool still RBAC-checks the caller per call (Principle II).
+     *
+     * `getContentBriefing` is composed in PER REQUEST rather than always present: an install that
+     * never opted into the briefing must not pay for its schema on every turn (FR-027, SC-009).
      */
-    return [listContentTypes, searchEntries, getEntry, describePageStructure, proposeChanges];
+    return [
+      listContentTypes,
+      searchEntries,
+      getEntry,
+      describePageStructure,
+      ...(offerBriefing ? [getContentBriefing] : []),
+      proposeChanges,
+    ];
   },
 });
 

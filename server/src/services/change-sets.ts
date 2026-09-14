@@ -7,6 +7,7 @@ import type {
   ChangeItemOutcome,
   ChangeOperation,
   ChangeSetStatus,
+  PendingPlanFact,
   PublishOutcome,
   ResultingState,
 } from '../types';
@@ -1029,6 +1030,49 @@ const changeSetsService = ({ strapi }: { strapi: Core.Strapi }) => {
         }
       }
       return out;
+    },
+
+    /**
+     * The plan awaiting THIS caller's decision in THIS thread, or null (005 FR-035).
+     *
+     * OWNER-SCOPED AND UNEXPIRED, both in the filter rather than afterwards: a plan belonging to
+     * someone else is not this editor's to be told about, and an expired one cannot be applied, so
+     * naming it would send the assistant after a decision that can no longer be made.
+     *
+     * Returns the NEWEST when several are pending. The situation block states one fact — that a
+     * plan is waiting — and the most recent is the one on screen.
+     *
+     * This changes nothing about approval (FR-034): it lets "the plan" resolve without the editor
+     * restating it, and the assistant still only proposes.
+     */
+    async pendingPlanFact({
+      threadId,
+      ownerId,
+    }: {
+      threadId: string;
+      ownerId: number;
+    }): Promise<PendingPlanFact | null> {
+      const rows = await docs(UID.changeSet).findMany({
+        filters: {
+          thread: { documentId: threadId },
+          ownerId,
+          status: 'pending',
+          expiresAt: { $gt: new Date().toISOString() },
+        },
+        fields: ['documentId', 'summary', 'items', 'expiresAt'],
+        sort: 'createdAt:desc',
+        limit: 1,
+      });
+      const set = Array.isArray(rows) ? rows[0] : null;
+      if (!set) {
+        return null;
+      }
+      return {
+        changeSetId: set.documentId,
+        summary: typeof set.summary === 'string' && set.summary !== '' ? set.summary : null,
+        itemCount: Array.isArray(set.items) ? set.items.length : 0,
+        expiresAt: set.expiresAt,
+      };
     },
 
     /** Pending sets of a thread — used when a thread is deleted (FR-022). */

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useIntl } from 'react-intl';
 import { getToolName, isToolUIPart, isFileUIPart, type UIMessage } from 'ai';
 import { Loader, Typography, useNotifyAT } from '@strapi/design-system';
 import { Sparkle } from '@strapi/icons';
@@ -6,6 +7,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { styled } from 'styled-components';
 import { LOADING_WORDS } from '../data/loadingWords';
+import { getTranslation } from '../utils/getTranslation';
 import { CopyButton } from './CopyButton';
 import {
   AssistantContent,
@@ -347,6 +349,7 @@ export const MessageList = ({
   renderChangeSet,
   expiredOrdinalsByMessage,
 }: MessageListProps) => {
+  const { formatMessage } = useIntl();
   const busy = status === 'submitted' || status === 'streaming';
   const loadingWord = useCyclingWord(busy, LOADING_WORDS);
 
@@ -481,6 +484,33 @@ export const MessageList = ({
                 }
                 if (part.type === 'data-apply-report') {
                   return <ApplyReport key={index} report={(part as any).data as ApplyReportPart} />;
+                }
+                /**
+                 * The turn-limit backstop notice (005 contracts/language.md §4.2).
+                 *
+                 * Reached only when the reserved wrap-up call itself failed. On every ordinary
+                 * cut-short turn the model has already explained, in the editor's own language,
+                 * what it completed and what it did not — so this part is not emitted at all and
+                 * nothing renders here.
+                 *
+                 * Rendered through react-intl in the ADMIN's locale, because this copy has no model
+                 * turn in front of it and a sentence written server-side would be English in a
+                 * Ukrainian conversation.
+                 */
+                if (part.type === 'data-turn-limit') {
+                  const data = (part as any).data as { modelCalls?: number; limit?: number };
+                  return (
+                    <Interrupted key={index}>
+                      {formatMessage(
+                        {
+                          id: getTranslation('turn.limit_reached'),
+                          defaultMessage:
+                            'This turn reached its limit of {limit} steps. Ask a narrower follow-up to continue.',
+                        },
+                        { limit: data.limit ?? 0, modelCalls: data.modelCalls ?? 0 }
+                      )}
+                    </Interrupted>
+                  );
                 }
                 if (part.type === 'data-interrupted') {
                   const data = (part as any).data as {

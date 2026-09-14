@@ -9,6 +9,9 @@ redeploying**.
   switchable from the UI. Language-model access goes through one LangChain-backed provider layer
   built from a declarative table (see *Providers* below).
 - **Streaming chat** with multi-step tool calling over Strapi's Document Service.
+- **It answers in the language you wrote in.** Ukrainian and Russian are named as distinct and
+  non-substitutable. A turn that hits the per-turn step ceiling explains, in *your* language, what it
+  completed and what it did not — see *Reply language* below.
 - **Nothing is written without approval.** The assistant has no write tools. It *proposes* a change
   plan; the only code path that mutates content is an admin route driven by your click.
 - **Live preview** of a pending plan on your real front-end, before anything is saved.
@@ -159,6 +162,123 @@ curated model list*.
 
 ---
 
+## Focus — point at what you mean
+
+Set a **Focus** from the chat and "this page", "the heading", "that image" resolve to one entry
+without naming it again. The control sits above the message box and is visible at all times: Focus
+silently changes which entry the assistant acts on, so you must be able to see what is focused while
+you write.
+
+**You set it; the plugin never observes it.** It does not watch your Content Manager navigation —
+that would bind this plugin to admin internals that shift across Strapi upgrades, and it would
+silently assume a wrong entry. One deliberate action buys the shorthand. With no focus set, the
+assistant **asks** which entry you mean and lists candidates; it never guesses.
+
+**Focus grants nothing.** It is re-resolved and re-permission-checked on *every* turn through the
+same permission path every tool uses. It adds no tool, removes no check, pre-authorizes no read, and
+changes no write path. Four states, and three of them are not failures:
+
+| State | What happens |
+|---|---|
+| set | the assistant acts on that entry |
+| you may not read it | it reports the permission denial and says **nothing** about the entry |
+| the entry was deleted | it says so and asks for a new focus — the turn still runs |
+| none set | it asks which entry you mean |
+
+**Your words win.** If a focus is set and you clearly refer to a different entry, the assistant
+follows what you wrote; where the two genuinely conflict it asks.
+
+A plan awaiting your decision is also part of the situation the assistant is told about, so "the
+plan" resolves without you restating it. That changes nothing about approval: it still only
+proposes, and your click on apply is still the only write path.
+
+### Language versions
+
+With `@strapi/i18n` enabled and **more than one locale**, a Focus records *which version* you mean,
+and `getEntry`, `searchEntries` and `describePageStructure` take an optional `locale` and report
+which version they returned. A version that does not exist comes back as `locale_not_found` — the
+assistant says so rather than answering from another one.
+
+Reply language and language version are resolved **independently**: writing in Ukrainian about the
+English version of an entry gets Ukrainian prose about English content, with neither substituted.
+
+**On a single-locale install this capability does not exist.** Not hidden — absent: the `locale`
+parameter is not in any tool schema, the prompt carries no language-version text, and the picker
+renders no language control. An install with one locale is indistinguishable from a build without
+the feature.
+
+### Routes
+
+Four new routes, all `type: 'admin'` under `/ai-content-studio/*`, behind
+`admin::isAuthenticatedAdmin` plus the existing grantable `chat.use` — the same gate every chat and
+thread route carries:
+
+| Method | Path | Returns |
+|---|---|---|
+| `PUT` | `/threads/:id/focus` | the resolved focus, with its label |
+| `DELETE` | `/threads/:id/focus` | `{ ok: true }` |
+| `GET` | `/focus/content-types` | readable uids, display names, `localized` flag, the install's locales |
+| `GET` | `/focus/entries?uid=&q=&locale=` | a bounded candidate list: `documentId`, label, locale |
+
+The two `/threads/:id/focus` routes resolve through the owner-scoped thread lookup, so another
+user's thread answers **404, not 403**. The two `/focus/*` routes validate the uid against the live
+`api::*` allow-list and RBAC-check the caller before touching the Document Service, and return no
+field values beyond a display label.
+
+---
+
+## Reply language
+
+The assistant replies in the language of **your most recent message**, and follows a mid-thread
+switch from its very next reply. Ukrainian and Russian are named in the instructions as distinct and
+non-substitutable — answering one with the other is a defect, not a near-enough match.
+
+Where the language of a message cannot be determined, it falls back to the account's **interface
+language** (`preferedLanguage` on the admin user, read per request — no extra query and no new
+setting), and to English only when it has neither. An explicit request for a named language
+overrides both.
+
+Its own prose is translated; **your content is not**. Entry values, field names, content-type
+identifiers and document identifiers are reproduced exactly as stored, in whatever language they are
+already in. Tool results stay English internally — their payloads carry identifiers, and translating
+an identifier is never correct — and the assistant relays their reasons to you in your language.
+
+**No new translation mechanism is introduced.** Two kinds of text appear in the panel, and they are
+handled differently because they fail differently:
+
+| Text | How it is localized |
+|---|---|
+| Anything the assistant writes | the instruction rule above — every language the active model writes |
+| Fixed product copy with no model turn in front of it (preview fallbacks, the turn-limit notice) | a typed code the admin renders through Strapi's own react-intl path, in the **admin's** locale |
+
+The plugin ships `en` only; a consumer adds locales through the mechanism Strapi already gives them.
+The server sends a `reasonCode` and its parameters **alongside** the existing English `message`,
+never instead of it — so the HTTP contract is unchanged, and an admin that does not recognise a code
+renders exactly what it rendered before.
+
+| Code | Parameters |
+|---|---|
+| `preview.fallback.disabled` | — |
+| `preview.fallback.no_path` | `contentTypeUid` |
+| `preview.fallback.missing_fields` | `contentTypeUid`, `fields` |
+| `preview.fallback.nothing_previewable` | — |
+| `turn.limit_reached` | `modelCalls`, `limit` |
+
+### The per-turn step ceiling
+
+One turn may make at most **12 model calls** (raised from 8), with a LangGraph recursion backstop of
+**40** super-steps. The two move together on purpose: the backstop counts super-steps and one
+tool-using iteration costs two, so leaving it behind would make the *backstop* cut turns short ahead
+of the limit that is meant to bound them.
+
+The **last allowed call is reserved for a wrap-up**: the model is handed no tools and asked to say
+what it completed, what it did not, and what to ask for next. That costs nothing extra — the call was
+already inside the budget — and because the model writes it, it arrives in your language. The typed
+`turn.limit_reached` notice is a backstop to that backstop, shown only if the wrap-up call itself
+failed.
+
+---
+
 ## Project structure in the prompt (grounding)
 
 The assistant is told what *this* install actually contains, so it stops guessing at field names.
@@ -236,11 +356,16 @@ access reads the same text.
 
 ### Choosing what the assistant carries
 
-| Setting | Effect |
-|---|---|
-| **Schema only** | the generated structure description — **the default, and the behaviour you already have** |
-| **Brief only** | the briefing instead of the structure description |
-| **Both** | structure first, briefing second, each with its own character budget |
+| Setting | Structure description | Briefing overview + index in the prompt | `getContentBriefing` offered |
+|---|---|---|---|
+| **Schema only** | yes | no | **no** | 
+| **Brief only** | no | yes | yes |
+| **Both** | yes | yes | yes |
+
+**Schema only is the default, and it is exactly the behaviour you already have** — nothing about the
+briefing reaches the model on it, not even a tool definition, so an install that opted into nothing
+pays nothing. No stored setting changed when the briefing moved behind a retrieval; what each value
+*selects* did.
 
 Depth is chosen in the same panel: **Light** (5 entries per content type), **Standard** (15) or
 **Deep** (50). Entries are sampled from both ends of the update order, so the briefing reflects what
@@ -272,10 +397,66 @@ runs on an install that has no briefing yet — the first run is always a delibe
       refreshThrottleMinutes: 60,
       maxAutoRefreshSections: 3,
       scopeToReader: false,       // false = ONE briefing, identical for every account
+      pageReading: {
+        enabled: false,           // OFF by default — see "Describing pages as they read"
+        timeoutMs: 5000,          // per fetch, clamped 500..30000
+        maxBytes: 1_000_000,      // per response body, clamped 10k..20M
+        maxChars: 8000,           // ceiling on the reading handed to the model
+      },
     },
   },
 },
 ```
+
+### Describing pages as they read (opt-in, off by default)
+
+A schema says a `page` has a `hero.image`; a sample of entries says that image is usually populated.
+Neither can say the page is a marketing landing page, that the hero is its lead region, or that the
+component named `block-c` is the testimonial carousel. **That meaning exists only in the rendered
+output** — and the plugin already knows where to find it, because preview configuration resolves a
+front-end URL per content type.
+
+With `contentBrief.pageReading.enabled: true`, a briefing run additionally fetches **one sample
+entry's published page** per content type that already has a `preview.paths` entry, reads its text
+and region structure, and feeds that into the **same** section call.
+
+**Pages are read, not seen.** No headless browser, no screenshot, no vision requirement — so this
+behaves identically on every provider. The accepted cost: presentation facts are inferred from
+document structure, not observed. The briefing can learn that a region is the page's lead and what it
+carries; it cannot learn that it renders full-bleed.
+
+**It adds no model calls.** The reading is extra *input* to the call that was already counted. That
+is what makes the cost stated in Settings before the run checkable: the billed-call count does not
+move.
+
+Every bound, all enforced:
+
+| Bound | Rule |
+|---|---|
+| Origin | the resolved URL's origin must **equal** the configured `preview.baseUrl` origin |
+| Redirects | followed manually, at most **2** hops, and only while the origin still matches |
+| Credentials | no cookies, no `Authorization`, no preview token — it reads as an anonymous visitor |
+| Time | `timeoutMs`, default 5 s |
+| Size | body read through a byte counter and abandoned past `maxBytes`, default 1 MB |
+| Content type | non-`text/html` is refused |
+| Links | **never followed.** This is not a crawler |
+| Source code | **never read** — unchanged from the rule the schema description already follows |
+
+There is deliberately **no private-address blocklist**. `preview.baseUrl` is set by your developer in
+`config/plugins.ts` at deploy time — never user-supplied, never model-supplied, never derived from
+content — so there is no request-forgery vector for one to close, while a blocklist *would* break
+`http://localhost:1337` and `http://web:3000`. Origin equality against your own value is the guard.
+
+**Nothing fetched is stored.** The reading is input to one model call and is then discarded; only the
+model's prose reaches a row. That absence — not a redaction filter — is the guarantee, and it is the
+same one the briefing already relies on for entry values. (`mailto:` links and email-shaped tokens
+are additionally dropped before the model sees them; that is insurance, not the guarantee.)
+
+**Failures are recorded, never hidden.** A content type with no preview target, an unreachable front
+end, a timeout, an oversized page, a non-HTML response, or a front end that renders entirely in the
+browser all degrade that section to entry-only — the run does not fail — and the Settings page names
+which content types fell back and why. Sections record whether a page informed them, so you can tell
+the two kinds apart.
 
 ### Who can read it
 
@@ -295,15 +476,44 @@ exists — set `contentBrief.scopeToReader: true`. Each reader is then served on
 own permissions allow, and the project overview is withheld entirely, because a paragraph
 synthesized across every content type cannot be filtered.
 
-### It is orientation, not authority
+`getContentBriefing` and the briefing index apply **exactly** this rule — the same one, not a
+second copy of it. The retrieval returns no more than the ambient block it replaced already returned
+to the same caller, and under `scopeToReader` the index is filtered to that caller's readable
+content types.
 
-The briefing enters the instructions as clearly delimited prose, under a preamble stating that it is
-not authoritative, not current, and grants no permission — and that **field names and identifiers
-never come from it**. Those come from the schema and the read tools, which read the live record.
-Where the briefing and a tool result disagree, the tool result wins.
+### It is retrieved, and it tells you how much it was written from
 
-It is model-written from a sample, so treat it as a useful impression rather than a fact: it can be
-out of date or simply wrong about a convention, which is why it can never override a tool.
+**The per-content-type sections are no longer in the prompt.** They used to be, and that was the
+defect: a section written from 4 entries out of 9,000 arrived looking exactly like one written from a
+complete reading, because the counts were stored and then dropped before the assistant ever saw them.
+The assistant had no way to tell a well-supported description from a guess, and neither did you.
+
+So the sections moved behind an explicit tool call, `getContentBriefing`, which returns the prose
+**and its coverage in the same payload** — how many entries it was written from, out of how many,
+which language version, when, whether the content has changed since, and whether that coverage is
+weak. One payload, never two, so the part that makes the answer honest cannot be the part that gets
+skipped.
+
+What stays in the prompt is two things:
+
+- the **project overview** — one paragraph on what this project *is*, labelled with its date and
+  explicitly barred from supporting any statement about a specific entry, field value or identifier.
+  For those, the assistant retrieves;
+- a **briefing index** — one line per content type: identifier, display name, `50 of 60 entries`, the
+  language version, the date, and whether it is current, out of date, weakly covered or
+  page-informed. **Names and numbers, never prose.** It exists so the assistant can judge whether a
+  section is worth retrieving before it spends the call, and say so when it relies on a weak one.
+
+A prompt is not an enforcement boundary, which is why the sections *moved* rather than acquiring a
+stronger warning. What guarantees a briefing-derived claim was preceded by a retrieval is that the
+prose is no longer reachable any other way.
+
+The instructions still say what the briefing is: model-written from a sample at a point in time, not
+a live read, granting no permission, and always losing to a tool result. Treat it as a useful
+impression rather than a fact.
+
+Retrieval costs one round trip, which is why the per-turn step ceiling was raised to 12 — see
+*Reply language → The per-turn step ceiling*.
 
 ---
 
@@ -469,7 +679,9 @@ provider key: it is a bearer credential for those proposed values, and it must n
 
 If preview is off, `baseUrl` is missing, or a content type has no `paths` entry, the preview request
 answers `409 preview_not_configured` and the panel shows a field-by-field before/after comparison
-instead. **Approval is never blocked by a missing preview target.**
+instead. **Approval is never blocked by a missing preview target.** The 409 body carries the existing
+English `message` plus a typed `reasonCode` / `reasonParams` pair the panel renders in the admin's
+locale — see *Reply language*.
 
 ---
 
@@ -503,10 +715,20 @@ Stated here so they are not rediscovered as bugs:
   cannot know what an arbitrary endpoint accepts. Attachment placement by filename still works.
 - **The automated test suite covers pure functions only.** It asserts the deterministic composition
   of the instructions, the deterministic derivation and tiered degradation of the schema
-  description, the declared image-input rule and configuration normalization. It never calls a
+  description, the declared image-input rule, configuration normalization, the briefing's coverage
+  and `weak` classification, Focus normalization and its four-state ladder, the situation block, the
+  turn-budget arithmetic, and HTML-to-reading extraction with its origin guard. It never calls a
   provider, opens a socket or boots a host — so streaming, tool calling, RBAC, replay and the UI
   are still verified **manually, in a running admin panel**, and a model identifier is still only
   verified by one live send.
+- **The assistant's reply language is a prompt rule, not a guarantee.** The two product-generated
+  strings a prompt cannot reach are fixed structurally (a model-written wrap-up, and typed reason
+  codes the admin renders), but what the model itself writes is kept honest by instruction text and
+  verified by reading real replies. There is no server-side check that a reply is in the right
+  language, and there could not usefully be one.
+- **Page reading infers presentation from document structure; it does not observe it.** The briefing
+  can learn that a region is the page's lead and what it carries. It cannot learn how that region
+  looks. A front end that ships no readable markup gets no benefit and is treated as unreachable.
 
 ---
 
@@ -659,9 +881,10 @@ To try it inside a real Strapi app, point the app's dependency at your local che
 
 ```
 server/src/
-  content-types/          4 hidden plugin types: chat-thread, chat-message,
-                          change-set, preview-session (invisible to the Content
-                          Manager and CTB, so generic RBAC is not a second door)
+  content-types/          5 hidden plugin types: chat-thread, chat-message,
+                          change-set, preview-session, content-brief (invisible to
+                          the Content Manager and CTB, so generic RBAC is not a
+                          second door)
   services/crypto.ts      AES-256-GCM encrypt/decrypt/mask + AI_STUDIO_ENC_KEY
                           validation + HMAC preview-token sign/verify
   services/redact.ts      ONE secret-redaction implementation, shared by the
@@ -673,8 +896,17 @@ server/src/
   services/registry.ts    per-request resolution of the active provider from
                           persisted config -> a chat-model instance
   services/agent.ts       the per-request agent + the model-call ceiling
+  services/turn-budget.ts the plugin's own model-call budget: the reserved final
+                          wrap-up call the MODEL writes, and the typed hard stop
   services/prompt.ts      sectioned instructions, in a fixed declared order, with a
                           version derived from their own text
+  services/situation.ts   the per-request block: interface language, Focus, whether
+                          a plan is awaiting a decision — data, never instruction
+  services/focus.ts       Focus: total normalization, the label ladder, and the
+                          four-state resolution re-checked on every turn
+  services/locales.ts     i18n-guarded language-version facts, memoized per request
+  services/page-reading.ts  the bounded, same-origin, credential-free page fetch and
+                          the HTML-to-reading extraction. Nothing it reads is stored
   services/grounding.ts   the deterministic, permission-scoped, size-bounded
                           description of this install's schema
   services/content-brief.ts  the model-written briefing about this install's
@@ -688,29 +920,35 @@ server/src/
   services/preview.ts     preview sessions, overlay payload, staged file bytes
   services/attachments.ts limits, manifest validation, idempotent ingestion
   services/tools.ts       one tool set: listContentTypes, searchEntries, getEntry,
-                          describePageStructure, proposeChanges
+                          describePageStructure, proposeChanges — plus
+                          getContentBriefing where the briefing is enabled, and an
+                          optional locale parameter on multi-locale installs only
   middlewares/preview-overlay.ts  content-API response overlay, inert without a token
   controllers/            chat, threads, change-sets, attachments, preview,
-                          settings, content-brief
+                          settings, content-brief, focus
   routes/index.ts         type:'admin' routes under /ai-content-studio/*
   routes/preview.ts       the single token-gated non-admin route (staged files)
   policies/               is-super-admin
 admin/src/
   index.ts                addMenuLink (Chat) + addSettingsLink (Settings)
-  pages/Chat.tsx          page shell: transport + useChat + wiring
+  pages/Chat.tsx          page shell: transport + useChat + wiring, including the
+                          conversation's Focus
   pages/Settings.tsx      provider/model/base-URL fields, masked write-only keys,
                           the grounding toggle and its inspector, the content
                           briefing (source, depth, stated cost, run, progress)
   components/             ThreadSidebar, MessageList, Composer, CopyButton,
-                          ChangePlanCard, PreviewPanel
-  hooks/                  useThreads, useChangeSet, useAttachments, useCopy
+                          ChangePlanCard, PreviewPanel, FocusBar, FocusPicker
+  hooks/                  useThreads, useChangeSet, useAttachments, useCopy,
+                          useFocus
   data/models.ts          curated per-provider model lists (edit me)
   data/providers.ts       the shipped-provider catalog (a SEPARATE module — see
                           the parseability note in models.ts)
 ```
 
-Four pure-function suites live beside the code they cover — `providers.test.ts`, `config.test.ts`,
-`prompt.test.ts`, `grounding.test.ts`. They are excluded from the published `dist/`.
+Ten pure-function suites live beside the code they cover — `providers.test.ts`, `config.test.ts`,
+`prompt.test.ts`, `grounding.test.ts`, `locales.test.ts`, `situation.test.ts`, `focus.test.ts`,
+`turn-budget.test.ts`, `content-brief.test.ts`, `page-reading.test.ts`. They are excluded from the
+published `dist/`.
 
 ## License
 

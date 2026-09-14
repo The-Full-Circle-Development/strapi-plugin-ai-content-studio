@@ -32,6 +32,20 @@ export interface ThreadHistory extends ThreadSummary {
   contextCondensed: boolean;
   messages: StoredMessage[];
   expiredAttachments: Array<{ messageId: string; ordinals: number[] }>;
+  /**
+   * The Focus last set for this conversation, or null (005 US3-7).
+   *
+   * Carried on the history so reopening a thread shows it with no extra request. Optional, because
+   * a cached admin bundle may be talking to a server that predates it — and absent reads as "none",
+   * which is the honest value.
+   */
+  focus?: {
+    uid: string;
+    documentId: string | null;
+    locale: string | null;
+    label: string;
+    setAt: string;
+  } | null;
 }
 
 export const backendURL = (): string => {

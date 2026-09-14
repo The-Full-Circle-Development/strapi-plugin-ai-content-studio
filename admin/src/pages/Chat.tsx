@@ -8,6 +8,8 @@ import { ChangePlanCard, type ApplyReport } from '../components/ChangePlanCard';
 import { ThreadSidebar } from '../components/ThreadSidebar';
 import { Column, ErrorText, Scroll, Shell } from '../components/styles';
 import { backendURL, useThreads } from '../hooks/useThreads';
+import { useFocus } from '../hooks/useFocus';
+import { FocusBar } from '../components/FocusBar';
 import { useAttachments } from '../hooks/useAttachments';
 import { styled } from 'styled-components';
 
@@ -83,6 +85,14 @@ export const Chat = () => {
     deleteThread,
   } = useThreads();
 
+  /**
+   * The conversation's Focus (005 FR-014, FR-015).
+   *
+   * Keyed on the CURRENT thread, because Focus belongs to the conversation: opening another one
+   * must show that conversation's focus, not carry this one's across (US3-7).
+   */
+  const focus = useFocus(currentThreadId);
+
   // The transport reads the freshest token AND the current thread id per request, so a thread
   // created lazily on the first send is already in the body.
   // The manifest must be whatever is held at SEND time, so a ref keeps the transport's body
@@ -144,8 +154,15 @@ export const Chat = () => {
       attachments.clear();
       manifestRef.current = [];
       setInput('');
+      /*
+       * Reopening a conversation shows the focus last set for it (US3-7), with no extra request:
+       * the thread history already carries it. Adopting it here also REPLACES the previous
+       * conversation's focus rather than leaving it on screen — a stale chip would name an entry
+       * this conversation was never pointed at.
+       */
+      focus.adopt(history.focus ?? null);
     },
-    [loadHistory, setMessages, attachments]
+    [loadHistory, setMessages, attachments, focus]
   );
 
   const startNewThread = React.useCallback(async () => {
@@ -157,10 +174,12 @@ export const Chat = () => {
     setInput('');
     threadIdRef.current = null;
     setCurrentThreadId(null);
+    // A new conversation starts with no focus, like any other.
+    focus.adopt(null);
     // There is no mode to reset, and no selection step on a new conversation (US2-2).
     // The thread row itself is created lazily on the first send, so opening the panel and not
     // typing leaves no empty conversation behind.
-  }, [setMessages, threadIdRef, setCurrentThreadId, attachments]);
+  }, [setMessages, threadIdRef, setCurrentThreadId, attachments, focus]);
 
   const onSend = async () => {
     const text = input.trim();
@@ -281,6 +300,24 @@ export const Chat = () => {
               onStop={() => stop()}
               // The hint always speaks about approval, never about which mode is active (FR-017).
               hint="Changes are proposed for your approval — nothing is written until you approve."
+              /*
+               * Focus is only settable once a conversation exists, because it is stored ON the
+               * thread — and the thread row is created lazily on the first send. Before then the
+               * bar renders and says none is set, which is true.
+               */
+              focusControl={
+                <FocusBar
+                  focus={focus.focus}
+                  options={focus.options}
+                  busy={focus.busy}
+                  error={focus.error}
+                  onLoadOptions={() => void focus.loadOptions()}
+                  searchEntries={focus.searchEntries}
+                  onSet={(input) => void focus.set(input)}
+                  onClear={() => void focus.clear()}
+                  disabled={!currentThreadId || preparing}
+                />
+              }
             />
           </Shell>
         </Main>

@@ -53,6 +53,23 @@
     },
     "model": {
       "type": "string"
+    },
+    "locale": {
+      "type": "string",
+      "description": "Which language version this section's counts are of. Null for sections written before language versions were tracked — which means exactly that, and NEVER 'all of them'."
+    },
+    "pageInformed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether rendered-page analysis informed this section, so an operator can tell the two kinds of section apart and re-run one without the other."
+    },
+    "pageUrl": {
+      "type": "string",
+      "description": "The page that was read, or null. Recorded for the same reason pageInformed is."
+    },
+    "pageLocale": {
+      "type": "string",
+      "description": "Which language version of the page was read, or null when the front end could not distinguish one."
     }
   }
 }

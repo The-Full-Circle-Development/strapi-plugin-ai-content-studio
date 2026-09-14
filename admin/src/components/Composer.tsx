@@ -189,6 +189,17 @@ export interface ComposerProps {
   onSend: () => void;
   onStop: () => void;
   hint?: React.ReactNode;
+  /**
+   * The Focus control (005 FR-015), rendered above the message box.
+   *
+   * HOSTED HERE BECAUSE FOCUS IS PART OF ASKING. It sits where the editor is composing the question
+   * it applies to, so what "this page" means is on screen at the moment they write "this page" —
+   * rather than somewhere they would have to go and look.
+   *
+   * Passed in as a node rather than built here: the Composer owns layout, and the focus state
+   * belongs to the conversation, which the page shell owns.
+   */
+  focusControl?: React.ReactNode;
 }
 
 export const Composer = ({
@@ -203,6 +214,7 @@ export const Composer = ({
   onSend,
   onStop,
   hint,
+  focusControl,
 }: ComposerProps) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const editorRef = React.useRef<HTMLTextAreaElement>(null);
@@ -260,6 +272,12 @@ export const Composer = ({
   return (
     <ComposerWrap>
       <Column>
+        {/*
+          Above the message box, and ALWAYS VISIBLE (FR-015). Focus silently changes which entry
+          "this page" means; an editor who cannot see what is focused cannot tell whether an answer
+          is about what they think it is about.
+        */}
+        {focusControl}
         <Box>
           {/*
             Held files, with the ordinal, the filename and any rejection reason shown BEFORE the

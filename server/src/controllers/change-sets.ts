@@ -189,6 +189,15 @@ const changeSetsController = ({ strapi }: { strapi: Core.Strapi }) => {
           error: result.error ?? 'preview_not_configured',
           message: result.message ?? 'Preview is unavailable. Showing the field comparison instead.',
           fallback: result.fallback ?? 'field-diff',
+          /*
+           * The typed reason, ADDED alongside the unchanged English `message` (005
+           * contracts/language.md §4.1). The panel renders the code in the admin's own locale and
+           * falls back to `message` when it does not recognise one — so a degradation here is a
+           * no-op for any consumer reading the sentence, and the HTTP contract is unbroken.
+           */
+          ...(result.reasonCode
+            ? { reasonCode: result.reasonCode, reasonParams: result.reasonParams ?? {} }
+            : {}),
         };
         return undefined;
       }

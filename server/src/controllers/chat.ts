@@ -3,6 +3,7 @@ import { toBaseMessages, toUIMessageStream } from '@ai-sdk/langchain';
 import { z } from 'zod';
 import type { Core } from '@strapi/strapi';
 import { ProviderConfigError } from '../services/registry';
+import { renderIndexLine } from '../services/content-brief';
 
 /**
  * Request body. `threadId` is REQUIRED: every turn belongs to a durable, owner-scoped conversation
@@ -76,6 +77,62 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     }
     const manifest = manifestResult.manifest;
 
+    /**
+     * WHICH generated context this turn carries (004 contracts/content-brief.md §2, reinterpreted
+     * by 005 contracts/briefing-retrieval.md §2).
+     *
+     * One administrator choice — `schema`, `brief` or `both` — resolved here rather than in the
+     * prompt composer, so the composer stays a pure function of what it is handed and never has to
+     * know a setting exists. Both sources sit behind the SAME grounding switch: it is the one
+     * control that means "put generated context in the prompt at all", and a second off-switch with
+     * the same meaning would be a way to have it half-off.
+     *
+     * NO STORED VALUE CHANGES (FR-033). What each value now SELECTS is different — the briefing's
+     * per-content-type sections moved behind a retrieval — but `normalizeSettings` is untouched and
+     * an install on `schema` is byte-identical to before.
+     */
+    const groundingSvc = plugin.service('grounding');
+    const groundingEnabled = await plugin.service('config').isGroundingEnabled();
+    const briefSource = (await plugin.service('config').get()).contentBrief.source;
+    const wantSchema = groundingEnabled && briefSource !== 'brief';
+    const wantBrief = groundingEnabled && briefSource !== 'schema';
+
+    /**
+     * The ambient briefing index (005 FR-032) — resolved BEFORE the tools, because whether the
+     * retrieval tool is offered at all depends on whether there is anything to retrieve.
+     *
+     * Resolved early and defensively: a briefing that cannot be read is an enhancement that failed,
+     * and the turn proceeds with tool-based discovery rather than failing the request.
+     */
+    let briefIndex: Array<{ uid: string; displayName: string; coverage: unknown }> = [];
+    if (wantBrief) {
+      try {
+        briefIndex = await plugin.service('content-brief').briefIndex(userAbility);
+      } catch (err) {
+        strapi.log.warn(
+          `[ai-content-studio] could not build the briefing index: ${redact().describeError(err)}`
+        );
+        briefIndex = [];
+      }
+    }
+
+    /**
+     * The retrieval tool is offered only where the briefing was ALREADY ambient, and only when
+     * there is at least one section to retrieve (contracts/briefing-retrieval.md §2). An install on
+     * `schema` — the default — gets today's behaviour and today's token cost.
+     */
+    const offerBriefing = wantBrief && briefIndex.length > 0;
+
+    /**
+     * The install's language versions (005 FR-042, SC-018).
+     *
+     * Resolved once per request — memoized in the locales service, so the situation block, the tool
+     * schemas and the focus resolution share one read — and handed to `buildTools`, which composes
+     * the `locale` parameter into the schemas only where there is more than one version to choose
+     * between. On a single-locale install the parameter does not exist.
+     */
+    const localeFacts = await plugin.service('locales').facts();
+
     // Tool set is derived per request from the caller's live ability. There is no mode to narrow
     // it any more — this is the one tool set (contracts/removals.md §1).
     const tools = plugin.service('tools').buildTools({
@@ -84,6 +141,8 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       ownerId,
       // Placements are validated against the ordinals actually attached to THIS turn.
       manifestOrdinals: manifest.map((a: { ordinal: number }) => a.ordinal),
+      localeCodes: localeFacts.codes,
+      offerBriefing,
     });
 
     // Debug flag: surface the real (redacted) provider error to the UI instead of a generic one.
@@ -168,30 +227,14 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     /**
      * The install description (FR-027..FR-037), resolved per request and per account.
      *
-     * `groundingEnabled` is the EFFECTIVE value from `config.isGroundingEnabled()` — the AND of the
-     * deploy-time hard off-switch and the runtime toggle — never one of the two flags read directly
-     * (contracts/install-description.md §7).
+     * `groundingEnabled` above is the EFFECTIVE value from `config.isGroundingEnabled()` — the AND
+     * of the deploy-time hard off-switch and the runtime toggle — never one of the two flags read
+     * directly (contracts/install-description.md §7).
      */
-    const groundingSvc = plugin.service('grounding');
-    const groundingEnabled = await plugin.service('config').isGroundingEnabled();
-
-    /**
-     * WHICH generated context this turn carries (contracts/content-brief.md §2).
-     *
-     * One administrator choice — `schema`, `brief` or `both` — resolved here rather than in the
-     * prompt composer, so the composer stays a pure function of what it is handed and never has to
-     * know a setting exists. Both sources sit behind the SAME grounding switch: it is the one
-     * control that means "put generated context in the prompt at all", and a second off-switch with
-     * the same meaning would be a way to have it half-off.
-     */
-    const briefSource = (await plugin.service('config').get()).contentBrief.source;
-    const wantSchema = groundingEnabled && briefSource !== 'brief';
-    const wantBrief = groundingEnabled && briefSource !== 'schema';
-
     let readableUids: string[] = [];
     let schemaFingerprint = '';
     let install: { text: string; partial: boolean } | null = null;
-    let brief: { text: string; partial: boolean } | null = null;
+    let briefOverview: { text: string; generatedAt: string | null } | null = null;
     if (groundingEnabled) {
       try {
         // Resolved even when only the brief is selected: the composer uses the uid list to decide
@@ -216,18 +259,24 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     if (wantBrief) {
       try {
         /*
-         * ONE BRIEF, THE SAME FOR EVERY ACCOUNT (contracts/content-brief.md §3). The ability is
-         * still passed, because an install that set `contentBrief.scopeToReader` narrows the
-         * result to the caller's own readable sections inside the service — the default does not.
+         * THE PROJECT OVERVIEW ONLY — the one part of the briefing that stays ambient (005 FR-036).
+         *
+         * The per-content-type sections that used to be assembled here are GONE from the prompt.
+         * They are where 004's factual claims about content actually lived, and therefore where
+         * hallucination actually happened; they are now reachable only through
+         * `getContentBriefing`, which returns coverage alongside the prose (FR-031). The ambient
+         * index above says what exists so the assistant can judge what is worth retrieving.
+         *
+         * The overview is withheld under `scopeToReader` inside the service, unchanged: it is
+         * synthesized across every content type, so it cannot be filtered.
          */
-        const assembled = await plugin.service('content-brief').describeFor(userAbility);
-        brief = assembled ? { text: assembled.text, partial: assembled.partial } : null;
+        briefOverview = await plugin.service('content-brief').overviewFor();
       } catch (err) {
         // Same rule as the description above: an enhancement that fails costs the turn nothing.
         strapi.log.warn(
-          `[ai-content-studio] could not assemble the content brief: ${redact().describeError(err)}`
+          `[ai-content-studio] could not read the briefing overview: ${redact().describeError(err)}`
         );
-        brief = null;
+        briefOverview = null;
       }
 
       /*
@@ -246,6 +295,71 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
         });
     }
 
+    /**
+     * The per-request situation block (005 contracts/situation-and-focus.md §2).
+     *
+     * `interfaceLanguage` is FR-003's fallback signal: the language to answer in when the model
+     * cannot determine the language of the editor's own message. It is read straight off
+     * `ctx.state.user`, where the admin auth strategy already put the full `admin::user` row —
+     * `preferedLanguage` is a declared string attribute on that content type (verified in
+     * `@strapi/admin@5.48.1`), so this costs no extra query.
+     *
+     * Note the spelling: `preferedLanguage`, with one `r`. That is Strapi's own, and correcting it
+     * here would read nothing.
+     *
+     * The block composes to null when there is nothing to say, and `prompt.build` then emits no
+     * section at all — so an install where nobody has set an interface language is byte-identical
+     * to one built before this existed.
+     */
+    const interfaceLanguage =
+      typeof ctx.state?.user?.preferedLanguage === 'string' ? ctx.state.user.preferedLanguage : null;
+
+    /**
+     * The conversation's Focus, RE-RESOLVED AND RE-PERMISSION-CHECKED THIS TURN (FR-017, FR-034).
+     *
+     * Never trusted as stored. The stored column is a pointer; whether this caller may read what it
+     * points at is a question only their live ability can answer, and it is asked again here on
+     * every turn. That is the whole of "focus grants nothing".
+     *
+     * Four states, three of which are not failures: an absent, deleted or unreadable focus changes
+     * what the assistant says, never whether the turn runs (FR-019).
+     */
+    let focusLine: string | null = null;
+    try {
+      const focusSvc = plugin.service('focus');
+      focusLine = focusSvc.renderFocusLine(await focusSvc.resolve(thread.focus, userAbility));
+    } catch (err) {
+      // Same rule as grounding: an enhancement that fails costs the turn nothing. Saying nothing
+      // about focus is a legal state of the block.
+      strapi.log.warn(
+        `[ai-content-studio] could not resolve the conversation's focus: ${redact().describeError(err)}`
+      );
+      focusLine = null;
+    }
+
+    /**
+     * Whether a plan is awaiting this editor's decision (FR-035), so "the plan" resolves without
+     * them restating it. Owner-scoped and unexpired, decided in the service.
+     *
+     * It changes NOTHING about approval: the assistant still proposes, and the editor's click on
+     * the apply route is still the only write path (US3-5).
+     */
+    let pendingPlan = null;
+    try {
+      pendingPlan = await plugin.service('change-sets').pendingPlanFact({ threadId, ownerId });
+    } catch (err) {
+      strapi.log.warn(
+        `[ai-content-studio] could not read the pending plan: ${redact().describeError(err)}`
+      );
+      pendingPlan = null;
+    }
+
+    const situation = plugin.service('situation').build({
+      interfaceLanguage,
+      focusLine,
+      pendingPlan,
+    });
+
     const instructions = plugin.service('prompt').build({
       supportsVision,
       hasAttachments: manifest.length > 0,
@@ -254,7 +368,11 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       schemaFingerprint,
       contextSummary: context?.summary ?? null,
       install,
-      brief,
+      briefOverview,
+      // Reduced to names and numbers here, so no section prose is in scope for the composer at all
+      // (FR-032 — the structural half of the no-prose invariant).
+      briefIndex: briefIndex.map((entry) => renderIndexLine(entry as never)),
+      situation,
     });
 
     /**
@@ -287,14 +405,24 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
     ctx.req.once('aborted', onClientGone);
 
     let agentStream;
+    /**
+     * The turn-budget's hard-stop signal (005 contracts/turn-budget.md §3.2).
+     *
+     * Null until the budget is built; afterwards it answers `{ modelCalls, limit }` only if the
+     * RESERVED WRAP-UP CALL ITSELF FAILED — on every ordinary cut-short turn the model writes its
+     * own explanation, in the editor's language, and nothing typed is needed.
+     */
+    let turnLimitStop: () => { modelCalls: number; limit: number } | null = () => null;
     try {
-      agentStream = await plugin.service('agent').run({
+      const run = await plugin.service('agent').run({
         model,
         tools,
         systemPrompt: instructions.text,
         messages: await toBaseMessages(replayed),
         signal: abort.signal,
       });
+      agentStream = run.stream;
+      turnLimitStop = run.turnLimitStop;
     } catch (err) {
       strapi.log.error(`[ai-content-studio] failed to start generation: ${redact().describeError(err)}`);
       return ctx.internalServerError('AI generation could not be started.');
@@ -393,6 +521,28 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
         controller.enqueue(chunk);
       },
       async flush(controller) {
+        /**
+         * The turn-limit backstop notice (005 contracts/language.md §4, turn-budget §3.2).
+         *
+         * TYPED, NOT PROSE, and that is the whole point: this path has no model turn in front of it,
+         * so a sentence written here would be English in a Ukrainian conversation — the exact defect
+         * FR-006 exists to close. The admin renders `turn.limit_reached` through the react-intl
+         * path it already has, in the admin's own locale.
+         *
+         * Reachable only when the reserved wrap-up call failed. On every ordinary cut-short turn the
+         * model has already explained itself, in the editor's language, and this emits nothing.
+         *
+         * Checked BEFORE the interrupted branch returns, because a turn can be both stopped and over
+         * budget and the editor should see the more specific fact.
+         */
+        const limitStop = turnLimitStop();
+        if (limitStop) {
+          controller.enqueue({
+            type: 'data-turn-limit',
+            data: limitStop,
+          } as UIMessageChunk);
+        }
+
         if (!userStopped) {
           return;
         }

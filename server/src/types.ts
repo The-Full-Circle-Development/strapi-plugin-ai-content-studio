@@ -58,22 +58,70 @@ export interface ProviderDescriptor {
 /** The declared section ids, in the fixed order of contracts/instructions.md §1. */
 export const INSTRUCTION_SECTION_IDS = [
   'role',
+  // 2. Immediately after `role`, because which language to answer in is a property of BEING the
+  //    assistant rather than a rule about one of its activities (005 contracts/language.md §1).
+  'language',
   'discovery',
   'permissions',
   'ambiguity',
   'proposing',
   'tool-honesty',
+  /*
+   * Where a claim about content came from (005 FR-008, FR-010..FR-012). After `tool-honesty`, which
+   * it extends: that governs how a result is REPORTED, this governs what may be asserted when there
+   * is no result at all.
+   */
+  'attribution',
   'retired',
   'style',
   'attachments',
   'attachments-blind',
   'install',
-  // 10a. After `install`, so the schema facts frame the prose rather than the other way round.
-  'brief',
+  /*
+   * The briefing, after `install` so the schema facts frame the prose rather than the other way
+   * round — and SPLIT IN TWO by feature 005, replacing the single `brief` section.
+   *
+   * `brief` carried every per-content-type section as ambient prose, which is where 004's factual
+   * claims about content lived and therefore where hallucination actually happened: a section
+   * written from 4 entries out of 9,000 read exactly like one written from a complete reading. Those
+   * sections are now RETRIEVED by an explicit tool call (FR-031); what stays ambient is the
+   * project overview, bounded away from any claim about a specific entry (FR-036), and an INDEX of
+   * names and numbers that carries no prose at all (FR-032).
+   */
+  'brief-overview',
+  'brief-index',
+  /*
+   * Facts about the CURRENT REQUEST — the editor's interface language, their Focus, whether a plan
+   * is awaiting their decision (005 contracts/situation-and-focus.md §2). Last before `condensed`,
+   * so it is read against every rule and every generated fact above it rather than framing them.
+   * Per-request, therefore NOT hashed.
+   */
+  'situation',
   'condensed',
 ] as const;
 
 export type InstructionSectionId = (typeof INSTRUCTION_SECTION_IDS)[number];
+
+/**
+ * The ONLY language signal the SERVER resolves (005 data-model §1).
+ *
+ * NOT PERSISTED, and there is nothing to persist: FR-001 makes the reply language a function of the
+ * editor's most recent message, so a stored value could only ever disagree with the message in
+ * front of the model. The message's own language is the model's to read; this is the fallback for
+ * when it cannot.
+ *
+ * Precedence — explicit request, then the most recent message, then this, then English — is stated
+ * in the `language` instruction section rather than computed here. Only the last two are facts the
+ * server holds; the first two are properties of text only the model sees.
+ */
+export interface LanguageSignal {
+  /**
+   * `ctx.state.user.preferedLanguage` — Strapi's own spelling, a declared string attribute on
+   * `admin::user`, already loaded onto `ctx.state.user` by the admin auth strategy. So it costs no
+   * extra query. Null when the account has never set one.
+   */
+  interfaceLanguage: string | null;
+}
 
 /**
  * The composed system instructions for one request (data-model §4).
@@ -171,7 +219,119 @@ export interface BriefSection {
   generatedAt: string;
   provider: string | null;
   model: string | null;
+  /**
+   * Which language version the counts above are of (005 FR-040).
+   *
+   * NULL MEANS "written before language versions were tracked", and never "all of them". The
+   * distinction is the point: before this feature a run sampled and counted every translation, so
+   * `totalCount` was inflated by the number of locales — a section written from 4 of 9,000 rows
+   * could be 4 of 3,000 entries in three languages. A null here says the number cannot be read that
+   * finely, rather than quietly asserting a coverage that was never measured.
+   */
+  locale: string | null;
+  /** Whether rendered-page analysis informed this section (005 FR-026). */
+  pageInformed: boolean;
+  pageUrl: string | null;
+  pageLocale: string | null;
 }
+
+/**
+ * How well supported one stored section is — the derived view BOTH surfaces use (005 data-model §4.3).
+ *
+ * THE DEFECT THIS EXISTS TO FIX. `sampledCount` and `totalCount` were stored and then discarded
+ * before the assistant ever saw them, so a section written from 4 entries out of 9,000 arrived
+ * looking exactly like one written from a complete reading. The assistant had no way to tell a
+ * well-supported description from a guess, and neither did the editor reading its answer.
+ */
+export interface BriefCoverage {
+  sampledCount: number;
+  totalCount: number;
+  /** Null means "written before language versions were tracked", never "all of them". */
+  locale: string | null;
+  generatedAt: string;
+  /** LIVE: the schema or content fingerprint has moved since the section was written. */
+  stale: boolean;
+  /**
+   * FR-013. DERIVED, NEVER STORED — a stored `weak` would be a snapshot of a judgement whose inputs
+   * (the live fingerprints, the current entry count) move underneath it.
+   *
+   * True when the content type is now EMPTY, when the section is STALE, or when
+   * `sampledCount / totalCount` falls below the stated constant in `content-brief.ts`. A weak
+   * section is returned LABELLED — never withheld, and never flattened into an ordinary one.
+   */
+  weak: boolean;
+  pageInformed: boolean;
+}
+
+/**
+ * One ambient line per content type that has a stored section (005 FR-032).
+ *
+ * THE INVARIANT IS THE WHOLE ENTITY: an index entry carries NO SECTION TEXT. It exists so the
+ * assistant can judge whether a section is worth retrieving before it spends the call — and a line
+ * of prose here would quietly restore the ambient claims FR-031 removed, making the index a second
+ * copy of the briefing.
+ */
+export interface BriefIndexEntry {
+  uid: string;
+  displayName: string;
+  coverage: BriefCoverage;
+}
+
+/* -------------------------------------------------------- page reading */
+
+/**
+ * One landmark region or heading of a rendered page (005 data-model §7).
+ *
+ * WHY REGIONS AND NOT JUST TEXT. The schema says a `page` has a `hero` with an `image`; a sample of
+ * entries says that image is usually populated. Neither can say the hero is the page's LEAD region,
+ * or that the component named `block-c` is the testimonial carousel. That meaning exists only in
+ * the rendered output's structure, which is what this captures.
+ */
+export interface PageRegion {
+  /** `header` | `nav` | `main` | `article` | `section` | `aside` | `footer`, or a heading level. */
+  role: string;
+  /** The region's heading or accessible name, where it has one. */
+  label: string | null;
+  /** Bounded plain text. Never reaches a stored section verbatim. */
+  text: string;
+  order: number;
+}
+
+/**
+ * What one page read produced. ⚠ DELIBERATELY NEVER PERSISTED, and that absence IS the mechanism
+ * behind FR-025.
+ *
+ * A redaction filter is a second-best guarantee that has to be right about every pattern it has
+ * never seen. NOT KEEPING THE DATA is a first-best one. This is input to one model call and is then
+ * gone; only the model's prose reaches a row — the same guarantee feature 004 already relies on for
+ * entry values.
+ */
+export interface PageReading {
+  url: string;
+  /** Which language version was read, or null when the front end could not distinguish one. */
+  locale: string | null;
+  title: string | null;
+  regions: PageRegion[];
+  text: string;
+  truncated: boolean;
+}
+
+/**
+ * Why a page could not be read. EVERY ONE OF THESE DEGRADES THE SECTION TO ENTRY-ONLY and must
+ * never fail the section, the run, or a chat turn (FR-023).
+ */
+export type PageReadingFailure =
+  /** Preview off, no path pattern, or the pattern cannot be filled from this entry. */
+  | 'not_configured'
+  /** The URL, or a redirect, left the configured front-end origin. */
+  | 'origin_mismatch'
+  /** DNS, connection refused, non-2xx. */
+  | 'unreachable'
+  | 'timeout'
+  | 'too_large'
+  | 'not_html'
+  /** A script shell with nothing to read — treated exactly as unreachable (US4-4). */
+  | 'no_readable_text';
 
 /** The run-level state, held in the plugin store rather than in a row — it is not content. */
 export interface BriefRun {
@@ -195,6 +355,77 @@ export interface BriefRun {
   lastRunByUserId: number | null;
   /** Throttle floor for the automatic refresh — never a floor for a human pressing Run. */
   lastAutoRefreshAt: string | null;
+  /**
+   * Which content types fell back to an entry-only section on the last run, and why (005 FR-023,
+   * SC-012).
+   *
+   * DEGRADATION IS RECORDED, NEVER HIDDEN. An operator who turned page reading on and got no
+   * benefit must be able to see which content types it could not reach and what stopped it —
+   * otherwise the capability fails silently, which is the one outcome that makes it untrustworthy.
+   *
+   * Defaulted to `[]` by `normalizeBriefRun`, so a run record written by an older build still reads.
+   */
+  pageReadingFailures: Array<{ uid: string; reason: PageReadingFailure }>;
+}
+
+/* --------------------------------------------------------------- focus */
+
+/**
+ * The one entry an editor has pointed at, stored on the conversation (005 data-model §2.2).
+ *
+ * FOCUS IS SET BY THE EDITOR, NEVER OBSERVED. The plugin does not watch Content Manager navigation:
+ * that would bind this plugin's behaviour to admin internals that shift across Strapi upgrades, and
+ * it would silently assume a wrong entry. One deliberate action buys "this page", "the heading",
+ * "that image" resolving without being named again — and an editor who has set none is ASKED, never
+ * guessed at.
+ */
+export interface ThreadFocus {
+  /** Content-type uid. Validated against the live `api::*` allow-list on WRITE AND ON READ. */
+  uid: string;
+  /** Null for single types. */
+  documentId: string | null;
+  /** The language version the editor means. Null when the type is not localized (FR-042). */
+  locale: string | null;
+  /**
+   * Display snapshot for the panel and the situation block. NEVER THE BASIS FOR A CLAIM: it is a
+   * label recorded at set time, and the entry may have been retitled or deleted since.
+   */
+  label: string;
+  setAt: string;
+}
+
+/**
+ * How a stored focus resolves THIS TURN. Re-resolved every time, never trusted as stored.
+ *
+ * THREE OF THE FOUR ARE NOT FAILURES (FR-019). An absent, stale, deleted or unreadable focus must
+ * never fail a turn — it changes what the assistant says, not whether it answers.
+ */
+export type FocusResolution =
+  /** uid still valid, caller may read it, the document (and locale version) exists. */
+  | { state: 'set'; focus: ThreadFocus }
+  /**
+   * The caller's `can.read(uid)` is false. Carries NOTHING about the entry — no label, no
+   * documentId, no uid contents — because revealing any of it through a focus the caller cannot
+   * read would be exactly the disclosure SC-008 forbids.
+   */
+  | { state: 'unreadable' }
+  /** The document, or that locale version, no longer exists (FR-044). */
+  | { state: 'missing' }
+  /** No focus stored. "This page" must be asked about rather than guessed (US3-2). */
+  | { state: 'none' };
+
+/**
+ * A plan awaiting the editor's decision, so "the plan" resolves without them restating it (FR-035).
+ *
+ * NOT PERSISTED — the change set already carries all of it. Resolved per request from the caller's
+ * own pending, unexpired change sets in this thread, and it changes NOTHING about approval: the plan
+ * is still applied only by the editor's click on the apply route (FR-034).
+ */
+export interface PendingPlanFact {
+  changeSetId: string;
+  summary: string | null;
+  itemCount: number;
+  expiresAt: string;
 }
 
 /* --------------------------------------------------------- change sets */

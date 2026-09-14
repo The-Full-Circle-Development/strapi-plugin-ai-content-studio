@@ -1,8 +1,10 @@
 import * as React from 'react';
+import { useIntl } from 'react-intl';
 import { Button, Typography } from '@strapi/design-system';
 import { useAuth } from '@strapi/strapi/admin';
 import { styled } from 'styled-components';
 import { adminFetch } from '../hooks/useThreads';
+import { getTranslation } from '../utils/getTranslation';
 import type { ChangeItemView } from '../hooks/useChangeSet';
 
 /**
@@ -11,6 +13,16 @@ import type { ChangeItemView } from '../hooks/useChangeSet';
  * Opens the real front-end with a signed token so it renders the proposed values (FR-010). When the
  * project has no preview target the server answers 409 with `fallback: 'field-diff'`, and this panel
  * shows the field-by-field comparison INSTEAD — approval is never blocked (FR-014).
+ *
+ * THE FALLBACK SENTENCE IS RENDERED HERE, NOT SENT (005 contracts/language.md §4). This copy reaches
+ * the editor with no model turn in front of it, so the assistant's language rule cannot reach it —
+ * an editor working in Ukrainian would read English. The server therefore sends a `reasonCode` and
+ * its `reasonParams`, and this panel renders them through the `registerTrads` / react-intl path the
+ * plugin already has, in the ADMIN's locale.
+ *
+ * The server's English `message` is passed as `defaultMessage`, so an unknown or missing code
+ * renders EXACTLY what this panel rendered before the codes existed. The degradation is a no-op,
+ * never a blank.
  */
 
 const Wrap = styled.div`
@@ -100,6 +112,7 @@ export interface PreviewPanelProps {
 }
 
 export const PreviewPanel = ({ changeSetId, items, disabled = false, filesByOrdinal }: PreviewPanelProps) => {
+  const { formatMessage } = useIntl();
   const token = useAuth('AiContentStudioPreview', (state) => state.token);
   const tokenRef = React.useRef<string | null>(token);
   React.useEffect(() => {
@@ -145,10 +158,27 @@ export const PreviewPanel = ({ changeSetId, items, disabled = false, filesByOrdi
       setSession(result);
       window.open(result.previewUrl, '_blank', 'noopener,noreferrer');
     } catch (err) {
-      const payload = (err as Error & { payload?: { fallback?: string; message?: string } }).payload;
+      const payload = (
+        err as Error & {
+          payload?: {
+            fallback?: string;
+            message?: string;
+            reasonCode?: string;
+            reasonParams?: Record<string, string>;
+          };
+        }
+      ).payload;
       if (payload?.fallback === 'field-diff') {
         // Contracted degradation, not an error — show the comparison and keep approval available.
-        setFallback(payload.message ?? 'Preview is unavailable for this project.');
+        const serverSentence = payload.message ?? 'Preview is unavailable for this project.';
+        setFallback(
+          payload.reasonCode
+            ? formatMessage(
+                { id: getTranslation(payload.reasonCode), defaultMessage: serverSentence },
+                payload.reasonParams ?? {}
+              )
+            : serverSentence
+        );
       } else {
         setError(err instanceof Error ? err.message : 'Could not open the preview.');
       }

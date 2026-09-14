@@ -113,6 +113,30 @@ export interface ContentBriefOptions {
    * content type only one team may know exists.
    */
   scopeToReader: boolean;
+  /** Rendered-page grounding (005 FR-024). OFF by default — see the interface below. */
+  pageReading: PageReadingOptions;
+}
+
+/**
+ * Rendered-page grounding for the briefing (005 contracts/page-reading.md §6).
+ *
+ * ⚠ OFF BY DEFAULT, and every other key defaults to the behaviour the plugin has today. An install
+ * that changes nothing costs nothing and behaves identically (FR-024, FR-027, SC-009) — this is the
+ * only part of feature 005 that spends anything new, and it spends it only on request.
+ *
+ * BOUNDED INSIDE THE BRIEFING'S EXISTING BUDGETS, not alongside them: the sampling depth, the
+ * per-section and total character ceilings, the throttle and the per-pass section cap all continue
+ * to govern spend unchanged. `maxChars` here is a ceiling WITHIN the sample budget handed to the
+ * model, not an addition to it — which is what makes the stated cost checkable (SC-011).
+ */
+export interface PageReadingOptions {
+  enabled: boolean;
+  /** Elapsed-time bound on one fetch, clamped. */
+  timeoutMs: number;
+  /** Byte bound on one response body, clamped. */
+  maxBytes: number;
+  /** Ceiling on the reading handed to the model, clamped. */
+  maxChars: number;
 }
 
 /** Seeded from the provider table so there is no second copy of the shipped id list. */
@@ -146,6 +170,7 @@ export const emptyBriefRun = (): BriefRun => ({
   error: null,
   lastRunByUserId: null,
   lastAutoRefreshAt: null,
+  pageReadingFailures: [],
 });
 
 /**
@@ -174,6 +199,21 @@ export const normalizeBriefRun = (raw: Partial<BriefRun> | null | undefined): Br
     error: typeof raw.error === 'string' ? raw.error : null,
     lastRunByUserId: Number.isInteger(raw.lastRunByUserId) ? (raw.lastRunByUserId as number) : null,
     lastAutoRefreshAt: typeof raw.lastAutoRefreshAt === 'string' ? raw.lastAutoRefreshAt : null,
+    /*
+     * Defaulted to `[]` for a record written by an older build (005 FR-023, page-reading §7).
+     *
+     * Each entry is validated rather than trusted: this record is read back from the plugin store,
+     * where a half-written run from a process that died mid-run is a real state, and the settings
+     * page renders these directly.
+     */
+    pageReadingFailures: Array.isArray(raw.pageReadingFailures)
+      ? raw.pageReadingFailures.filter(
+          (entry): entry is BriefRun['pageReadingFailures'][number] =>
+            Boolean(entry) &&
+            typeof (entry as { uid?: unknown }).uid === 'string' &&
+            typeof (entry as { reason?: unknown }).reason === 'string'
+        )
+      : [],
   };
 };
 
@@ -530,6 +570,20 @@ const configService = ({ strapi }: { strapi: Core.Strapi }) => {
         // Explicit `true` only — the shared brief is the stated default, so a typo never silently
         // narrows what every account sees.
         scopeToReader: raw.scopeToReader === true,
+        pageReading: (() => {
+          const page = (raw.pageReading ?? {}) as Record<string, unknown>;
+          return {
+            /*
+             * Explicit `true` only, for the same reason `scopeToReader` requires one and the
+             * OPPOSITE of how `enabled` above is read. This capability makes outbound HTTP requests
+             * from the host, so a typo must leave it off rather than silently on.
+             */
+            enabled: page.enabled === true,
+            timeoutMs: num(page.timeoutMs, 5000, 500, 30000),
+            maxBytes: num(page.maxBytes, 1_000_000, 10_000, 20_000_000),
+            maxChars: num(page.maxChars, 8000, 500, 40000),
+          };
+        })(),
       };
     },
 

@@ -17,10 +17,38 @@ import type { ChangeItem, PreviewOverlay, PreviewTokenPayload, StagedFileMeta } 
  * session lives in the database.
  */
 
+/**
+ * The typed reason a preview degraded to the field comparison (005 contracts/language.md §4.2).
+ *
+ * WHY A CODE AND NOT A TRANSLATED SENTENCE. These strings reach the panel with NO MODEL TURN in
+ * front of them (`preview.ts` -> `PreviewPanel.tsx`), so the `language` instruction section cannot
+ * reach them — an editor working in Ukrainian would read English. Fixed product copy with no model
+ * in its path can be localized exactly one way: the server sends a code and its parameters, and the
+ * admin renders it through the `registerTrads` / react-intl path it already has.
+ *
+ * A server-side translation catalogue was the alternative, and it is worse in two ways: it
+ * introduces a translation mechanism the server does not have, and it is bounded to whatever
+ * languages the plugin happens to ship. The admin's catalogue is the consumer's to extend.
+ */
+export type PreviewReasonCode =
+  | 'preview.fallback.disabled'
+  | 'preview.fallback.no_path'
+  | 'preview.fallback.missing_fields'
+  | 'preview.fallback.nothing_previewable';
+
 export interface PreviewSessionResult {
   ok: boolean;
   error?: string;
   message?: string;
+  /**
+   * ADDED ALONGSIDE `message`, never instead of it (contracts/language.md §4.1 rule 1). `message`
+   * stays the exact English sentence it has always been, so logs, the HTTP contract and any
+   * consumer reading it are untouched — and an admin that does not recognise a code renders that
+   * sentence as its `defaultMessage`. The degradation is a no-op, not a blank panel.
+   */
+  reasonCode?: PreviewReasonCode;
+  /** Interpolation values for the code's message. Identifiers, never translated (FR-005). */
+  reasonParams?: Record<string, string>;
   fallback?: 'field-diff';
   sessionId?: string;
   token?: string;
@@ -73,13 +101,22 @@ const previewService = ({ strapi }: { strapi: Core.Strapi }) => {
     resolvePreviewUrl(
       contentTypeUid: string,
       doc: Record<string, unknown> | null
-    ): { ok: true; url: string } | { ok: false; message: string } {
+    ):
+      | { ok: true; url: string }
+      | {
+          ok: false;
+          message: string;
+          reasonCode: PreviewReasonCode;
+          reasonParams: Record<string, string>;
+        } {
       const opts = options();
       if (!opts.enabled) {
         return {
           ok: false,
           message:
             'Front-end preview is not enabled for this project. Showing the field comparison instead.',
+          reasonCode: 'preview.fallback.disabled',
+          reasonParams: {},
         };
       }
       const pattern = opts.paths[contentTypeUid];
@@ -87,6 +124,8 @@ const previewService = ({ strapi }: { strapi: Core.Strapi }) => {
         return {
           ok: false,
           message: `No preview target is configured for ${contentTypeUid}. Showing the field comparison instead.`,
+          reasonCode: 'preview.fallback.no_path',
+          reasonParams: { contentTypeUid },
         };
       }
       // Fill :token segments from the target document's own fields.
@@ -105,6 +144,9 @@ const previewService = ({ strapi }: { strapi: Core.Strapi }) => {
           message: `The preview path for ${contentTypeUid} needs ${missing
             .map((m) => `"${m}"`)
             .join(', ')}, which this entry does not have. Showing the field comparison instead.`,
+          reasonCode: 'preview.fallback.missing_fields',
+          // Field names are identifiers: they are interpolated as-is and never translated (FR-005).
+          reasonParams: { contentTypeUid, fields: missing.join(', ') },
         };
       }
       return { ok: true, url: `${opts.baseUrl}${path.startsWith('/') ? '' : '/'}${path}` };
@@ -187,6 +229,8 @@ const previewService = ({ strapi }: { strapi: Core.Strapi }) => {
           error: 'preview_not_configured',
           fallback: 'field-diff',
           message: 'This plan has nothing a front-end page could render. Showing the field comparison instead.',
+          reasonCode: 'preview.fallback.nothing_previewable',
+          reasonParams: {},
         };
       }
 
@@ -205,6 +249,10 @@ const previewService = ({ strapi }: { strapi: Core.Strapi }) => {
           error: 'preview_not_configured',
           fallback: 'field-diff',
           message: resolved.message,
+          // Carried through unchanged: the resolver decided which degradation this is, and
+          // re-deriving it here would be a second place for the two to disagree.
+          reasonCode: resolved.reasonCode,
+          reasonParams: resolved.reasonParams,
         };
       }
 
