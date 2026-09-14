@@ -35,6 +35,19 @@ const bodySchema = z
     // curated list, never normalized, lowercased or date-suffixed (FR-004, FR-005).
     activeModel: z.string().optional(),
     grounding: z.object({ enabled: z.boolean() }).strict().optional(),
+    /**
+     * Which generated context the instructions carry, and how deep a brief run reads. Both are
+     * CLOSED enums here, unlike `activeModel` above: a value outside them is a prompt this build
+     * cannot compose or a sample size it cannot take, so it is refused at the edge rather than
+     * stored and silently ignored.
+     */
+    contentBrief: z
+      .object({
+        source: z.enum(['schema', 'brief', 'both']).optional(),
+        depth: z.enum(['light', 'standard', 'deep']).optional(),
+      })
+      .strict()
+      .optional(),
     providers: z.record(z.string(), providerPatchSchema).optional(),
   })
   .strict();
@@ -116,6 +129,10 @@ const settingsController = ({ strapi }: { strapi: Core.Strapi }) => {
 
       if (body.grounding) {
         await svc.setGroundingEnabled(body.grounding.enabled);
+      }
+
+      if (body.contentBrief) {
+        await svc.setContentBrief(body.contentBrief);
       }
 
       // `activeModel` is stored exactly as received. A directly entered identifier must survive a

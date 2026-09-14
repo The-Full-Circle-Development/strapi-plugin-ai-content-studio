@@ -5,7 +5,7 @@ const React = require("react");
 const reactIntl = require("react-intl");
 const admin = require("@strapi/strapi/admin");
 const designSystem = require("@strapi/design-system");
-const index = require("./index-DXgiN1qj.js");
+const index = require("./index-C4JnU-nU.js");
 function _interopNamespace(e) {
   if (e && e.__esModule) return e;
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
@@ -68,6 +68,17 @@ const PROVIDER_CATALOG = [
   }
 ];
 const getProviderEntry = (id) => PROVIDER_CATALOG.find((p) => p.id === id) ?? null;
+const DEPTH_SAMPLE = { light: 5, standard: 15, deep: 50 };
+const DEPTH_LABEL = {
+  light: "Light — 5 entries per content type",
+  standard: "Standard — 15 entries per content type",
+  deep: "Deep — 50 entries per content type"
+};
+const SOURCE_LABEL = {
+  schema: "Schema only — the generated structure description",
+  brief: "Brief only — the content briefing",
+  both: "Both — structure, then the briefing"
+};
 const PROVIDER_IDS = PROVIDER_CATALOG.map((p) => p.id);
 const emptyByProvider = (value) => PROVIDER_IDS.reduce((acc, p) => {
   acc[p] = value;
@@ -76,7 +87,7 @@ const emptyByProvider = (value) => PROVIDER_IDS.reduce((acc, p) => {
 const curatedFor = (providerId) => MODELS[providerId] ?? null;
 const SettingsForm = () => {
   const { formatMessage } = reactIntl.useIntl();
-  const { get, put } = admin.useFetchClient();
+  const { get, put, post } = admin.useFetchClient();
   const { toggleNotification } = admin.useNotification();
   const [loading, setLoading] = React__namespace.useState(true);
   const [saving, setSaving] = React__namespace.useState(false);
@@ -89,11 +100,18 @@ const SettingsForm = () => {
   const [keyDirty, setKeyDirty] = React__namespace.useState(emptyByProvider(false));
   const [baseUrl, setBaseUrl] = React__namespace.useState(emptyByProvider(""));
   const [inspector, setInspector] = React__namespace.useState(null);
+  const [briefSource, setBriefSource] = React__namespace.useState("schema");
+  const [briefDepth, setBriefDepth] = React__namespace.useState("deep");
+  const [brief, setBrief] = React__namespace.useState(null);
+  const [briefBusy, setBriefBusy] = React__namespace.useState(false);
+  const [runIntent, setRunIntent] = React__namespace.useState(false);
   const hydrate = React__namespace.useCallback((data) => {
     setServer(data);
     setActiveProvider(data.activeProvider);
     setActiveModel(data.activeModel);
     setGrounding(data.grounding?.enabled !== false);
+    setBriefSource(data.contentBrief?.source ?? "schema");
+    setBriefDepth(data.contentBrief?.depth ?? "deep");
     setEnabled(
       PROVIDER_IDS.reduce((acc, p) => {
         acc[p] = data.providers[p]?.enabled ?? false;
@@ -117,6 +135,25 @@ const SettingsForm = () => {
       setInspector(null);
     }
   }, [get]);
+  const loadBrief = React__namespace.useCallback(async () => {
+    try {
+      const { data } = await get("/ai-content-studio/content-brief");
+      setBrief(data);
+      return data;
+    } catch {
+      setBrief(null);
+      return null;
+    }
+  }, [get]);
+  React__namespace.useEffect(() => {
+    if (!brief?.run.active) {
+      return void 0;
+    }
+    const id = window.setInterval(() => {
+      void loadBrief();
+    }, 3e3);
+    return () => window.clearInterval(id);
+  }, [brief?.run.active, loadBrief]);
   React__namespace.useEffect(() => {
     let active = true;
     (async () => {
@@ -126,6 +163,7 @@ const SettingsForm = () => {
           hydrate(data);
         }
         await loadInspector();
+        await loadBrief();
       } catch {
         toggleNotification({
           type: "danger",
@@ -143,7 +181,25 @@ const SettingsForm = () => {
     return () => {
       active = false;
     };
-  }, [get, hydrate, loadInspector, toggleNotification, formatMessage]);
+  }, [get, hydrate, loadInspector, loadBrief, toggleNotification, formatMessage]);
+  const onRunBrief = async () => {
+    setRunIntent(false);
+    setBriefBusy(true);
+    try {
+      const { data } = await post("/ai-content-studio/content-brief/run", { depth: briefDepth });
+      const started = data;
+      toggleNotification({
+        type: "info",
+        message: `Brief run started over ${started.contentTypes} content type${started.contentTypes === 1 ? "" : "s"}. You can leave this page — it continues in the background.`
+      });
+      await loadBrief();
+    } catch (err) {
+      const message = err?.response?.data?.error?.message ?? "Could not start the brief run.";
+      toggleNotification({ type: "danger", message });
+    } finally {
+      setBriefBusy(false);
+    }
+  };
   const onSave = async () => {
     setSaving(true);
     try {
@@ -174,12 +230,16 @@ const SettingsForm = () => {
       if (server && grounding !== (server.grounding?.enabled !== false)) {
         body.grounding = { enabled: grounding };
       }
+      if (server && (briefSource !== server.contentBrief?.source || briefDepth !== server.contentBrief?.depth)) {
+        body.contentBrief = { source: briefSource, depth: briefDepth };
+      }
       if (Object.keys(providers).length > 0) {
         body.providers = providers;
       }
       const { data } = await put("/ai-content-studio/settings", body);
       hydrate(data);
       await loadInspector();
+      await loadBrief();
       toggleNotification({
         type: "success",
         message: formatMessage({
@@ -365,6 +425,162 @@ const SettingsForm = () => {
             }
           ) : null
         ] }) : null
+      ] }),
+      /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { padding: 4, hasRadius: true, background: "neutral0", borderColor: "neutral200", children: [
+        /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "delta", children: "Content briefing" }),
+        /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 2, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral600", children: "A one-off run that reads a sample of this project’s real entries and writes a short, human-readable briefing: one paragraph on what this project is, then one per content type on what it is for and how it is actually used." }) }),
+        /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { marginTop: 3, children: /* @__PURE__ */ jsxRuntime.jsxs(
+          designSystem.Field.Root,
+          {
+            name: "brief-source",
+            hint: !grounding || groundingLockedByConfig ? "Turn the structure switch above on to use either source — it is the one control for putting generated context in the prompt at all." : briefSource === "brief" ? "The briefing replaces the structure description. The assistant keeps exact field names through its read tools, but loses the dotted media-slot paths the description lists up front." : briefSource === "both" ? "Structure first, briefing second. Each has its own character budget, so together they cannot crowd out the conversation." : "The current behaviour: schema-derived structure only. No content is read.",
+            children: [
+              /* @__PURE__ */ jsxRuntime.jsx(designSystem.Field.Label, { children: "What the assistant’s instructions carry" }),
+              /* @__PURE__ */ jsxRuntime.jsx(
+                designSystem.SingleSelect,
+                {
+                  value: briefSource,
+                  onChange: (value) => setBriefSource(String(value)),
+                  disabled: !grounding || groundingLockedByConfig,
+                  children: Object.keys(SOURCE_LABEL).map((id) => /* @__PURE__ */ jsxRuntime.jsx(designSystem.SingleSelectOption, { value: id, children: SOURCE_LABEL[id] }, id))
+                }
+              ),
+              /* @__PURE__ */ jsxRuntime.jsx(designSystem.Field.Hint, {})
+            ]
+          }
+        ) }),
+        /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { marginTop: 3, children: /* @__PURE__ */ jsxRuntime.jsxs(
+          designSystem.Field.Root,
+          {
+            name: "brief-depth",
+            hint: "Entries are sampled from both ends of the update order, so the briefing reflects what the project has settled into as well as what it is doing now.",
+            children: [
+              /* @__PURE__ */ jsxRuntime.jsx(designSystem.Field.Label, { children: "How much content one run reads" }),
+              /* @__PURE__ */ jsxRuntime.jsx(
+                designSystem.SingleSelect,
+                {
+                  value: briefDepth,
+                  onChange: (value) => setBriefDepth(String(value)),
+                  children: Object.keys(DEPTH_LABEL).map((id) => /* @__PURE__ */ jsxRuntime.jsx(designSystem.SingleSelectOption, { value: id, children: DEPTH_LABEL[id] }, id))
+                }
+              ),
+              /* @__PURE__ */ jsxRuntime.jsx(designSystem.Field.Hint, {})
+            ]
+          }
+        ) }),
+        brief ? /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { marginTop: 3, padding: 3, hasRadius: true, background: "neutral100", borderColor: "neutral200", children: [
+          /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", fontWeight: "bold", textColor: "neutral700", children: "What a full run costs" }),
+          /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 1, children: /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Typography, { variant: "pi", textColor: "neutral600", children: [
+            brief.readableCount,
+            " content type",
+            brief.readableCount === 1 ? "" : "s",
+            " ×",
+            " ",
+            DEPTH_SAMPLE[briefDepth],
+            " entries read =",
+            " ",
+            /* @__PURE__ */ jsxRuntime.jsxs("strong", { children: [
+              brief.estimate.modelCalls,
+              " model call",
+              brief.estimate.modelCalls === 1 ? "" : "s"
+            ] }),
+            " ",
+            "billed to your active provider — one per content type",
+            brief.scopeToReader ? "" : ", plus one for the project overview",
+            " — run sequentially. Expect roughly",
+            " ",
+            Math.max(1, Math.round(brief.estimate.modelCalls * 4 / 60)),
+            "–",
+            Math.max(1, Math.round(brief.estimate.modelCalls * 12 / 60)),
+            " minute",
+            brief.estimate.modelCalls > 15 ? "s" : "",
+            ". Re-running replaces every section."
+          ] }) }),
+          /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 2, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral600", children: brief.scopeToReader ? "Every account is served only the sections its own permissions allow, and the project overview is withheld. Set contentBrief.scopeToReader to false in the host application’s config/plugins.ts for one shared briefing." : "One briefing, identical for every account that can use the chat — overview included — regardless of their own content permissions. It never describes a content type you cannot read yourself, and it changes nothing about what the assistant may do: every read and every change is still checked against the acting account. Set contentBrief.scopeToReader to true in the host application’s config/plugins.ts to serve each reader only their own sections instead." }) }),
+          brief.autoRefresh ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 2, children: /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Typography, { variant: "pi", textColor: "neutral600", children: [
+            "After the first run, sections whose content or schema changed are refreshed automatically during chat sessions — at most",
+            " ",
+            brief.maxAutoRefreshSections,
+            " content type",
+            brief.maxAutoRefreshSections === 1 ? "" : "s",
+            " per pass and no more than once every ",
+            brief.refreshThrottleMinutes,
+            " minutes. That is the only way this feature spends anything without a click; set contentBrief.autoRefresh to false in the host application’s config/plugins.ts to disable it."
+          ] }) }) : null
+        ] }) : null,
+        brief ? /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { marginTop: 3, children: [
+          /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", fontWeight: "bold", textColor: "neutral700", children: brief.run.active ? `Running — ${brief.run.doneCount} of ${brief.run.totalCount} done${brief.run.currentUid ? `, on ${brief.run.currentUid}` : ""}` : brief.run.state === "never-run" ? "No briefing has been generated yet." : `${brief.sectionCount} content type${brief.sectionCount === 1 ? "" : "s"} described${brief.run.completedAt ? `, last run ${new Date(brief.run.completedAt).toLocaleString()}` : ""}${brief.staleCount > 0 ? `, ${brief.staleCount} out of date` : ""}${brief.missingCount > 0 ? `, ${brief.missingCount} never described` : ""}` }),
+          brief.run.error ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 1, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "danger600", children: brief.run.error }) }) : null
+        ] }) : null,
+        runIntent ? /* @__PURE__ */ jsxRuntime.jsxs(
+          designSystem.Box,
+          {
+            marginTop: 3,
+            padding: 3,
+            hasRadius: true,
+            background: "danger100",
+            borderColor: "danger200",
+            children: [
+              /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Typography, { variant: "pi", fontWeight: "bold", textColor: "danger700", children: [
+                "Start a run of ",
+                brief?.estimate.modelCalls ?? 0,
+                " model call",
+                (brief?.estimate.modelCalls ?? 0) === 1 ? "" : "s",
+                "?"
+              ] }),
+              /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 1, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "danger700", children: "This bills your active provider and replaces every existing section. It cannot be cancelled once started." }) }),
+              /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Flex, { gap: 2, paddingTop: 2, children: [
+                /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { variant: "danger", onClick: () => void onRunBrief(), loading: briefBusy, children: "Yes, run it" }),
+                /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { variant: "tertiary", onClick: () => setRunIntent(false), disabled: briefBusy, children: "Cancel" })
+              ] })
+            ]
+          }
+        ) : null,
+        /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Flex, { gap: 2, marginTop: 3, children: [
+          /* @__PURE__ */ jsxRuntime.jsx(
+            designSystem.Button,
+            {
+              variant: "secondary",
+              onClick: () => setRunIntent(true),
+              disabled: briefBusy || runIntent || Boolean(brief?.run.active) || brief?.enabled === false,
+              children: brief?.run.state === "never-run" ? "Generate briefing" : "Re-run briefing"
+            }
+          ),
+          brief?.run.active ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral600", children: "Running in the background — you can leave this page." }) : null
+        ] }),
+        brief?.enabled === false ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 2, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral600", children: "Turned off for this deployment by the contentBrief.enabled plugin config key. Change it in the host application’s config/plugins.ts to re-enable this control." }) }) : null,
+        brief && (brief.sections.length > 0 || brief.overview) ? /* @__PURE__ */ jsxRuntime.jsxs(
+          designSystem.Box,
+          {
+            marginTop: 3,
+            padding: 3,
+            hasRadius: true,
+            background: "neutral100",
+            borderColor: "neutral200",
+            style: { maxHeight: "22rem", overflow: "auto" },
+            children: [
+              brief.overview ? /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { paddingBottom: 3, children: [
+                /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", fontWeight: "bold", textColor: "neutral700", children: "What this project is" }),
+                /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 1, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral700", children: brief.overview }) })
+              ] }) : null,
+              brief.sections.map((section) => /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Box, { paddingBottom: 3, children: [
+                /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Typography, { variant: "pi", fontWeight: "bold", textColor: "neutral700", children: [
+                  section.uid,
+                  section.stale ? " — out of date" : ""
+                ] }),
+                /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 1, children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral700", children: section.text }) }),
+                /* @__PURE__ */ jsxRuntime.jsx(designSystem.Box, { paddingTop: 1, children: /* @__PURE__ */ jsxRuntime.jsxs(designSystem.Typography, { variant: "pi", textColor: "neutral500", children: [
+                  section.sampledCount,
+                  " of ",
+                  section.totalCount,
+                  " entries read ·",
+                  " ",
+                  new Date(section.generatedAt).toLocaleDateString()
+                ] }) })
+              ] }, section.uid))
+            ]
+          }
+        ) : null
       ] }),
       activeEntry?.requiresBaseUrl ? /* @__PURE__ */ jsxRuntime.jsx(designSystem.Typography, { variant: "pi", textColor: "neutral600", children: "The active provider requires a Base URL. Without a valid one, requests are refused before generation begins rather than failing mid-reply." }) : null,
       /* @__PURE__ */ jsxRuntime.jsx(designSystem.Flex, { children: /* @__PURE__ */ jsxRuntime.jsx(designSystem.Button, { onClick: onSave, loading: saving, disabled: saving, children: formatMessage({ id: index.getTranslation("settings.save"), defaultMessage: "Save" }) }) })

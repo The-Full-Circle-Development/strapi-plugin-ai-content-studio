@@ -177,9 +177,12 @@ Four properties are what make that safe to have on by default:
 - **Permission-filtered.** A content type appears only if the **calling** account can read it, via
   the same live check every tool makes. Two accounts legitimately see different descriptions.
 - **Size-bounded.** A declared character budget (24,000 by default) with deterministic tiered
-  degradation — full, then component expansions dropped, then names and flags only, then content
-  types dropped from the end of the sorted order with the count stated. It says when it is partial
-  and tells the assistant to discover the rest with tools.
+  degradation — full, then component expansions dropped, then names and flags only, then **identities
+  only** (uid, display name and kind, one line each), and only then content types dropped from the
+  end of the sorted order with the count stated. The identities-only tier is what keeps a large
+  install fully **nameable**: a content type the assistant is never shown is one it cannot ask about,
+  whereas an identity line costs a fraction of a full entry. It says when it is partial and tells the
+  assistant to discover the rest with tools.
 - **Inspectable.** The settings page shows the **exact** text your requests are carrying, its tier
   and its size against the budget.
 
@@ -214,6 +217,93 @@ flipping a control that does nothing.
 With grounding off, the assistant falls back to tool-based discovery and **nothing else about its
 behaviour changes** — no other instruction changes, no tool is added or removed, and stored history
 stays valid.
+
+---
+
+## Content briefing (opt-in, costs provider calls)
+
+The structure description above answers *what fields exist*. It cannot answer *what this project
+is* — a schema says a `page` has a `hero.image`; it cannot say the project uses `page` for marketing
+landing pages, or that one flag marks entries nobody maintains. Nothing in a schema carries that.
+
+The **content briefing** does. It is a one-off run, started from **Settings**, that reads a sample of
+your real entries and writes a short, human-readable briefing: one paragraph on what this project
+*is*, then one per content type — what it is for, how it is actually used, and the conventions a
+newcomer would otherwise learn the hard way.
+
+**One briefing, the same for everyone.** A super-admin runs it once, and every account with chat
+access reads the same text.
+
+### Choosing what the assistant carries
+
+| Setting | Effect |
+|---|---|
+| **Schema only** | the generated structure description — **the default, and the behaviour you already have** |
+| **Brief only** | the briefing instead of the structure description |
+| **Both** | structure first, briefing second, each with its own character budget |
+
+Depth is chosen in the same panel: **Light** (5 entries per content type), **Standard** (15) or
+**Deep** (50). Entries are sampled from both ends of the update order, so the briefing reflects what
+the project has settled into as well as what it is doing now.
+
+### ⚠ What it costs
+
+A full run is **one model call per content type, plus one for the project overview**, billed to your
+active provider and run sequentially — 40 content types is 41 calls and a few minutes. The settings
+panel states the exact count and an estimated duration **before** the button is armed, and Run only
+arms a confirmation: the run starts on the confirmation, never on the first click.
+
+After the first run, sections whose content or schema changed are refreshed **automatically** during
+chat sessions. This is the only thing in this plugin that spends provider money without a click, and
+it is bounded three ways: only genuinely stale sections are eligible, at most
+`maxAutoRefreshSections` per pass, and no more than once every `refreshThrottleMinutes`. It never
+runs on an install that has no briefing yet — the first run is always a deliberate act.
+
+```ts
+// config/plugins.ts
+'ai-content-studio': {
+  enabled: true,
+  config: {
+    contentBrief: {
+      enabled: true,              // hard off-switch, like grounding.enabled
+      maxChars: 24000,            // budget for the assembled brief, clamped 2000..80000
+      maxSectionChars: 1200,      // per content type
+      autoRefresh: true,          // set false to keep ONLY the manual button
+      refreshThrottleMinutes: 60,
+      maxAutoRefreshSections: 3,
+      scopeToReader: false,       // false = ONE briefing, identical for every account
+    },
+  },
+},
+```
+
+### Who can read it
+
+Every account with chat access reads the **same** briefing, overview included, regardless of its own
+content permissions. That is a real disclosure, so it is bounded and stated:
+
+- the run reads only what the **account that started it** can read, so the briefing can never
+  describe a content type that super-admin could not see;
+- the settings page says who will be able to read the result, next to the cost, **before** the run
+  can be started;
+- it changes nothing about what the assistant can **do**. Every tool still checks the acting
+  account's permissions before touching content, and the approval path is still the only way
+  anything is written. The briefing is orientation, not access.
+
+If that is not acceptable for your install — multi-tenant, or a content type only one team may know
+exists — set `contentBrief.scopeToReader: true`. Each reader is then served only the sections their
+own permissions allow, and the project overview is withheld entirely, because a paragraph
+synthesized across every content type cannot be filtered.
+
+### It is orientation, not authority
+
+The briefing enters the instructions as clearly delimited prose, under a preamble stating that it is
+not authoritative, not current, and grants no permission — and that **field names and identifiers
+never come from it**. Those come from the schema and the read tools, which read the live record.
+Where the briefing and a tool result disagree, the tool result wins.
+
+It is model-written from a sample, so treat it as a useful impression rather than a fact: it can be
+out of date or simply wrong about a convention, which is why it can never override a tool.
 
 ---
 
@@ -587,6 +677,11 @@ server/src/
                           version derived from their own text
   services/grounding.ts   the deterministic, permission-scoped, size-bounded
                           description of this install's schema
+  services/content-brief.ts  the model-written briefing about this install's
+                          CONTENT: the walk, the background run, the project
+                          overview, the staleness signal, and the assembly —
+                          one briefing shared by every account, with
+                          scopeToReader as the per-reader opt-out
   services/threads.ts     owner-scoped conversations, message append, condensing
   services/change-sets.ts propose -> apply -> publish, the seven-step gate,
                           the ONLY write path
@@ -595,7 +690,8 @@ server/src/
   services/tools.ts       one tool set: listContentTypes, searchEntries, getEntry,
                           describePageStructure, proposeChanges
   middlewares/preview-overlay.ts  content-API response overlay, inert without a token
-  controllers/            chat, threads, change-sets, attachments, preview, settings
+  controllers/            chat, threads, change-sets, attachments, preview,
+                          settings, content-brief
   routes/index.ts         type:'admin' routes under /ai-content-studio/*
   routes/preview.ts       the single token-gated non-admin route (staged files)
   policies/               is-super-admin
@@ -603,7 +699,8 @@ admin/src/
   index.ts                addMenuLink (Chat) + addSettingsLink (Settings)
   pages/Chat.tsx          page shell: transport + useChat + wiring
   pages/Settings.tsx      provider/model/base-URL fields, masked write-only keys,
-                          the grounding toggle and its inspector
+                          the grounding toggle and its inspector, the content
+                          briefing (source, depth, stated cost, run, progress)
   components/             ThreadSidebar, MessageList, Composer, CopyButton,
                           ChangePlanCard, PreviewPanel
   hooks/                  useThreads, useChangeSet, useAttachments, useCopy

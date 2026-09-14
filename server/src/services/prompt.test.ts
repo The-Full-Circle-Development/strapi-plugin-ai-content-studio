@@ -24,8 +24,12 @@ const baseInputs = (overrides: Partial<InstructionInputs> = {}): InstructionInpu
   schemaFingerprint: 'fp-schema',
   contextSummary: null,
   install: null,
+  brief: null,
   ...overrides,
 });
+
+/** A brief as the content-brief service assembles one: prose, per content type. */
+const BRIEF_TEXT = '- some::uid — "Thing"\n  Holds the things. Most entries fill only the title.';
 
 /** Every combination of the flags that can vary the composition. */
 const allCombinations = (): InstructionInputs[] => {
@@ -39,16 +43,27 @@ const allCombinations = (): InstructionInputs[] => {
             { text: '#### Content types\n- some::uid — "Thing" (collection)', partial: false },
             { text: '#### Content types\n- some::uid — "Thing" (collection)', partial: true },
           ]) {
-            out.push(
-              baseInputs({
-                supportsVision,
-                hasAttachments,
-                groundingEnabled,
-                readableUids: groundingEnabled ? ['some::uid'] : [],
-                contextSummary,
-                install,
-              })
-            );
+            // The brief is varied alongside `install` rather than in its own suite, so the
+            // determinism, ordering and prohibition tests below all exercise it for free — the
+            // three selections an administrator can make (schema / brief / both) are exactly the
+            // three shapes of this pair.
+            for (const brief of [
+              null,
+              { text: BRIEF_TEXT, partial: false },
+              { text: BRIEF_TEXT, partial: true },
+            ]) {
+              out.push(
+                baseInputs({
+                  supportsVision,
+                  hasAttachments,
+                  groundingEnabled,
+                  readableUids: groundingEnabled ? ['some::uid'] : [],
+                  contextSummary,
+                  install,
+                  brief,
+                })
+              );
+            }
           }
         }
       }
@@ -145,9 +160,87 @@ describe('declared section order (contracts/instructions.md §1)', () => {
       )
     ).toBe(false);
 
+    // 10a — only when a brief was assembled for this caller and it actually says something.
+    expect(has(composeInstructions(baseInputs({ brief: null })).sections, 'brief')).toBe(false);
+    expect(
+      has(composeInstructions(baseInputs({ brief: { text: BRIEF_TEXT, partial: false } })).sections, 'brief')
+    ).toBe(true);
+    // An empty or whitespace-only brief is the same as none: an empty delimiter block would tell
+    // the model this project has no content, which is a different and false claim.
+    expect(
+      has(composeInstructions(baseInputs({ brief: { text: '   \n ', partial: false } })).sections, 'brief')
+    ).toBe(false);
+    // Absent and null are the same input, so every caller written before the brief existed
+    // composes byte-identically.
+    const withoutKey = baseInputs();
+    delete (withoutKey as { brief?: unknown }).brief;
+    expect(composeInstructions(withoutKey).text).toBe(
+      composeInstructions(baseInputs({ brief: null })).text
+    );
+
     // 11 — only when the thread has a condensed summary.
     expect(has(composeInstructions(baseInputs({ contextSummary: null })).sections, 'condensed')).toBe(false);
     expect(has(composeInstructions(baseInputs({ contextSummary: 'x' })).sections, 'condensed')).toBe(true);
+  });
+});
+
+/**
+ * The brief is model-written prose about real content sitting in a prompt beside schema facts that
+ * are true by construction. Everything asserted here is about keeping those two apart.
+ */
+describe('the content brief section (contracts/content-brief.md §3)', () => {
+  const brief = { text: BRIEF_TEXT, partial: false };
+  const install = { text: '#### Content types\n- a::a — "A" (collection)', partial: false };
+
+  it('is delimited, so prose can never be mistaken for an instruction', () => {
+    const { text } = composeInstructions(baseInputs({ brief }));
+    expect(text).toContain('<content-brief>');
+    expect(text).toContain('</content-brief>');
+    expect(text).toContain(BRIEF_TEXT);
+  });
+
+  it('states that it is neither authoritative nor current, and that tools win', () => {
+    const { text } = composeInstructions(baseInputs({ brief }));
+    expect(text).toMatch(/NOT authoritative/);
+    expect(text).toMatch(/THE TOOL RESULT WINS/);
+    // The one mistake that would actually corrupt a proposal: taking a field name from prose.
+    expect(text).toMatch(/NEVER take a field name/);
+  });
+
+  it('grants no permission, in its own words', () => {
+    const { text } = composeInstructions(baseInputs({ brief }));
+    expect(text).toMatch(/GRANTS NO PERMISSION/);
+  });
+
+  it('says so when it was shortened to fit its budget', () => {
+    expect(composeInstructions(baseInputs({ brief: { text: BRIEF_TEXT, partial: true } })).text).toMatch(
+      /briefing is PARTIAL/
+    );
+    expect(composeInstructions(baseInputs({ brief })).text).not.toMatch(/briefing is PARTIAL/);
+  });
+
+  it('places the schema facts BEFORE the prose when both are carried', () => {
+    const { text, sections } = composeInstructions(
+      baseInputs({ groundingEnabled: true, readableUids: ['a::a'], install, brief })
+    );
+    expect(sections.indexOf('install')).toBeLessThan(sections.indexOf('brief'));
+    expect(text.indexOf('<install-structure>')).toBeLessThan(text.indexOf('<content-brief>'));
+  });
+
+  it('carries the brief alone when no description was rendered — the `brief` selection', () => {
+    const { sections } = composeInstructions(
+      baseInputs({ groundingEnabled: true, readableUids: ['a::a'], install: null, brief })
+    );
+    expect(sections).toContain('brief');
+    expect(sections).not.toContain('install');
+  });
+
+  it('does NOT change the instruction version — it is per-install fact, not a rule', () => {
+    // The same reason the install description is excluded from the hash (research D10): a version
+    // that differed between two installs running identical rules would identify nothing.
+    expect(composeInstructions(baseInputs({ brief })).version).toBe(
+      composeInstructions(baseInputs({ brief: null })).version
+    );
   });
 });
 

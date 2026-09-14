@@ -1,11 +1,12 @@
-import { aE as AnthropicError } from "./index-D5zw8c7m.mjs";
-import { aF, aG } from "./index-D5zw8c7m.mjs";
+"use strict";
+Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+const index = require("./index-Bcyu31Tu.js");
 function nodeOnly(name) {
-  throw new AnthropicError(`${name} requires Node.js or a Node-compatible runtime`);
+  throw new index.AnthropicError(`${name} requires Node.js or a Node-compatible runtime`);
 }
 const MEMORY_FLUSH_TIMEOUT_MS = 3e4;
 const MARKER_PATH = ".anthropic-memory-store";
-class SessionMemoryError extends AnthropicError {
+class SessionMemoryError extends index.AnthropicError {
   constructor(message, cause) {
     super(message);
     this.name = "SessionMemoryError";
@@ -58,7 +59,7 @@ function betaAgentToolset20260401(_ctx) {
 function resolvePath(_ctx, _p) {
   return nodeOnly("resolvePath");
 }
-class BashTimeoutError extends AnthropicError {
+class BashTimeoutError extends index.AnthropicError {
   constructor(timeoutMs) {
     super(`bash command timed out after ${timeoutMs}ms`);
     this.name = "BashTimeoutError";
@@ -97,24 +98,22 @@ function betaGlobTool(_ctx) {
 function betaGrepTool(_ctx) {
   return nodeOnly("betaGrepTool");
 }
-export {
-  BashSession,
-  BashTimeoutError,
-  aF as DEFAULT_MEMORY_SYNC_INTERVAL_MS,
-  MARKER_PATH,
-  MEMORY_FLUSH_TIMEOUT_MS,
-  aG as MIN_MEMORY_SYNC_INTERVAL_MS,
-  SessionMemoryError,
-  SessionMemoryStores,
-  betaAgentToolset20260401,
-  betaBashTool,
-  betaEditTool,
-  betaGlobTool,
-  betaGrepTool,
-  betaReadTool,
-  betaWriteTool,
-  extractSkillArchive,
-  resolvePath,
-  resolveSkillVersion,
-  setupSkills
-};
+exports.DEFAULT_MEMORY_SYNC_INTERVAL_MS = index.DEFAULT_MEMORY_SYNC_INTERVAL_MS;
+exports.MIN_MEMORY_SYNC_INTERVAL_MS = index.MIN_MEMORY_SYNC_INTERVAL_MS;
+exports.BashSession = BashSession;
+exports.BashTimeoutError = BashTimeoutError;
+exports.MARKER_PATH = MARKER_PATH;
+exports.MEMORY_FLUSH_TIMEOUT_MS = MEMORY_FLUSH_TIMEOUT_MS;
+exports.SessionMemoryError = SessionMemoryError;
+exports.SessionMemoryStores = SessionMemoryStores;
+exports.betaAgentToolset20260401 = betaAgentToolset20260401;
+exports.betaBashTool = betaBashTool;
+exports.betaEditTool = betaEditTool;
+exports.betaGlobTool = betaGlobTool;
+exports.betaGrepTool = betaGrepTool;
+exports.betaReadTool = betaReadTool;
+exports.betaWriteTool = betaWriteTool;
+exports.extractSkillArchive = extractSkillArchive;
+exports.resolvePath = resolvePath;
+exports.resolveSkillVersion = resolveSkillVersion;
+exports.setupSkills = setupSkills;

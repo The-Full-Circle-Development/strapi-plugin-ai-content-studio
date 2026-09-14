@@ -68,6 +68,8 @@ export const INSTRUCTION_SECTION_IDS = [
   'attachments',
   'attachments-blind',
   'install',
+  // 10a. After `install`, so the schema facts frame the prose rather than the other way round.
+  'brief',
   'condensed',
 ] as const;
 
@@ -97,7 +99,7 @@ export interface InstructionSet {
 /* -------------------------------------------------------------- grounding */
 
 /** Deterministic degradation tiers, applied by the same rule every time (FR-032). */
-export type GroundingTier = 'full' | 'no-components' | 'names-only';
+export type GroundingTier = 'full' | 'no-components' | 'names-only' | 'index';
 
 /**
  * Generated structural facts about the running install (data-model §5).
@@ -124,6 +126,75 @@ export interface InstallDescription {
   contentTypeCount: number;
   /** How many were dropped from the end of the sorted order to fit the budget. */
   omittedContentTypeCount: number;
+}
+
+/* ---------------------------------------------------------- content brief */
+
+/**
+ * Which generated context the instructions carry (contracts/content-brief.md §2).
+ *
+ * `schema` is the deterministic install description; `brief` is the model-written content brief;
+ * `both` carries each under its own heading and its own character budget.
+ */
+export type GroundingSource = 'schema' | 'brief' | 'both';
+
+/** How many entries one run reads per content type. Chosen by an administrator in Settings. */
+export type BriefDepth = 'light' | 'standard' | 'deep';
+
+/** Entries sampled per content type, per depth. The only place these numbers are defined. */
+export const BRIEF_DEPTH_SAMPLE: Readonly<Record<BriefDepth, number>> = {
+  light: 5,
+  standard: 15,
+  deep: 50,
+};
+
+export type BriefRunState = 'never-run' | 'running' | 'ready' | 'failed';
+
+/**
+ * One content type's section of the brief.
+ *
+ * SECTIONED PER CONTENT TYPE ON PURPOSE, and that is a Principle II requirement rather than a
+ * storage convenience: the brief is generated once and shared by every account, so the only way it
+ * can never tell an account something its own permissions would not is to be assembled per caller
+ * from the sections that caller can read. A single blob could not be filtered.
+ */
+export interface BriefSection {
+  uid: string;
+  /** The human-readable prose. No JSON, no field dumps — that is what the schema source is for. */
+  text: string;
+  /** The schema fingerprint at generation time. A change makes this section stale. */
+  schemaFingerprint: string;
+  /** Entry count + newest `updatedAt`, hashed. A change makes this section stale. */
+  contentFingerprint: string;
+  sampledCount: number;
+  totalCount: number;
+  generatedAt: string;
+  provider: string | null;
+  model: string | null;
+}
+
+/** The run-level state, held in the plugin store rather than in a row — it is not content. */
+export interface BriefRun {
+  state: BriefRunState;
+  depth: BriefDepth;
+  /**
+   * The whole-platform paragraph: what this project IS, written from the finished sections.
+   *
+   * Stored on the RUN rather than as a row, because it is a property of a run rather than of any
+   * one content type — there is no uid it could be keyed by, and it is rewritten whole every time.
+   */
+  overview: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  /** Which uid the run is on, so the settings page can show real progress. */
+  currentUid: string | null;
+  doneCount: number;
+  totalCount: number;
+  /** Redacted. A provider error never reaches here unmasked (Principle I). */
+  error: string | null;
+  lastRunByUserId: number | null;
+  /** Throttle floor for the automatic refresh — never a floor for a human pressing Run. */
+  lastAutoRefreshAt: string | null;
 }
 
 /* --------------------------------------------------------- change sets */

@@ -1,58 +1,19 @@
-"use strict";
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-const fs = require("node:fs/promises");
-const crypto$1 = require("node:crypto");
-const require$$1 = require("crypto");
-const require$$0$1 = require("child_process");
-const require$$0$2 = require("os");
-const require$$0$4 = require("path");
-const require$$0$3 = require("fs");
-const require$$0$5 = require("assert");
-const require$$2 = require("events");
-const require$$0$7 = require("buffer");
-const require$$0$6 = require("stream");
-const require$$2$1 = require("util");
-const require$$0$8 = require("constants");
-require("node:stream");
-const os = require("node:os");
-const path$4 = require("node:path");
-const _interopDefault = (e) => e && e.__esModule ? e : { default: e };
-const fs__default = /* @__PURE__ */ _interopDefault(fs);
-const crypto__default = /* @__PURE__ */ _interopDefault(crypto$1);
-const require$$1__default = /* @__PURE__ */ _interopDefault(require$$1);
-const require$$0__default = /* @__PURE__ */ _interopDefault(require$$0$1);
-const require$$0__default$1 = /* @__PURE__ */ _interopDefault(require$$0$2);
-const require$$0__default$3 = /* @__PURE__ */ _interopDefault(require$$0$4);
-const require$$0__default$2 = /* @__PURE__ */ _interopDefault(require$$0$3);
-const require$$0__default$4 = /* @__PURE__ */ _interopDefault(require$$0$5);
-const require$$2__default = /* @__PURE__ */ _interopDefault(require$$2);
-const require$$0__default$6 = /* @__PURE__ */ _interopDefault(require$$0$7);
-const require$$0__default$5 = /* @__PURE__ */ _interopDefault(require$$0$6);
-const require$$2__default$1 = /* @__PURE__ */ _interopDefault(require$$2$1);
-const require$$0__default$7 = /* @__PURE__ */ _interopDefault(require$$0$8);
-const os__default = /* @__PURE__ */ _interopDefault(os);
-const path__default = /* @__PURE__ */ _interopDefault(path$4);
+import fs from "node:fs/promises";
+import crypto$1, { createHash } from "node:crypto";
+import require$$1 from "crypto";
+import require$$0$1 from "child_process";
+import require$$0$2 from "os";
+import require$$0$4 from "path";
+import require$$0$3 from "fs";
+import require$$0$5 from "assert";
+import require$$2 from "events";
+import require$$0$7 from "buffer";
+import require$$0$6 from "stream";
+import require$$2$1 from "util";
+import require$$0$8 from "constants";
+import "node:stream";
+import os from "node:os";
+import path$4 from "node:path";
 const register = ({ strapi: strapi2 }) => {
   strapi2.plugin("ai-content-studio").service("crypto").assertConfigured();
 };
@@ -123,18 +84,74 @@ const config$2 = {
        * ordinary project in full. Exceeding it degrades by tier, deterministically, and says so.
        */
       maxChars: 24e3
+    },
+    contentBrief: {
+      /**
+       * The HARD off-switch for the whole feature, the same shape `grounding.enabled` has. With it
+       * off, the Run control renders disabled and names this key, and no brief text can reach a
+       * prompt even if one was generated before the key was set.
+       *
+       * ON by default, and unlike grounding that costs nothing on its own: an install has no brief
+       * until someone presses Run, and the stored source defaults to `schema`.
+       */
+      enabled: true,
+      /** Declared character budget for the ASSEMBLED brief, clamped 2,000..80,000. Its own budget,
+       *  separate from `grounding.maxChars`, so selecting both cannot double one ceiling. */
+      maxChars: 24e3,
+      /** Per-section ceiling, so one verbose section cannot consume the whole budget. */
+      maxSectionChars: 1200,
+      /**
+       * ⚠ THE ONLY SETTING IN THIS PLUGIN THAT SPENDS PROVIDER MONEY WITHOUT A CLICK.
+       *
+       * With it on, sections whose schema or content fingerprint moved are regenerated during chat
+       * sessions, bounded by the two keys below. With it off, a stale brief stays stale and says so
+       * in Settings until an administrator re-runs it — nothing else changes.
+       */
+      autoRefresh: true,
+      /** Floor between two automatic passes, in minutes. A human pressing Run is never throttled. */
+      refreshThrottleMinutes: 60,
+      /** Hard ceiling on sections ONE automatic pass may regenerate — the unattended-spend bound. */
+      maxAutoRefreshSections: 3,
+      /**
+       * ONE BRIEF, THE SAME FOR EVERY ACCOUNT — the default, and `false` is that default.
+       *
+       * The briefing describes the platform, so every account with chat access reads the same text,
+       * project overview included. It never describes a content type the super-admin who ran it
+       * could not read, and it changes nothing about what the assistant may DO: every tool still
+       * RBAC-checks the calling account before touching content.
+       *
+       * Set `true` where that disclosure is not acceptable — multi-tenant, or a content type only
+       * one team may know exists. Each reader is then served only the sections their own
+       * permissions allow, and the project overview is withheld entirely, because it is synthesized
+       * across every content type and so cannot be filtered.
+       */
+      scopeToReader: false
     }
   },
   validator() {
   }
 };
+const kind$4 = "collectionType";
+const collectionName$4 = "ai_studio_chat_threads";
+const info$4 = { "singularName": "chat-thread", "pluralName": "chat-threads", "displayName": "AI Studio chat thread", "description": "One conversation, owned by exactly one admin user. Private to its owner — super-admin included." };
+const options$4 = { "draftAndPublish": false };
+const pluginOptions$4 = { "content-manager": { "visible": false }, "content-type-builder": { "visible": false } };
+const attributes$4 = { "title": { "type": "string", "required": true, "maxLength": 120 }, "ownerId": { "type": "integer", "required": true, "private": true }, "mode": { "type": "enumeration", "enum": ["content", "layout", "audit"], "required": true, "default": "content", "description": "VESTIGIAL - no longer read or written. The plugin has a single mode; this column is left in place deliberately because it is a required enumeration on live consumer databases, so removing it is a migration risk for no behavioural gain. Legacy values are ignored, not migrated. Do not mistake it for live state." }, "lastActivityAt": { "type": "datetime", "required": true }, "contextSummary": { "type": "text" }, "summarizedThroughMessageId": { "type": "string" }, "messages": { "type": "relation", "relation": "oneToMany", "target": "plugin::ai-content-studio.chat-message", "mappedBy": "thread" }, "changeSets": { "type": "relation", "relation": "oneToMany", "target": "plugin::ai-content-studio.change-set", "mappedBy": "thread" } };
+const chatThreadSchema = {
+  kind: kind$4,
+  collectionName: collectionName$4,
+  info: info$4,
+  options: options$4,
+  pluginOptions: pluginOptions$4,
+  attributes: attributes$4
+};
 const kind$3 = "collectionType";
-const collectionName$3 = "ai_studio_chat_threads";
-const info$3 = { "singularName": "chat-thread", "pluralName": "chat-threads", "displayName": "AI Studio chat thread", "description": "One conversation, owned by exactly one admin user. Private to its owner — super-admin included." };
+const collectionName$3 = "ai_studio_chat_messages";
+const info$3 = { "singularName": "chat-message", "pluralName": "chat-messages", "displayName": "AI Studio chat message", "description": "One turn, stored in the shape the chat UI replays. `parts` never holds attachment bytes." };
 const options$3 = { "draftAndPublish": false };
 const pluginOptions$3 = { "content-manager": { "visible": false }, "content-type-builder": { "visible": false } };
-const attributes$3 = { "title": { "type": "string", "required": true, "maxLength": 120 }, "ownerId": { "type": "integer", "required": true, "private": true }, "mode": { "type": "enumeration", "enum": ["content", "layout", "audit"], "required": true, "default": "content", "description": "VESTIGIAL - no longer read or written. The plugin has a single mode; this column is left in place deliberately because it is a required enumeration on live consumer databases, so removing it is a migration risk for no behavioural gain. Legacy values are ignored, not migrated. Do not mistake it for live state." }, "lastActivityAt": { "type": "datetime", "required": true }, "contextSummary": { "type": "text" }, "summarizedThroughMessageId": { "type": "string" }, "messages": { "type": "relation", "relation": "oneToMany", "target": "plugin::ai-content-studio.chat-message", "mappedBy": "thread" }, "changeSets": { "type": "relation", "relation": "oneToMany", "target": "plugin::ai-content-studio.change-set", "mappedBy": "thread" } };
-const chatThreadSchema = {
+const attributes$3 = { "thread": { "type": "relation", "relation": "manyToOne", "target": "plugin::ai-content-studio.chat-thread", "inversedBy": "messages" }, "role": { "type": "enumeration", "enum": ["user", "assistant"], "required": true }, "sequence": { "type": "integer", "required": true }, "parts": { "type": "json", "required": true }, "attachmentManifest": { "type": "json" }, "interrupted": { "type": "boolean", "default": false }, "promptVersion": { "type": "string", "description": "The InstructionSet.version that produced this turn, so a stored reply is traceable to the rules it was run under. NULLABLE on purpose: turns stored before instruction versioning existed honestly have none, and a null is honest where a backfilled guess would not be." }, "modeAtSend": { "type": "enumeration", "enum": ["content", "layout", "audit"], "required": true, "default": "content", "description": "VESTIGIAL — no longer read or written. The plugin has a single mode; this column is left in place deliberately because it is a required enumeration on live consumer databases, so removing it is a migration risk for no behavioural gain. New rows take the default. Do not mistake it for live state." }, "changeSet": { "type": "relation", "relation": "oneToOne", "target": "plugin::ai-content-studio.change-set" } };
+const chatMessageSchema = {
   kind: kind$3,
   collectionName: collectionName$3,
   info: info$3,
@@ -143,12 +160,12 @@ const chatThreadSchema = {
   attributes: attributes$3
 };
 const kind$2 = "collectionType";
-const collectionName$2 = "ai_studio_chat_messages";
-const info$2 = { "singularName": "chat-message", "pluralName": "chat-messages", "displayName": "AI Studio chat message", "description": "One turn, stored in the shape the chat UI replays. `parts` never holds attachment bytes." };
+const collectionName$2 = "ai_studio_change_sets";
+const info$2 = { "singularName": "change-set", "pluralName": "change-sets", "displayName": "AI Studio change set", "description": "One pending change plan. Items are a JSON array — they are only ever read and written as a whole set." };
 const options$2 = { "draftAndPublish": false };
 const pluginOptions$2 = { "content-manager": { "visible": false }, "content-type-builder": { "visible": false } };
-const attributes$2 = { "thread": { "type": "relation", "relation": "manyToOne", "target": "plugin::ai-content-studio.chat-thread", "inversedBy": "messages" }, "role": { "type": "enumeration", "enum": ["user", "assistant"], "required": true }, "sequence": { "type": "integer", "required": true }, "parts": { "type": "json", "required": true }, "attachmentManifest": { "type": "json" }, "interrupted": { "type": "boolean", "default": false }, "promptVersion": { "type": "string", "description": "The InstructionSet.version that produced this turn, so a stored reply is traceable to the rules it was run under. NULLABLE on purpose: turns stored before instruction versioning existed honestly have none, and a null is honest where a backfilled guess would not be." }, "modeAtSend": { "type": "enumeration", "enum": ["content", "layout", "audit"], "required": true, "default": "content", "description": "VESTIGIAL — no longer read or written. The plugin has a single mode; this column is left in place deliberately because it is a required enumeration on live consumer databases, so removing it is a migration risk for no behavioural gain. New rows take the default. Do not mistake it for live state." }, "changeSet": { "type": "relation", "relation": "oneToOne", "target": "plugin::ai-content-studio.change-set" } };
-const chatMessageSchema = {
+const attributes$2 = { "thread": { "type": "relation", "relation": "manyToOne", "target": "plugin::ai-content-studio.chat-thread", "inversedBy": "changeSets" }, "ownerId": { "type": "integer", "required": true, "private": true }, "status": { "type": "enumeration", "enum": ["pending", "applied", "partially_applied", "rejected", "expired"], "required": true, "default": "pending" }, "items": { "type": "json", "required": true }, "summary": { "type": "text" }, "expiresAt": { "type": "datetime", "required": true }, "proposedAt": { "type": "datetime", "required": true }, "resolvedAt": { "type": "datetime" }, "approvedByUserId": { "type": "integer", "private": true }, "approvedItemIds": { "type": "json" }, "destructiveConfirmed": { "type": "boolean", "default": false }, "publishRequested": { "type": "boolean", "default": false, "description": "Whether the Approve & Publish action was used for this set." }, "publishConfirmed": { "type": "boolean", "default": false, "description": "The explicit publish confirmation. A set with publishRequested true and publishConfirmed false is refused before anything is written, so a single activation publishes nothing AND writes nothing." }, "previewSessions": { "type": "relation", "relation": "oneToMany", "target": "plugin::ai-content-studio.preview-session", "mappedBy": "changeSet" } };
+const changeSetSchema = {
   kind: kind$2,
   collectionName: collectionName$2,
   info: info$2,
@@ -157,12 +174,12 @@ const chatMessageSchema = {
   attributes: attributes$2
 };
 const kind$1 = "collectionType";
-const collectionName$1 = "ai_studio_change_sets";
-const info$1 = { "singularName": "change-set", "pluralName": "change-sets", "displayName": "AI Studio change set", "description": "One pending change plan. Items are a JSON array — they are only ever read and written as a whole set." };
+const collectionName$1 = "ai_studio_preview_sessions";
+const info$1 = { "singularName": "preview-session", "pluralName": "preview-sessions", "displayName": "AI Studio preview session", "description": "A short-lived, owner-only view of one pending change set. Staged file BYTES are not here — they live in the creating instance's memory." };
 const options$1 = { "draftAndPublish": false };
 const pluginOptions$1 = { "content-manager": { "visible": false }, "content-type-builder": { "visible": false } };
-const attributes$1 = { "thread": { "type": "relation", "relation": "manyToOne", "target": "plugin::ai-content-studio.chat-thread", "inversedBy": "changeSets" }, "ownerId": { "type": "integer", "required": true, "private": true }, "status": { "type": "enumeration", "enum": ["pending", "applied", "partially_applied", "rejected", "expired"], "required": true, "default": "pending" }, "items": { "type": "json", "required": true }, "summary": { "type": "text" }, "expiresAt": { "type": "datetime", "required": true }, "proposedAt": { "type": "datetime", "required": true }, "resolvedAt": { "type": "datetime" }, "approvedByUserId": { "type": "integer", "private": true }, "approvedItemIds": { "type": "json" }, "destructiveConfirmed": { "type": "boolean", "default": false }, "publishRequested": { "type": "boolean", "default": false, "description": "Whether the Approve & Publish action was used for this set." }, "publishConfirmed": { "type": "boolean", "default": false, "description": "The explicit publish confirmation. A set with publishRequested true and publishConfirmed false is refused before anything is written, so a single activation publishes nothing AND writes nothing." }, "previewSessions": { "type": "relation", "relation": "oneToMany", "target": "plugin::ai-content-studio.preview-session", "mappedBy": "changeSet" } };
-const changeSetSchema = {
+const attributes$1 = { "changeSet": { "type": "relation", "relation": "manyToOne", "target": "plugin::ai-content-studio.change-set", "inversedBy": "previewSessions" }, "ownerId": { "type": "integer", "required": true, "private": true }, "sessionId": { "type": "string", "required": true, "unique": true }, "overlay": { "type": "json", "required": true }, "stagedFiles": { "type": "json" }, "expiresAt": { "type": "datetime", "required": true }, "revokedAt": { "type": "datetime" }, "targetUrl": { "type": "string", "required": true } };
+const previewSessionSchema = {
   kind: kind$1,
   collectionName: collectionName$1,
   info: info$1,
@@ -171,12 +188,12 @@ const changeSetSchema = {
   attributes: attributes$1
 };
 const kind = "collectionType";
-const collectionName = "ai_studio_preview_sessions";
-const info = { "singularName": "preview-session", "pluralName": "preview-sessions", "displayName": "AI Studio preview session", "description": "A short-lived, owner-only view of one pending change set. Staged file BYTES are not here — they live in the creating instance's memory." };
+const collectionName = "ai_studio_content_briefs";
+const info = { "singularName": "content-brief", "pluralName": "content-briefs", "displayName": "AI Studio content brief", "description": "One human-readable section per content type, generated once and shared by every account. Rows are never served whole: the brief is assembled per caller from the sections that caller's own permissions allow them to read." };
 const options = { "draftAndPublish": false };
 const pluginOptions = { "content-manager": { "visible": false }, "content-type-builder": { "visible": false } };
-const attributes = { "changeSet": { "type": "relation", "relation": "manyToOne", "target": "plugin::ai-content-studio.change-set", "inversedBy": "previewSessions" }, "ownerId": { "type": "integer", "required": true, "private": true }, "sessionId": { "type": "string", "required": true, "unique": true }, "overlay": { "type": "json", "required": true }, "stagedFiles": { "type": "json" }, "expiresAt": { "type": "datetime", "required": true }, "revokedAt": { "type": "datetime" }, "targetUrl": { "type": "string", "required": true } };
-const previewSessionSchema = {
+const attributes = { "uid": { "type": "string", "required": true, "unique": true }, "text": { "type": "text", "required": true }, "schemaFingerprint": { "type": "string", "required": true }, "contentFingerprint": { "type": "string", "required": true }, "sampledCount": { "type": "integer", "default": 0 }, "totalCount": { "type": "integer", "default": 0 }, "generatedAt": { "type": "datetime", "required": true }, "provider": { "type": "string" }, "model": { "type": "string" } };
+const contentBriefSchema = {
   kind,
   collectionName,
   info,
@@ -188,13 +205,15 @@ const contentTypes = {
   "chat-thread": { schema: chatThreadSchema },
   "chat-message": { schema: chatMessageSchema },
   "change-set": { schema: changeSetSchema },
-  "preview-session": { schema: previewSessionSchema }
+  "preview-session": { schema: previewSessionSchema },
+  "content-brief": { schema: contentBriefSchema }
 };
 const UID = {
   thread: "plugin::ai-content-studio.chat-thread",
   message: "plugin::ai-content-studio.chat-message",
   changeSet: "plugin::ai-content-studio.change-set",
-  previewSession: "plugin::ai-content-studio.preview-session"
+  previewSession: "plugin::ai-content-studio.preview-session",
+  contentBrief: "plugin::ai-content-studio.content-brief"
 };
 var marker = "vercel.ai.error";
 var symbol = Symbol.for(marker);
@@ -18461,7 +18480,7 @@ var hasRequiredEventemitter3;
 function requireEventemitter3() {
   if (hasRequiredEventemitter3) return eventemitter3.exports;
   hasRequiredEventemitter3 = 1;
-  (function(module2) {
+  (function(module) {
     var has2 = Object.prototype.hasOwnProperty, prefix = "~";
     function Events3() {
     }
@@ -18614,7 +18633,7 @@ function requireEventemitter3() {
     EventEmitter.prefixed = prefix;
     EventEmitter.EventEmitter = EventEmitter;
     {
-      module2.exports = EventEmitter;
+      module.exports = EventEmitter;
     }
   })(eventemitter3);
   return eventemitter3.exports;
@@ -38487,10 +38506,10 @@ Sha256.prototype.arrayBuffer = function() {
   if (!this.is224) dataView.setUint32(28, this.h7);
   return buffer;
 };
-const sha256$3 = (...strings) => {
+const sha256$4 = (...strings) => {
   return new Sha256(false, true).update(strings.join("")).hex();
 };
-var hash_exports = /* @__PURE__ */ __exportAll({ sha256: () => sha256$3 });
+var hash_exports = /* @__PURE__ */ __exportAll({ sha256: () => sha256$4 });
 var caches_exports = /* @__PURE__ */ __exportAll({
   BaseCache: () => BaseCache$1,
   InMemoryCache: () => InMemoryCache,
@@ -38498,7 +38517,7 @@ var caches_exports = /* @__PURE__ */ __exportAll({
   deserializeStoredGeneration: () => deserializeStoredGeneration,
   serializeGeneration: () => serializeGeneration
 });
-const defaultHashKeyEncoder = (...strings) => sha256$3(strings.join("_"));
+const defaultHashKeyEncoder = (...strings) => sha256$4(strings.join("_"));
 function deserializeStoredGeneration(storedGeneration) {
   if (storedGeneration.message !== void 0) return {
     text: storedGeneration.text,
@@ -39001,7 +39020,7 @@ var _HashedDocument = class {
   metadataHash;
   pageContent;
   metadata;
-  keyEncoder = sha256$3;
+  keyEncoder = sha256$4;
   constructor(fields2) {
     this.uid = fields2.uid;
     this.pageContent = fields2.pageContent;
@@ -49246,11 +49265,11 @@ async function reviver(value) {
       langchain_core: import_map_exports,
       langchain: importMap
     };
-    let module2 = null;
+    let module = null;
     const optionalImportNamespaceAliases = [namespace.join("/")];
     if (namespace[0] === "langchain_community") optionalImportNamespaceAliases.push(["langchain", ...namespace.slice(1)].join("/"));
     const matchingNamespaceAlias = optionalImportNamespaceAliases.find((alias) => alias in optionalImportsMap);
-    if (optionalImportEntrypoints.concat(optionalImportEntrypoints$1).includes(namespace.join("/")) || matchingNamespaceAlias) if (matchingNamespaceAlias !== void 0) module2 = await optionalImportsMap[matchingNamespaceAlias];
+    if (optionalImportEntrypoints.concat(optionalImportEntrypoints$1).includes(namespace.join("/")) || matchingNamespaceAlias) if (matchingNamespaceAlias !== void 0) module = await optionalImportsMap[matchingNamespaceAlias];
     else throw new Error(`Missing key "${namespace.join("/")}" for ${pathStr} in load(optionalImportsMap={})`);
     else {
       let finalImportMap;
@@ -49265,10 +49284,10 @@ async function reviver(value) {
         if (importMapKey in finalImportMap) break;
         else namespace.pop();
       } while (namespace.length > 0);
-      if (importMapKey in finalImportMap) module2 = finalImportMap[importMapKey];
+      if (importMapKey in finalImportMap) module = finalImportMap[importMapKey];
     }
-    if (typeof module2 !== "object" || module2 === null) throw new Error(`Invalid namespace: ${pathStr} -> ${str2}`);
-    const builder = module2[name] ?? Object.values(module2).find((v) => typeof v === "function" && get_lc_unique_name(v) === name);
+    if (typeof module !== "object" || module === null) throw new Error(`Invalid namespace: ${pathStr} -> ${str2}`);
+    const builder = module[name] ?? Object.values(module).find((v) => typeof v === "function" && get_lc_unique_name(v) === name);
     if (typeof builder !== "function") throw new Error(`Invalid identifer: ${pathStr} -> ${str2}`);
     const instance = new builder(mapKeys$1(await reviver.call({
       ...this,
@@ -58241,28 +58260,28 @@ const MessagesZodMeta = {
   default: () => []
 };
 const MessagesZodState = objectType({ messages: withLangGraph(custom(), MessagesZodMeta) });
-var __create2 = Object.create;
-var __defProp2 = Object.defineProperty;
-var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames2 = Object.getOwnPropertyNames;
-var __getProtoOf2 = Object.getPrototypeOf;
-var __hasOwnProp2 = Object.prototype.hasOwnProperty;
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __commonJSMin = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
-var __copyProps2 = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") for (var keys = __getOwnPropNames2(from), i = 0, n2 = keys.length, key; i < n2; i++) {
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") for (var keys = __getOwnPropNames(from), i = 0, n2 = keys.length, key; i < n2; i++) {
     key = keys[i];
-    if (!__hasOwnProp2.call(to, key) && key !== except) __defProp2(to, key, {
+    if (!__hasOwnProp.call(to, key) && key !== except) __defProp(to, key, {
       get: ((k) => from[k]).bind(null, key),
-      enumerable: !(desc = __getOwnPropDesc2(from, key)) || desc.enumerable
+      enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable
     });
   }
   return to;
 };
-var __toESM2 = (mod, isNodeMode, target) => (target = mod != null ? __create2(__getProtoOf2(mod)) : {}, __copyProps2(__defProp2(target, "default", {
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(__defProp(target, "default", {
   value: mod,
   enumerable: true
 }), mod));
-var require_eventemitter3 = /* @__PURE__ */ __commonJSMin(((exports2, module2) => {
+var require_eventemitter3 = /* @__PURE__ */ __commonJSMin(((exports, module) => {
   var has2 = Object.prototype.hasOwnProperty, prefix = "~";
   function Events3() {
   }
@@ -58396,10 +58415,10 @@ var require_eventemitter3 = /* @__PURE__ */ __commonJSMin(((exports2, module2) =
   EventEmitter.prototype.addListener = EventEmitter.prototype.on;
   EventEmitter.prefixed = prefix;
   EventEmitter.EventEmitter = EventEmitter;
-  if ("undefined" !== typeof module2) module2.exports = EventEmitter;
+  if ("undefined" !== typeof module) module.exports = EventEmitter;
 }));
 require_eventemitter3();
-var import_eventemitter3 = /* @__PURE__ */ __toESM2(require_eventemitter3());
+var import_eventemitter3 = /* @__PURE__ */ __toESM(require_eventemitter3());
 var TimeoutError = class TimeoutError2 extends Error {
   name = "TimeoutError";
   constructor(message, options2) {
@@ -65580,27 +65599,27 @@ function requireBase64() {
   };
   return base64$1;
 }
-var sha256$2 = { exports: {} };
-var sha256$1 = sha256$2.exports;
+var sha256$3 = { exports: {} };
+var sha256$2 = sha256$3.exports;
 var hasRequiredSha256;
 function requireSha256() {
-  if (hasRequiredSha256) return sha256$2.exports;
+  if (hasRequiredSha256) return sha256$3.exports;
   hasRequiredSha256 = 1;
-  (function(module2) {
+  (function(module) {
     (function(root, factory) {
-      var exports2 = {};
-      factory(exports2);
-      var sha2562 = exports2["default"];
-      for (var k in exports2) {
-        sha2562[k] = exports2[k];
+      var exports = {};
+      factory(exports);
+      var sha2562 = exports["default"];
+      for (var k in exports) {
+        sha2562[k] = exports[k];
       }
       {
-        module2.exports = sha2562;
+        module.exports = sha2562;
       }
-    })(sha256$1, function(exports2) {
-      exports2.__esModule = true;
-      exports2.digestLength = 32;
-      exports2.blockSize = 64;
+    })(sha256$2, function(exports) {
+      exports.__esModule = true;
+      exports.digestLength = 32;
+      exports.blockSize = 64;
       var K2 = new Uint32Array([
         1116352408,
         1899447441,
@@ -65718,8 +65737,8 @@ function requireSha256() {
         /** @class */
         (function() {
           function Hash2() {
-            this.digestLength = exports2.digestLength;
-            this.blockSize = exports2.blockSize;
+            this.digestLength = exports.digestLength;
+            this.blockSize = exports.blockSize;
             this.state = new Int32Array(8);
             this.temp = new Int32Array(64);
             this.buffer = new Uint8Array(128);
@@ -65831,7 +65850,7 @@ function requireSha256() {
           return Hash2;
         })()
       );
-      exports2.Hash = Hash;
+      exports.Hash = Hash;
       var HMAC = (
         /** @class */
         (function() {
@@ -65897,22 +65916,22 @@ function requireSha256() {
           return HMAC2;
         })()
       );
-      exports2.HMAC = HMAC;
+      exports.HMAC = HMAC;
       function hash(data) {
         var h = new Hash().update(data);
         var digest = h.digest();
         h.clean();
         return digest;
       }
-      exports2.hash = hash;
-      exports2["default"] = hash;
+      exports.hash = hash;
+      exports["default"] = hash;
       function hmac(key, data) {
         var h = new HMAC(key).update(data);
         var digest = h.digest();
         h.clean();
         return digest;
       }
-      exports2.hmac = hmac;
+      exports.hmac = hmac;
       function fillBuffer(buffer, hmac2, info2, counter) {
         var num2 = counter[0];
         if (num2 === 0) {
@@ -65929,7 +65948,7 @@ function requireSha256() {
         hmac2.finish(buffer);
         counter[0]++;
       }
-      var hkdfSalt = new Uint8Array(exports2.digestLength);
+      var hkdfSalt = new Uint8Array(exports.digestLength);
       function hkdf(key, salt, info2, length) {
         if (salt === void 0) {
           salt = hkdfSalt;
@@ -65955,7 +65974,7 @@ function requireSha256() {
         counter.fill(0);
         return out;
       }
-      exports2.hkdf = hkdf;
+      exports.hkdf = hkdf;
       function pbkdf2(password, salt, iterations, dkLen) {
         var prf = new HMAC(password);
         var len = prf.digestLength;
@@ -65996,10 +66015,10 @@ function requireSha256() {
         prf.clean();
         return dk;
       }
-      exports2.pbkdf2 = pbkdf2;
+      exports.pbkdf2 = pbkdf2;
     });
-  })(sha256$2);
-  return sha256$2.exports;
+  })(sha256$3);
+  return sha256$3.exports;
 }
 var timing_safe_equal = {};
 var hasRequiredTiming_safe_equal;
@@ -67285,7 +67304,7 @@ async function _EnvironmentWorker_handleItem2(work, environmentKey, externalSign
   const ctrl = new AbortController();
   const detachExternal = linkAbort(externalSignal, ctrl);
   const lease = new Lease(ctrl);
-  const agentToolset = await Promise.resolve().then(() => require("./node.browser-D60HQh1u.js"));
+  const agentToolset = await import("./node.browser-BY3q7y40.mjs");
   let leaseTtlMs;
   let runner;
   const heartbeatPromise = heartbeatLoop(sessionClient, work, lease, log, this.requestOptions, (ttlMs) => {
@@ -93688,21 +93707,43 @@ const chatController = ({ strapi: strapi2 }) => ({
     }));
     const groundingSvc = plugin.service("grounding");
     const groundingEnabled = await plugin.service("config").isGroundingEnabled();
+    const briefSource = (await plugin.service("config").get()).contentBrief.source;
+    const wantSchema = groundingEnabled && briefSource !== "brief";
+    const wantBrief = groundingEnabled && briefSource !== "schema";
     let readableUids = [];
     let schemaFingerprint = "";
     let install = null;
+    let brief = null;
     if (groundingEnabled) {
       try {
         readableUids = groundingSvc.readableUids(userAbility);
         schemaFingerprint = groundingSvc.schemaFingerprint();
-        const description = groundingSvc.describe(userAbility);
-        install = description ? { text: description.text, partial: description.partial } : null;
+        if (wantSchema) {
+          const description = groundingSvc.describe(userAbility);
+          install = description ? { text: description.text, partial: description.partial } : null;
+        }
       } catch (err) {
         strapi2.log.warn(
           `[ai-content-studio] could not build the install description: ${redact().describeError(err)}`
         );
         install = null;
       }
+    }
+    if (wantBrief) {
+      try {
+        const assembled = await plugin.service("content-brief").describeFor(userAbility);
+        brief = assembled ? { text: assembled.text, partial: assembled.partial } : null;
+      } catch (err) {
+        strapi2.log.warn(
+          `[ai-content-studio] could not assemble the content brief: ${redact().describeError(err)}`
+        );
+        brief = null;
+      }
+      void plugin.service("content-brief").refreshIfDue(userAbility).catch((err) => {
+        strapi2.log.warn(
+          `[ai-content-studio] brief auto-refresh failed: ${redact().describeError(err)}`
+        );
+      });
     }
     const instructions = plugin.service("prompt").build({
       supportsVision,
@@ -93711,7 +93752,8 @@ const chatController = ({ strapi: strapi2 }) => ({
       readableUids,
       schemaFingerprint,
       contextSummary: context2?.summary ?? null,
-      install
+      install,
+      brief
     });
     const abort = new AbortController();
     let streamFinished = false;
@@ -93747,6 +93789,24 @@ const chatController = ({ strapi: strapi2 }) => ({
       }
       return "The AI provider returned an error. Please try again or check the provider settings.";
     };
+    const asToolOutputObject = (output) => {
+      if (typeof output !== "string") {
+        return output;
+      }
+      try {
+        const parsed2 = JSON.parse(output);
+        return parsed2 !== null && typeof parsed2 === "object" && !Array.isArray(parsed2) ? parsed2 : output;
+      } catch {
+        return output;
+      }
+    };
+    const normalizeToolOutput2 = new TransformStream({
+      transform(chunk, controller) {
+        controller.enqueue(
+          chunk.type === "tool-output-available" ? { ...chunk, output: asToolOutputObject(chunk.output) } : chunk
+        );
+      }
+    });
     const guardChunks = new TransformStream({
       transform(chunk, controller) {
         if (chunk.type === "error") {
@@ -93803,7 +93863,7 @@ const chatController = ({ strapi: strapi2 }) => ({
                   "[ai-content-studio] generation stopped by the user; no further step will run"
                 );
               }
-            }).pipeThrough(guardChunks)
+            }).pipeThrough(normalizeToolOutput2).pipeThrough(guardChunks)
           );
         },
         /**
@@ -93963,9 +94023,9 @@ async function readOrdinalFiles(ctx) {
       if (Buffer.isBuffer(file.buffer)) {
         bytes = file.buffer;
       } else if (typeof file.filepath === "string") {
-        bytes = await fs__default.default.readFile(file.filepath);
+        bytes = await fs.readFile(file.filepath);
       } else if (typeof file.path === "string") {
-        bytes = await fs__default.default.readFile(file.path);
+        bytes = await fs.readFile(file.path);
       }
       if (!bytes) {
         continue;
@@ -94127,9 +94187,9 @@ async function readMultipart(ctx) {
       if (Buffer.isBuffer(file.buffer)) {
         bytes = file.buffer;
       } else if (typeof file.filepath === "string") {
-        bytes = await fs__default.default.readFile(file.filepath);
+        bytes = await fs.readFile(file.filepath);
       } else if (typeof file.path === "string") {
-        bytes = await fs__default.default.readFile(file.path);
+        bytes = await fs.readFile(file.path);
       }
       if (!bytes) {
         return { files: [], error: `Attachment #${ordinal} could not be read.` };
@@ -94213,8 +94273,49 @@ const previewController = ({ strapi: strapi2 }) => ({
     return void 0;
   }
 });
+const BRIEF_DEPTH_SAMPLE = {
+  light: 5,
+  standard: 15,
+  deep: 50
+};
 const PROVIDERS = [...PROVIDER_IDS];
 const STORE_PARAMS = { type: "plugin", name: "ai-content-studio", key: "settings" };
+const RUN_STORE_PARAMS = { type: "plugin", name: "ai-content-studio", key: "brief-run" };
+const GROUNDING_SOURCES = ["schema", "brief", "both"];
+const BRIEF_DEPTHS = Object.keys(BRIEF_DEPTH_SAMPLE);
+const emptyBriefRun = () => ({
+  state: "never-run",
+  depth: "deep",
+  overview: null,
+  startedAt: null,
+  completedAt: null,
+  currentUid: null,
+  doneCount: 0,
+  totalCount: 0,
+  error: null,
+  lastRunByUserId: null,
+  lastAutoRefreshAt: null
+});
+const normalizeBriefRun = (raw) => {
+  const base = emptyBriefRun();
+  if (!raw) {
+    return base;
+  }
+  const state = raw.state === "running" || raw.state === "ready" || raw.state === "failed" ? raw.state : "never-run";
+  return {
+    state,
+    depth: BRIEF_DEPTHS.includes(raw.depth) ? raw.depth : base.depth,
+    overview: typeof raw.overview === "string" && raw.overview.trim() !== "" ? raw.overview : null,
+    startedAt: typeof raw.startedAt === "string" ? raw.startedAt : null,
+    completedAt: typeof raw.completedAt === "string" ? raw.completedAt : null,
+    currentUid: typeof raw.currentUid === "string" ? raw.currentUid : null,
+    doneCount: Number.isInteger(raw.doneCount) ? raw.doneCount : 0,
+    totalCount: Number.isInteger(raw.totalCount) ? raw.totalCount : 0,
+    error: typeof raw.error === "string" ? raw.error : null,
+    lastRunByUserId: Number.isInteger(raw.lastRunByUserId) ? raw.lastRunByUserId : null,
+    lastAutoRefreshAt: typeof raw.lastAutoRefreshAt === "string" ? raw.lastAutoRefreshAt : null
+  };
+};
 const baseUrlSchema = url({ protocol: /^https?$/ }).refine((value) => !/^[a-z]+:\/\/[^/@]*@/i.test(value), {
   message: "Base URL must not contain a username or password."
 }).transform((value) => value.trim().replace(/\/+$/, ""));
@@ -94244,7 +94345,9 @@ const defaults = () => ({
   activeProvider: PROVIDERS[0],
   activeModel: "",
   providers: Object.fromEntries(PROVIDERS.map((id) => [id, emptyProvider()])),
-  grounding: { enabled: true }
+  grounding: { enabled: true },
+  // `schema` by default — see the field's own comment: an upgrade must change no behaviour.
+  contentBrief: { source: "schema", depth: "deep" }
 });
 const normalizeSettings = (raw) => {
   const base = defaults();
@@ -94273,7 +94376,18 @@ const normalizeSettings = (raw) => {
     activeModel: raw.activeModel ?? base.activeModel,
     providers,
     // A missing `grounding` defaults to ON, so an existing install gains it on upgrade (FR-036).
-    grounding: { enabled: raw.grounding?.enabled !== false }
+    grounding: { enabled: raw.grounding?.enabled !== false },
+    /*
+     * An unrecognized value falls back to the DEFAULT rather than being preserved, which is the
+     * opposite of the rule the `providers` map above follows — deliberately. A provider key this
+     * build does not offer is configuration worth keeping through a downgrade; a grounding source
+     * this build cannot assemble is a prompt this build cannot compose, so it must resolve to one
+     * that works rather than to a stored string nothing honours.
+     */
+    contentBrief: {
+      source: GROUNDING_SOURCES.includes(raw.contentBrief?.source) ? raw.contentBrief.source : base.contentBrief.source,
+      depth: BRIEF_DEPTHS.includes(raw.contentBrief?.depth) ? raw.contentBrief.depth : base.contentBrief.depth
+    }
   };
 };
 const isGroundingEnabledFrom = (pluginEnabled, settingsEnabled) => pluginEnabled && settingsEnabled;
@@ -94286,6 +94400,7 @@ const num = (value, fallback, min, max) => {
 };
 const configService = ({ strapi: strapi2 }) => {
   const store = () => strapi2.store(STORE_PARAMS);
+  const runStore = () => strapi2.store(RUN_STORE_PARAMS);
   const cryptoSvc = () => strapi2.plugin("ai-content-studio").service("crypto");
   const option = (key, fallback) => strapi2.config.get(`plugin::ai-content-studio.${key}`, fallback);
   const service = {
@@ -94336,6 +94451,18 @@ const configService = ({ strapi: strapi2 }) => {
       current.grounding = { enabled };
       await service.set(current);
     },
+    /**
+     * Patch the content-brief selection. Each field is applied only if present, so changing the
+     * source never resets the depth an operator chose for their next run — and vice versa.
+     */
+    async setContentBrief(patch) {
+      const current = await service.get();
+      current.contentBrief = {
+        source: patch.source ?? current.contentBrief.source,
+        depth: patch.depth ?? current.contentBrief.depth
+      };
+      await service.set(current);
+    },
     /** Decrypts and returns a provider's raw key, or null. SERVER-INTERNAL ONLY. */
     async getDecryptedKey(provider) {
       const current = await service.get();
@@ -94365,7 +94492,8 @@ const configService = ({ strapi: strapi2 }) => {
         activeProvider: current.activeProvider,
         activeModel: current.activeModel,
         providers,
-        grounding: current.grounding
+        grounding: current.grounding,
+        contentBrief: current.contentBrief
       };
     },
     /**
@@ -94423,6 +94551,47 @@ const configService = ({ strapi: strapi2 }) => {
         enabled: raw.enabled !== false,
         maxChars: num(raw.maxChars, 24e3, 2e3, 8e4)
       };
+    },
+    /**
+     * Content-brief options. `enabled` defaults to TRUE, but that grants nothing on its own: an
+     * install has no brief until an administrator presses Run, and the stored source defaults to
+     * `schema`, so an upgrade changes no prompt and spends no provider token.
+     *
+     * The automatic refresh is bounded by THREE independent limits, and every one of them is a
+     * spend bound rather than a correctness one: only sections whose fingerprint actually moved are
+     * eligible, `refreshThrottleMinutes` floors how often a pass may run at all, and
+     * `maxAutoRefreshSections` caps how many sections any single pass may regenerate. A host that
+     * wants none of it sets `autoRefresh: false` and keeps the manual button.
+     */
+    getContentBriefOptions() {
+      const raw = option("contentBrief", {});
+      return {
+        enabled: raw.enabled !== false,
+        maxChars: num(raw.maxChars, 24e3, 2e3, 8e4),
+        maxSectionChars: num(raw.maxSectionChars, 1200, 200, 8e3),
+        autoRefresh: raw.autoRefresh !== false,
+        refreshThrottleMinutes: num(raw.refreshThrottleMinutes, 60, 5, 10080),
+        maxAutoRefreshSections: num(raw.maxAutoRefreshSections, 3, 1, 50),
+        // Explicit `true` only — the shared brief is the stated default, so a typo never silently
+        // narrows what every account sees.
+        scopeToReader: raw.scopeToReader === true
+      };
+    },
+    /** How many entries one run reads per content type, for the stored depth. */
+    briefSampleSize(depth) {
+      return BRIEF_DEPTH_SAMPLE[depth] ?? BRIEF_DEPTH_SAMPLE.deep;
+    },
+    /* ------------------------------------------------------- the brief run record */
+    async getBriefRun() {
+      const raw = await runStore().get({});
+      return normalizeBriefRun(raw);
+    },
+    /** Merge a patch into the run record. Callers only ever state the fields they changed. */
+    async setBriefRun(patch) {
+      const current = await service.getBriefRun();
+      const next = normalizeBriefRun({ ...current, ...patch });
+      await runStore().set({ value: next });
+      return next;
     }
   };
   return service;
@@ -94438,6 +94607,16 @@ const bodySchema = object$3({
   // curated list, never normalized, lowercased or date-suffixed (FR-004, FR-005).
   activeModel: string$3().optional(),
   grounding: object$3({ enabled: boolean$3() }).strict().optional(),
+  /**
+   * Which generated context the instructions carry, and how deep a brief run reads. Both are
+   * CLOSED enums here, unlike `activeModel` above: a value outside them is a prompt this build
+   * cannot compose or a sample size it cannot take, so it is refused at the edge rather than
+   * stored and silently ignored.
+   */
+  contentBrief: object$3({
+    source: _enum$1(["schema", "brief", "both"]).optional(),
+    depth: _enum$1(["light", "standard", "deep"]).optional()
+  }).strict().optional(),
   providers: record$1(string$3(), providerPatchSchema).optional()
 }).strict();
 const settingsController = ({ strapi: strapi2 }) => {
@@ -94504,6 +94683,9 @@ const settingsController = ({ strapi: strapi2 }) => {
       }
       if (body.grounding) {
         await svc.setGroundingEnabled(body.grounding.enabled);
+      }
+      if (body.contentBrief) {
+        await svc.setContentBrief(body.contentBrief);
       }
       if (body.activeProvider !== void 0 || body.activeModel !== void 0) {
         const current = await svc.get();
@@ -94574,6 +94756,58 @@ const settingsController = ({ strapi: strapi2 }) => {
     }
   };
 };
+const runSchema = object$3({
+  /** Restrict a run to specific content types. Omitted, every readable one is regenerated. */
+  uids: array$4(string$3().min(1)).optional(),
+  /** Overrides the stored depth for THIS run only; the stored default is untouched. */
+  depth: _enum$1(["light", "standard", "deep"]).optional()
+}).strict();
+const contentBriefController = ({ strapi: strapi2 }) => {
+  const plugin = () => strapi2.plugin("ai-content-studio");
+  return {
+    /** Run state, coverage, staleness and the estimated cost of a run, for the settings page. */
+    async status(ctx) {
+      ctx.body = await plugin().service("content-brief").status(ctx.state.userAbility);
+    },
+    /**
+     * Start a run and return immediately.
+     *
+     * 202 rather than 200, and that is not decoration: the work has been ACCEPTED, not performed.
+     * A `deep` run over a large install is minutes of sequential provider calls, so the response
+     * only promises that a run started — the settings page polls `status` for the rest.
+     */
+    async run(ctx) {
+      const parsed = runSchema.safeParse(ctx.request.body ?? {});
+      if (!parsed.success) {
+        return ctx.badRequest(
+          parsed.error.issues[0]?.message ?? "Invalid run payload.",
+          { code: "invalid_body" }
+        );
+      }
+      const userId = ctx.state?.user?.id;
+      if (!Number.isInteger(userId)) {
+        return ctx.unauthorized("Not authenticated.");
+      }
+      const settings = await plugin().service("config").get();
+      const depth = parsed.data.depth ?? settings.contentBrief.depth;
+      const result = await plugin().service("content-brief").startRun({
+        userAbility: ctx.state.userAbility,
+        userId,
+        depth,
+        uids: parsed.data.uids
+      });
+      if (!result.ok) {
+        if (result.error === "already_running") {
+          return ctx.conflict(result.message, { code: result.error });
+        }
+        return ctx.badRequest(result.message, { code: result.error });
+      }
+      ctx.status = 202;
+      ctx.body = { started: true, contentTypes: result.total, depth };
+      return void 0;
+    }
+  };
+};
 const controllers = {
   chat: chatController,
   threads: threadsController,
@@ -94581,7 +94815,9 @@ const controllers = {
   "change-sets": changeSetsController,
   attachments: attachmentsController,
   preview: previewController,
-  settings: settingsController
+  settings: settingsController,
+  // Route handlers reference this as `content-brief.<handler>`.
+  "content-brief": contentBriefController
 };
 const HEADER = "x-ai-studio-preview";
 const QUERY_PARAM = "aiStudioPreview";
@@ -94785,6 +95021,34 @@ const routes = {
             }
           ]
         }
+      },
+      /**
+       * The content brief (contracts/content-brief.md §5). SUPER-ADMIN ONLY, the same gate the
+       * provider settings carry and deliberately NOT the narrower `chat.use`:
+       *
+       *   - `run` spends provider money and walks every content type the runner can read. That is
+       *     an operator action with a bill attached, not a chat action.
+       *   - `status` returns the generated prose ABOUT CONTENT, which by default is one briefing
+       *     shared by every account (contracts/content-brief.md §3). Super-admin is therefore the
+       *     right gate for the surface that shows it whole and can rewrite it — not because the
+       *     text is secret from chat users, who are given the same briefing in their prompts, but
+       *     because running and inspecting it is an operator's job with a bill attached.
+       */
+      {
+        method: "GET",
+        path: "/content-brief",
+        handler: "content-brief.status",
+        config: {
+          policies: ["admin::isAuthenticatedAdmin", "plugin::ai-content-studio.is-super-admin"]
+        }
+      },
+      {
+        method: "POST",
+        path: "/content-brief/run",
+        handler: "content-brief.run",
+        config: {
+          policies: ["admin::isAuthenticatedAdmin", "plugin::ai-content-studio.is-super-admin"]
+        }
       }
     ]
   },
@@ -94830,7 +95094,7 @@ const cryptoService = ({ strapi: _strapi }) => {
   const previewKey = () => {
     if (!cachedPreviewKey) {
       cachedPreviewKey = Buffer.from(
-        crypto__default.default.hkdfSync("sha256", key(), Buffer.alloc(0), Buffer.from(PREVIEW_KEY_LABEL, "utf8"), KEY_BYTES)
+        crypto$1.hkdfSync("sha256", key(), Buffer.alloc(0), Buffer.from(PREVIEW_KEY_LABEL, "utf8"), KEY_BYTES)
       );
     }
     return cachedPreviewKey;
@@ -94842,8 +95106,8 @@ const cryptoService = ({ strapi: _strapi }) => {
     },
     /** Returns "iv:authTag:ciphertext", each segment base64. */
     encrypt(plaintext) {
-      const iv = crypto__default.default.randomBytes(IV_BYTES);
-      const cipher = crypto__default.default.createCipheriv(ALGO, key(), iv);
+      const iv = crypto$1.randomBytes(IV_BYTES);
+      const cipher = crypto$1.createCipheriv(ALGO, key(), iv);
       const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
       const authTag = cipher.getAuthTag();
       return [iv.toString("base64"), authTag.toString("base64"), ciphertext.toString("base64")].join(":");
@@ -94861,7 +95125,7 @@ const cryptoService = ({ strapi: _strapi }) => {
       if (iv.length !== IV_BYTES || authTag.length !== AUTH_TAG_BYTES) {
         throw new Error("[ai-content-studio] Encrypted payload has invalid IV/tag length.");
       }
-      const decipher = crypto__default.default.createDecipheriv(ALGO, key(), iv);
+      const decipher = crypto$1.createDecipheriv(ALGO, key(), iv);
       decipher.setAuthTag(authTag);
       return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
     },
@@ -94885,7 +95149,7 @@ const cryptoService = ({ strapi: _strapi }) => {
      */
     signPreviewToken(payload) {
       const body = b64url(Buffer.from(JSON.stringify(payload), "utf8"));
-      const sig = b64url(crypto__default.default.createHmac("sha256", previewKey()).update(body).digest());
+      const sig = b64url(crypto$1.createHmac("sha256", previewKey()).update(body).digest());
       return `${body}.${sig}`;
     },
     /**
@@ -94908,12 +95172,12 @@ const cryptoService = ({ strapi: _strapi }) => {
       let expected;
       let provided;
       try {
-        expected = crypto__default.default.createHmac("sha256", previewKey()).update(body).digest();
+        expected = crypto$1.createHmac("sha256", previewKey()).update(body).digest();
         provided = Buffer.from(sig, "base64url");
       } catch {
         return null;
       }
-      if (provided.length !== expected.length || !crypto__default.default.timingSafeEqual(provided, expected)) {
+      if (provided.length !== expected.length || !crypto$1.timingSafeEqual(provided, expected)) {
         return null;
       }
       let parsed;
@@ -95430,7 +95694,7 @@ async function initChatModel(model, fields2) {
 function createHeadlessTool(fields2) {
   const { name, description, schema: schema2 } = fields2;
   const wrappedTool = tool(async (args, config2) => {
-    const { interrupt: interrupt2 } = await Promise.resolve().then(() => require("./web-Cht2NQDO.js"));
+    const { interrupt: interrupt2 } = await import("./web-BhanEtE7.mjs");
     return interrupt2({
       type: "tool",
       toolCall: {
@@ -98435,7 +98699,7 @@ const BEHAVIOURAL = [
   ["style", STYLE]
 ];
 const VERSION_GENERATION = "v1";
-const deriveVersion = (sections) => `${VERSION_GENERATION}-${crypto$1.createHash("sha256").update(sections.map(([, text2]) => text2).join("\n\n")).digest("hex").slice(0, 8)}`;
+const deriveVersion = (sections) => `${VERSION_GENERATION}-${createHash("sha256").update(sections.map(([, text2]) => text2).join("\n\n")).digest("hex").slice(0, 8)}`;
 const INSTRUCTION_VERSION = deriveVersion(BEHAVIOURAL);
 const ATTACHMENTS = `## Attachments — refer to them by ordinal, never by a library id
 - The user's message lists each attached file as "#1 name (type, size)". Those ordinals are stable
@@ -98461,6 +98725,29 @@ const installSection = (text2, partial2) => [
   "<install-structure>",
   text2,
   "</install-structure>"
+].filter((line) => line !== null).join("\n");
+const briefSection = (text2, partial2) => [
+  "## What this project's content is about",
+  "",
+  "The block below is a BRIEFING generated earlier by a language model that read a sample of this",
+  "install's real entries. It is here for orientation — so you understand what this project is and",
+  "how it uses its content types, rather than inferring it from field names.",
+  "",
+  "- It is NOT authoritative and it is NOT current. It was written from a SAMPLE at a point in",
+  "  time, and content has changed since. Never state anything from it to the user as a present",
+  "  fact about their data.",
+  "- NEVER take a field name, a content-type identifier or a document identifier from this block.",
+  "  Those come from the schema facts and from the read tools, which read the live record.",
+  "- Where this block and a tool result disagree, THE TOOL RESULT WINS, always.",
+  "- It GRANTS NO PERMISSION, and it is NOT evidence that your caller may touch anything it",
+  "  mentions. Every read and every change is still checked against their live permissions, so a",
+  "  content type described here can still come back blocked with a reason — say so plainly when",
+  "  that happens, rather than treating this block as proof the access should exist.",
+  partial2 ? "- This briefing is PARTIAL: it was shortened to fit its size budget. Do not treat it as a\n  complete list of what this project contains." : null,
+  "",
+  "<content-brief>",
+  text2,
+  "</content-brief>"
 ].filter((line) => line !== null).join("\n");
 const condensedSection = (summary) => `## Earlier in this conversation (condensed)
 These notes replace older turns that were summarized to stay inside the model's context. Treat them
@@ -98488,6 +98775,11 @@ ${ATTACHMENTS_BLIND}`);
   if (groundingIncluded && inputs.install) {
     sections.push("install");
     parts.push(installSection(inputs.install.text, inputs.install.partial));
+  }
+  const briefIncluded = inputs.brief != null && inputs.brief.text.trim() !== "";
+  if (briefIncluded && inputs.brief) {
+    sections.push("brief");
+    parts.push(briefSection(inputs.brief.text, inputs.brief.partial));
   }
   if (inputs.contextSummary) {
     sections.push("condensed");
@@ -98529,7 +98821,7 @@ var hasRequiredLodash;
 function requireLodash() {
   if (hasRequiredLodash) return lodash$1.exports;
   hasRequiredLodash = 1;
-  (function(module2, exports2) {
+  (function(module, exports) {
     (function() {
       var undefined$1;
       var VERSION2 = "4.18.1";
@@ -98857,8 +99149,8 @@ function requireLodash() {
       var freeGlobal = typeof commonjsGlobal == "object" && commonjsGlobal && commonjsGlobal.Object === Object && commonjsGlobal;
       var freeSelf = typeof self == "object" && self && self.Object === Object && self;
       var root = freeGlobal || freeSelf || Function("return this")();
-      var freeExports = exports2 && !exports2.nodeType && exports2;
-      var freeModule = freeExports && true && module2 && !module2.nodeType && module2;
+      var freeExports = exports && !exports.nodeType && exports;
+      var freeModule = freeExports && true && module && !module.nodeType && module;
       var moduleExports = freeModule && freeModule.exports === freeExports;
       var freeProcess = moduleExports && freeGlobal.process;
       var nodeUtil = (function() {
@@ -104110,7 +104402,7 @@ var hasRequiredLodash_min;
 function requireLodash_min() {
   if (hasRequiredLodash_min) return lodash_min$1.exports;
   hasRequiredLodash_min = 1;
-  (function(module2, exports2) {
+  (function(module, exports) {
     (function() {
       function n2(n3, t2, r2) {
         switch (r2.length) {
@@ -104543,7 +104835,7 @@ function requireLodash_min() {
         "œ": "oe",
         "ŉ": "'n",
         "ſ": "s"
-      }, Hr = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }, Jr = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" }, Yr = { "\\": "\\", "'": "'", "\n": "n", "\r": "r", "\u2028": "u2028", "\u2029": "u2029" }, Qr = parseFloat, Xr = parseInt, ne = typeof commonjsGlobal == "object" && commonjsGlobal && commonjsGlobal.Object === Object && commonjsGlobal, te = typeof self == "object" && self && self.Object === Object && self, re = ne || te || Function("return this")(), ee = exports2 && !exports2.nodeType && exports2, ue = ee && true && module2 && !module2.nodeType && module2, ie = ue && ue.exports === ee, oe = ie && ne.process, fe = (function() {
+      }, Hr = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }, Jr = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" }, Yr = { "\\": "\\", "'": "'", "\n": "n", "\r": "r", "\u2028": "u2028", "\u2029": "u2029" }, Qr = parseFloat, Xr = parseInt, ne = typeof commonjsGlobal == "object" && commonjsGlobal && commonjsGlobal.Object === Object && commonjsGlobal, te = typeof self == "object" && self && self.Object === Object && self, re = ne || te || Function("return this")(), ee = exports && !exports.nodeType && exports, ue = ee && true && module && !module.nodeType && module, ie = ue && ue.exports === ee, oe = ie && ne.process, fe = (function() {
         try {
           var n3 = ue && ue.require && ue.require("util").types;
           return n3 ? n3 : oe && oe.binding && oe.binding("util");
@@ -107234,8 +107526,8 @@ var hasRequired_mapping;
 function require_mapping() {
   if (hasRequired_mapping) return _mapping;
   hasRequired_mapping = 1;
-  (function(exports2) {
-    exports2.aliasToReal = {
+  (function(exports) {
+    exports.aliasToReal = {
       // Lodash aliases.
       "each": "forEach",
       "eachRight": "forEachRight",
@@ -107300,7 +107592,7 @@ function require_mapping() {
       "whereEq": "isMatch",
       "zipObj": "zipObject"
     };
-    exports2.aryMethod = {
+    exports.aryMethod = {
       "1": [
         "assignAll",
         "assignInAll",
@@ -107535,12 +107827,12 @@ function require_mapping() {
         "updateWith"
       ]
     };
-    exports2.aryRearg = {
+    exports.aryRearg = {
       "2": [1, 0],
       "3": [2, 0, 1],
       "4": [3, 2, 0, 1]
     };
-    exports2.iterateeAry = {
+    exports.iterateeAry = {
       "dropRightWhile": 1,
       "dropWhile": 1,
       "every": 1,
@@ -107578,11 +107870,11 @@ function require_mapping() {
       "times": 1,
       "transform": 2
     };
-    exports2.iterateeRearg = {
+    exports.iterateeRearg = {
       "mapKeys": [1],
       "reduceRight": [1, 0]
     };
-    exports2.methodRearg = {
+    exports.methodRearg = {
       "assignInAllWith": [1, 0],
       "assignInWith": [1, 2, 0],
       "assignAllWith": [1, 0],
@@ -107613,7 +107905,7 @@ function require_mapping() {
       "xorWith": [1, 2, 0],
       "zipWith": [1, 2, 0]
     };
-    exports2.methodSpread = {
+    exports.methodSpread = {
       "assignAll": { "start": 0 },
       "assignAllWith": { "start": 0 },
       "assignInAll": { "start": 0 },
@@ -107629,7 +107921,7 @@ function require_mapping() {
       "without": { "start": 1 },
       "zipAll": { "start": 0 }
     };
-    exports2.mutate = {
+    exports.mutate = {
       "array": {
         "fill": true,
         "pull": true,
@@ -107666,8 +107958,8 @@ function require_mapping() {
         "updateWith": true
       }
     };
-    exports2.realToAlias = (function() {
-      var hasOwnProperty2 = Object.prototype.hasOwnProperty, object2 = exports2.aliasToReal, result = {};
+    exports.realToAlias = (function() {
+      var hasOwnProperty2 = Object.prototype.hasOwnProperty, object2 = exports.aliasToReal, result = {};
       for (var key in object2) {
         var value = object2[key];
         if (hasOwnProperty2.call(result, value)) {
@@ -107678,7 +107970,7 @@ function require_mapping() {
       }
       return result;
     })();
-    exports2.remap = {
+    exports.remap = {
       "assignAll": "assign",
       "assignAllWith": "assignWith",
       "assignInAll": "assignIn",
@@ -107712,7 +108004,7 @@ function require_mapping() {
       "trimCharsStart": "trimStart",
       "zipAll": "zip"
     };
-    exports2.skipFixed = {
+    exports.skipFixed = {
       "castArray": true,
       "flow": true,
       "flowRight": true,
@@ -107721,7 +108013,7 @@ function require_mapping() {
       "rearg": true,
       "runInContext": true
     };
-    exports2.skipRearg = {
+    exports.skipRearg = {
       "add": true,
       "assign": true,
       "assignIn": true,
@@ -108361,9 +108653,9 @@ var hasRequiredDist;
 function requireDist() {
   if (hasRequiredDist) return dist$1.exports;
   hasRequiredDist = 1;
-  (function(module2, exports2) {
+  (function(module, exports) {
     !(function(t, n2) {
-      module2.exports = n2(require$$0__default.default, require$$1__default.default);
+      module.exports = n2(require$$0$1, require$$1);
     })(dist, function(t, n2) {
       return (function(t2) {
         function n3(e) {
@@ -109071,9 +109363,9 @@ function requireDist() {
           p && !p[c] && o(p, c, f2), i[f2] = i.Array;
         }
       }, function(t2, n3) {
-        t2.exports = require$$0__default.default;
+        t2.exports = require$$0$1;
       }, function(t2, n3) {
-        t2.exports = require$$1__default.default;
+        t2.exports = require$$1;
       }]);
     });
   })(dist$1);
@@ -110358,15 +110650,15 @@ var hasRequiredIsBuffer;
 function requireIsBuffer() {
   if (hasRequiredIsBuffer) return isBuffer.exports;
   hasRequiredIsBuffer = 1;
-  (function(module2, exports2) {
+  (function(module, exports) {
     var root = require_root(), stubFalse = requireStubFalse();
-    var freeExports = exports2 && !exports2.nodeType && exports2;
-    var freeModule = freeExports && true && module2 && !module2.nodeType && module2;
+    var freeExports = exports && !exports.nodeType && exports;
+    var freeModule = freeExports && true && module && !module.nodeType && module;
     var moduleExports = freeModule && freeModule.exports === freeExports;
     var Buffer2 = moduleExports ? root.Buffer : void 0;
     var nativeIsBuffer = Buffer2 ? Buffer2.isBuffer : void 0;
     var isBuffer2 = nativeIsBuffer || stubFalse;
-    module2.exports = isBuffer2;
+    module.exports = isBuffer2;
   })(isBuffer, isBuffer.exports);
   return isBuffer.exports;
 }
@@ -110406,10 +110698,10 @@ var hasRequired_nodeUtil;
 function require_nodeUtil() {
   if (hasRequired_nodeUtil) return _nodeUtil.exports;
   hasRequired_nodeUtil = 1;
-  (function(module2, exports2) {
+  (function(module, exports) {
     var freeGlobal = require_freeGlobal();
-    var freeExports = exports2 && !exports2.nodeType && exports2;
-    var freeModule = freeExports && true && module2 && !module2.nodeType && module2;
+    var freeExports = exports && !exports.nodeType && exports;
+    var freeModule = freeExports && true && module && !module.nodeType && module;
     var moduleExports = freeModule && freeModule.exports === freeExports;
     var freeProcess = moduleExports && freeGlobal.process;
     var nodeUtil = (function() {
@@ -110422,7 +110714,7 @@ function require_nodeUtil() {
       } catch (e) {
       }
     })();
-    module2.exports = nodeUtil;
+    module.exports = nodeUtil;
   })(_nodeUtil, _nodeUtil.exports);
   return _nodeUtil.exports;
 }
@@ -113821,16 +114113,16 @@ var hasRequiredHttpErrors;
 function requireHttpErrors() {
   if (hasRequiredHttpErrors) return httpErrors.exports;
   hasRequiredHttpErrors = 1;
-  (function(module2) {
+  (function(module) {
     var deprecate = requireBrowser()("http-errors");
     var setPrototypeOf = requireSetprototypeof();
     var statuses2 = requireStatuses();
     var inherits = requireInherits_browser();
     var toIdentifier = requireToidentifier();
-    module2.exports = createError;
-    module2.exports.HttpError = createHttpErrorConstructor();
-    module2.exports.isHttpError = createIsHttpErrorFunction(module2.exports.HttpError);
-    populateConstructorExports(module2.exports, statuses2.codes, module2.exports.HttpError);
+    module.exports = createError;
+    module.exports.HttpError = createHttpErrorConstructor();
+    module.exports.isHttpError = createIsHttpErrorFunction(module.exports.HttpError);
+    populateConstructorExports(module.exports, statuses2.codes, module.exports.HttpError);
     function codeClass(status) {
       return Number(String(status).charAt(0) + "00");
     }
@@ -113958,7 +114250,7 @@ function requireHttpErrors() {
         Object.defineProperty(func, "name", desc);
       }
     }
-    function populateConstructorExports(exports2, codes, HttpError) {
+    function populateConstructorExports(exports, codes, HttpError) {
       codes.forEach(function forEachCode(code) {
         var CodeError;
         var name = toIdentifier(statuses2.message[code]);
@@ -113971,8 +114263,8 @@ function requireHttpErrors() {
             break;
         }
         if (CodeError) {
-          exports2[code] = CodeError;
-          exports2[name] = CodeError;
+          exports[code] = CodeError;
+          exports[name] = CodeError;
         }
       });
     }
@@ -114145,7 +114437,7 @@ var hasRequiredCleanStack;
 function requireCleanStack() {
   if (hasRequiredCleanStack) return cleanStack;
   hasRequiredCleanStack = 1;
-  const os2 = require$$0__default$1.default;
+  const os2 = require$$0$2;
   const extractPathRegex = /\s+at.*(?:\(|\s)(.*)\)?/;
   const pathRegex = /^(?:(?:(?:node|(?:internal\/[\w/]*|.*node_modules\/(?:babel-polyfill|pirates)\/.*)?\w+)\.js:\d+:\d+)|native)/;
   const homeDir = typeof os2.homedir === "undefined" ? "" : os2.homedir();
@@ -115186,7 +115478,7 @@ function requireWindows() {
   hasRequiredWindows = 1;
   windows = isexe;
   isexe.sync = sync;
-  var fs2 = require$$0__default$2.default;
+  var fs2 = require$$0$3;
   function checkPathExt(path2, options2) {
     var pathext = options2.pathExt !== void 0 ? options2.pathExt : process.env.PATHEXT;
     if (!pathext) {
@@ -115227,7 +115519,7 @@ function requireMode() {
   hasRequiredMode = 1;
   mode = isexe;
   isexe.sync = sync;
-  var fs2 = require$$0__default$2.default;
+  var fs2 = require$$0$3;
   function isexe(path2, options2, cb) {
     fs2.stat(path2, function(er, stat2) {
       cb(er, er ? false : checkStat(stat2, options2));
@@ -115315,7 +115607,7 @@ function requireWhich() {
   if (hasRequiredWhich) return which_1;
   hasRequiredWhich = 1;
   const isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
-  const path2 = require$$0__default$3.default;
+  const path2 = require$$0$4;
   const COLON = isWindows ? ";" : ":";
   const isexe = requireIsexe();
   const getNotFoundError = (cmd) => Object.assign(new Error(`not found: ${cmd}`), { code: "ENOENT" });
@@ -115428,7 +115720,7 @@ var hasRequiredResolveCommand;
 function requireResolveCommand() {
   if (hasRequiredResolveCommand) return resolveCommand_1;
   hasRequiredResolveCommand = 1;
-  const path2 = require$$0__default$3.default;
+  const path2 = require$$0$4;
   const which = requireWhich();
   const getPathKey = requirePathKey();
   function resolveCommandAttempt(parsed, withoutPathExt) {
@@ -115523,7 +115815,7 @@ var hasRequiredReadShebang;
 function requireReadShebang() {
   if (hasRequiredReadShebang) return readShebang_1;
   hasRequiredReadShebang = 1;
-  const fs2 = require$$0__default$2.default;
+  const fs2 = require$$0$3;
   const shebangCommand2 = requireShebangCommand();
   function readShebang(command2) {
     const size = 150;
@@ -115545,7 +115837,7 @@ var hasRequiredParse$2;
 function requireParse$2() {
   if (hasRequiredParse$2) return parse_1$2;
   hasRequiredParse$2 = 1;
-  const path2 = require$$0__default$3.default;
+  const path2 = require$$0$4;
   const resolveCommand = requireResolveCommand();
   const escape2 = require_escape();
   const readShebang = requireReadShebang();
@@ -115656,7 +115948,7 @@ var hasRequiredCrossSpawn;
 function requireCrossSpawn() {
   if (hasRequiredCrossSpawn) return crossSpawn.exports;
   hasRequiredCrossSpawn = 1;
-  const cp = require$$0__default.default;
+  const cp = require$$0$1;
   const parse4 = requireParse$2();
   const enoent2 = requireEnoent();
   function spawn(command2, args, options2) {
@@ -115702,8 +115994,8 @@ var hasRequiredNpmRunPath;
 function requireNpmRunPath() {
   if (hasRequiredNpmRunPath) return npmRunPath.exports;
   hasRequiredNpmRunPath = 1;
-  (function(module2) {
-    const path2 = require$$0__default$3.default;
+  (function(module) {
+    const path2 = require$$0$4;
     const pathKey2 = requirePathKey();
     const npmRunPath2 = (options2) => {
       options2 = {
@@ -115724,9 +116016,9 @@ function requireNpmRunPath() {
       result.push(execPathDir);
       return result.concat(options2.path).join(path2.delimiter);
     };
-    module2.exports = npmRunPath2;
-    module2.exports.default = npmRunPath2;
-    module2.exports.env = (options2) => {
+    module.exports = npmRunPath2;
+    module.exports.default = npmRunPath2;
+    module.exports.env = (options2) => {
       options2 = {
         env: process.env,
         ...options2
@@ -115734,7 +116026,7 @@ function requireNpmRunPath() {
       const env2 = { ...options2.env };
       const path3 = pathKey2({ env: env2 });
       options2.path = env2[path3];
-      env2[path3] = module2.exports(options2);
+      env2[path3] = module.exports(options2);
       return env2;
     };
   })(npmRunPath);
@@ -116108,7 +116400,7 @@ function requireSignals$1() {
   hasRequiredSignals$1 = 1;
   Object.defineProperty(signals$1, "__esModule", { value: true });
   signals$1.getSignals = void 0;
-  var _os = require$$0__default$1.default;
+  var _os = require$$0$2;
   var _core = requireCore$2();
   var _realtime = requireRealtime();
   const getSignals = function() {
@@ -116140,7 +116432,7 @@ function requireMain() {
   hasRequiredMain = 1;
   Object.defineProperty(main, "__esModule", { value: true });
   main.signalsByNumber = main.signalsByName = void 0;
-  var _os = require$$0__default$1.default;
+  var _os = require$$0$2;
   var _signals = requireSignals$1();
   var _realtime = requireRealtime();
   const getSignalsByName = function() {
@@ -116316,8 +116608,8 @@ var hasRequiredSignals;
 function requireSignals() {
   if (hasRequiredSignals) return signals.exports;
   hasRequiredSignals = 1;
-  (function(module2) {
-    module2.exports = [
+  (function(module) {
+    module.exports = [
       "SIGABRT",
       "SIGALRM",
       "SIGHUP",
@@ -116325,7 +116617,7 @@ function requireSignals() {
       "SIGTERM"
     ];
     if (process.platform !== "win32") {
-      module2.exports.push(
+      module.exports.push(
         "SIGVTALRM",
         "SIGXCPU",
         "SIGXFSZ",
@@ -116340,7 +116632,7 @@ function requireSignals() {
       );
     }
     if (process.platform === "linux") {
-      module2.exports.push(
+      module.exports.push(
         "SIGIO",
         "SIGPOLL",
         "SIGPWR",
@@ -116365,10 +116657,10 @@ function requireSignalExit() {
       };
     };
   } else {
-    var assert2 = require$$0__default$4.default;
+    var assert2 = require$$0$5;
     var signals2 = requireSignals();
     var isWin = /^win/i.test(process2.platform);
-    var EE = require$$2__default.default;
+    var EE = require$$2;
     if (typeof EE !== "function") {
       EE = EE.EventEmitter;
     }
@@ -116502,7 +116794,7 @@ var hasRequiredKill;
 function requireKill() {
   if (hasRequiredKill) return kill;
   hasRequiredKill = 1;
-  const os2 = require$$0__default$1.default;
+  const os2 = require$$0$2;
   const onExit = requireSignalExit();
   const DEFAULT_FORCE_KILL_TIMEOUT = 1e3 * 5;
   const spawnedKill = (kill2, signal = "SIGTERM", options2 = {}) => {
@@ -116606,7 +116898,7 @@ var hasRequiredBufferStream;
 function requireBufferStream() {
   if (hasRequiredBufferStream) return bufferStream;
   hasRequiredBufferStream = 1;
-  const { PassThrough: PassThroughStream } = require$$0__default$5.default;
+  const { PassThrough: PassThroughStream } = require$$0$6;
   bufferStream = (options2) => {
     options2 = { ...options2 };
     const { array: array2 } = options2;
@@ -116650,9 +116942,9 @@ var hasRequiredGetStream;
 function requireGetStream() {
   if (hasRequiredGetStream) return getStream.exports;
   hasRequiredGetStream = 1;
-  const { constants: BufferConstants } = require$$0__default$6.default;
-  const stream2 = require$$0__default$5.default;
-  const { promisify } = require$$2__default$1.default;
+  const { constants: BufferConstants } = require$$0$7;
+  const stream2 = require$$0$6;
+  const { promisify } = require$$2$1;
   const bufferStream2 = requireBufferStream();
   const streamPipelinePromisified = promisify(stream2.pipeline);
   class MaxBufferError extends Error {
@@ -116705,7 +116997,7 @@ var hasRequiredMergeStream;
 function requireMergeStream() {
   if (hasRequiredMergeStream) return mergeStream;
   hasRequiredMergeStream = 1;
-  const { PassThrough } = require$$0__default$5.default;
+  const { PassThrough } = require$$0$6;
   mergeStream = function() {
     var sources = [];
     var output = new PassThrough({ objectMode: true });
@@ -116907,8 +117199,8 @@ var hasRequiredExeca;
 function requireExeca() {
   if (hasRequiredExeca) return execa.exports;
   hasRequiredExeca = 1;
-  const path2 = require$$0__default$3.default;
-  const childProcess = require$$0__default.default;
+  const path2 = require$$0$4;
+  const childProcess = require$$0$1;
   const crossSpawn2 = requireCrossSpawn();
   const stripFinalNewline2 = requireStripFinalNewline();
   const npmRunPath2 = requireNpmRunPath();
@@ -117244,9 +117536,9 @@ var hasRequiredLocatePath$1;
 function requireLocatePath$1() {
   if (hasRequiredLocatePath$1) return locatePath$1.exports;
   hasRequiredLocatePath$1 = 1;
-  const path2 = require$$0__default$3.default;
-  const fs2 = require$$0__default$2.default;
-  const { promisify } = require$$2__default$1.default;
+  const path2 = require$$0$4;
+  const fs2 = require$$0$3;
+  const { promisify } = require$$2$1;
   const pLocate2 = requirePLocate$1();
   const fsStat = promisify(fs2.stat);
   const fsLStat = promisify(fs2.lstat);
@@ -117305,8 +117597,8 @@ var hasRequiredPathExists;
 function requirePathExists() {
   if (hasRequiredPathExists) return pathExists.exports;
   hasRequiredPathExists = 1;
-  const fs2 = require$$0__default$2.default;
-  const { promisify } = require$$2__default$1.default;
+  const fs2 = require$$0$3;
+  const { promisify } = require$$2$1;
   const pAccess = promisify(fs2.access);
   pathExists.exports = async (path2) => {
     try {
@@ -117330,12 +117622,12 @@ var hasRequiredFindUp$1;
 function requireFindUp$1() {
   if (hasRequiredFindUp$1) return findUp$1.exports;
   hasRequiredFindUp$1 = 1;
-  (function(module2) {
-    const path2 = require$$0__default$3.default;
+  (function(module) {
+    const path2 = require$$0$4;
     const locatePath2 = requireLocatePath$1();
     const pathExists2 = requirePathExists();
     const stop = Symbol("findUp.stop");
-    module2.exports = async (name, options2 = {}) => {
+    module.exports = async (name, options2 = {}) => {
       let directory = path2.resolve(options2.cwd || "");
       const { root } = path2.parse(directory);
       const paths = [].concat(name);
@@ -117363,7 +117655,7 @@ function requireFindUp$1() {
         directory = path2.dirname(directory);
       }
     };
-    module2.exports.sync = (name, options2 = {}) => {
+    module.exports.sync = (name, options2 = {}) => {
       let directory = path2.resolve(options2.cwd || "");
       const { root } = path2.parse(directory);
       const paths = [].concat(name);
@@ -117391,9 +117683,9 @@ function requireFindUp$1() {
         directory = path2.dirname(directory);
       }
     };
-    module2.exports.exists = pathExists2;
-    module2.exports.sync.exists = pathExists2.sync;
-    module2.exports.stop = stop;
+    module.exports.exists = pathExists2;
+    module.exports.sync.exists = pathExists2.sync;
+    module.exports.stop = stop;
   })(findUp$1);
   return findUp$1.exports;
 }
@@ -117401,7 +117693,7 @@ var hasRequiredPkgDir;
 function requirePkgDir() {
   if (hasRequiredPkgDir) return pkgDir.exports;
   hasRequiredPkgDir = 1;
-  const path2 = require$$0__default$3.default;
+  const path2 = require$$0$4;
   const findUp2 = requireFindUp$1();
   const pkgDir$1 = async (cwd) => {
     const filePath = await findUp2("package.json", { cwd });
@@ -117420,8 +117712,8 @@ var hasRequiredUtils$1;
 function requireUtils$1() {
   if (hasRequiredUtils$1) return utils$1;
   hasRequiredUtils$1 = 1;
-  (function(exports2) {
-    exports2.isInteger = (num2) => {
+  (function(exports) {
+    exports.isInteger = (num2) => {
       if (typeof num2 === "number") {
         return Number.isInteger(num2);
       }
@@ -117430,13 +117722,13 @@ function requireUtils$1() {
       }
       return false;
     };
-    exports2.find = (node, type2) => node.nodes.find((node2) => node2.type === type2);
-    exports2.exceedsLimit = (min, max, step = 1, limit2) => {
+    exports.find = (node, type2) => node.nodes.find((node2) => node2.type === type2);
+    exports.exceedsLimit = (min, max, step = 1, limit2) => {
       if (limit2 === false) return false;
-      if (!exports2.isInteger(min) || !exports2.isInteger(max)) return false;
+      if (!exports.isInteger(min) || !exports.isInteger(max)) return false;
       return (Number(max) - Number(min)) / Number(step) >= limit2;
     };
-    exports2.escapeNode = (block, n2 = 0, type2) => {
+    exports.escapeNode = (block, n2 = 0, type2) => {
       const node = block.nodes[n2];
       if (!node) return;
       if (type2 && node.type === type2 || node.type === "open" || node.type === "close") {
@@ -117446,7 +117738,7 @@ function requireUtils$1() {
         }
       }
     };
-    exports2.encloseBrace = (node) => {
+    exports.encloseBrace = (node) => {
       if (node.type !== "brace") return false;
       if (node.commas >> 0 + node.ranges >> 0 === 0) {
         node.invalid = true;
@@ -117454,7 +117746,7 @@ function requireUtils$1() {
       }
       return false;
     };
-    exports2.isInvalidBrace = (block) => {
+    exports.isInvalidBrace = (block) => {
       if (block.type !== "brace") return false;
       if (block.invalid === true || block.dollar) return true;
       if (block.commas >> 0 + block.ranges >> 0 === 0) {
@@ -117467,18 +117759,18 @@ function requireUtils$1() {
       }
       return false;
     };
-    exports2.isOpenOrClose = (node) => {
+    exports.isOpenOrClose = (node) => {
       if (node.type === "open" || node.type === "close") {
         return true;
       }
       return node.open === true || node.close === true;
     };
-    exports2.reduce = (nodes) => nodes.reduce((acc, node) => {
+    exports.reduce = (nodes) => nodes.reduce((acc, node) => {
       if (node.type === "text") acc.push(node.value);
       if (node.type === "range") node.type = "text";
       return acc;
     }, []);
-    exports2.flatten = (...args) => {
+    exports.flatten = (...args) => {
       const result = [];
       const flat = (arr2) => {
         for (let i = 0; i < arr2.length; i++) {
@@ -117780,7 +118072,7 @@ var hasRequiredFillRange;
 function requireFillRange() {
   if (hasRequiredFillRange) return fillRange;
   hasRequiredFillRange = 1;
-  const util2 = require$$2__default$1.default;
+  const util2 = require$$2$1;
   const toRegexRange = requireToRegexRange();
   const isObject2 = (val) => val !== null && typeof val === "object" && !Array.isArray(val);
   const transform2 = (toNumber) => {
@@ -118523,7 +118815,7 @@ var hasRequiredConstants;
 function requireConstants() {
   if (hasRequiredConstants) return constants;
   hasRequiredConstants = 1;
-  const path2 = require$$0__default$3.default;
+  const path2 = require$$0$4;
   const WIN_SLASH = "\\\\/";
   const WIN_NO_SLASH = `[^${WIN_SLASH}]`;
   const DEFAULT_MAX_EXTGLOB_RECURSION = 0;
@@ -118723,8 +119015,8 @@ var hasRequiredUtils;
 function requireUtils() {
   if (hasRequiredUtils) return utils;
   hasRequiredUtils = 1;
-  (function(exports2) {
-    const path2 = require$$0__default$3.default;
+  (function(exports) {
+    const path2 = require$$0$4;
     const win32 = process.platform === "win32";
     const {
       REGEX_BACKSLASH,
@@ -118732,36 +119024,36 @@ function requireUtils() {
       REGEX_SPECIAL_CHARS,
       REGEX_SPECIAL_CHARS_GLOBAL
     } = requireConstants();
-    exports2.isObject = (val) => val !== null && typeof val === "object" && !Array.isArray(val);
-    exports2.hasRegexChars = (str2) => REGEX_SPECIAL_CHARS.test(str2);
-    exports2.isRegexChar = (str2) => str2.length === 1 && exports2.hasRegexChars(str2);
-    exports2.escapeRegex = (str2) => str2.replace(REGEX_SPECIAL_CHARS_GLOBAL, "\\$1");
-    exports2.toPosixSlashes = (str2) => str2.replace(REGEX_BACKSLASH, "/");
-    exports2.removeBackslashes = (str2) => {
+    exports.isObject = (val) => val !== null && typeof val === "object" && !Array.isArray(val);
+    exports.hasRegexChars = (str2) => REGEX_SPECIAL_CHARS.test(str2);
+    exports.isRegexChar = (str2) => str2.length === 1 && exports.hasRegexChars(str2);
+    exports.escapeRegex = (str2) => str2.replace(REGEX_SPECIAL_CHARS_GLOBAL, "\\$1");
+    exports.toPosixSlashes = (str2) => str2.replace(REGEX_BACKSLASH, "/");
+    exports.removeBackslashes = (str2) => {
       return str2.replace(REGEX_REMOVE_BACKSLASH, (match) => {
         return match === "\\" ? "" : match;
       });
     };
-    exports2.supportsLookbehinds = () => {
+    exports.supportsLookbehinds = () => {
       const segs = process.version.slice(1).split(".").map(Number);
       if (segs.length === 3 && segs[0] >= 9 || segs[0] === 8 && segs[1] >= 10) {
         return true;
       }
       return false;
     };
-    exports2.isWindows = (options2) => {
+    exports.isWindows = (options2) => {
       if (options2 && typeof options2.windows === "boolean") {
         return options2.windows;
       }
       return win32 === true || path2.sep === "\\";
     };
-    exports2.escapeLast = (input, char, lastIdx) => {
+    exports.escapeLast = (input, char, lastIdx) => {
       const idx = input.lastIndexOf(char, lastIdx);
       if (idx === -1) return input;
-      if (input[idx - 1] === "\\") return exports2.escapeLast(input, char, idx - 1);
+      if (input[idx - 1] === "\\") return exports.escapeLast(input, char, idx - 1);
       return `${input.slice(0, idx)}\\${input.slice(idx)}`;
     };
-    exports2.removePrefix = (input, state = {}) => {
+    exports.removePrefix = (input, state = {}) => {
       let output = input;
       if (output.startsWith("./")) {
         output = output.slice(2);
@@ -118769,7 +119061,7 @@ function requireUtils() {
       }
       return output;
     };
-    exports2.wrapOutput = (input, state = {}, options2 = {}) => {
+    exports.wrapOutput = (input, state = {}, options2 = {}) => {
       const prepend = options2.contains ? "" : "^";
       const append = options2.contains ? "" : "$";
       let output = `${prepend}(?:${input})${append}`;
@@ -120118,7 +120410,7 @@ var hasRequiredPicomatch$1;
 function requirePicomatch$1() {
   if (hasRequiredPicomatch$1) return picomatch_1;
   hasRequiredPicomatch$1 = 1;
-  const path2 = require$$0__default$3.default;
+  const path2 = require$$0$4;
   const scan2 = requireScan();
   const parse4 = requireParse();
   const utils2 = requireUtils();
@@ -120267,7 +120559,7 @@ var hasRequiredMicromatch;
 function requireMicromatch() {
   if (hasRequiredMicromatch) return micromatch_1;
   hasRequiredMicromatch = 1;
-  const util2 = require$$2__default$1.default;
+  const util2 = require$$2$1;
   const braces = requireBraces();
   const picomatch2 = requirePicomatch();
   const utils2 = requireUtils();
@@ -120432,9 +120724,9 @@ function requireCore$1() {
   };
   Object.defineProperty(core$1, "__esModule", { value: true });
   core$1.readPackageJSON = core$1.extractWorkspaces = core$1.isMatchWorkspaces = core$1.checkWorkspaces = core$1.findWorkspaceRoot = void 0;
-  const path_1 = __importDefault(require$$0__default$3.default);
+  const path_1 = __importDefault(require$$0$4);
   const pkg_dir_1 = __importDefault(requirePkgDir());
-  const fs_1 = require$$0__default$2.default;
+  const fs_1 = require$$0$3;
   const micromatch_12 = __importDefault(requireMicromatch());
   function findWorkspaceRoot(initial) {
     if (!initial) {
@@ -120682,9 +120974,9 @@ var hasRequiredLocatePath;
 function requireLocatePath() {
   if (hasRequiredLocatePath) return locatePath.exports;
   hasRequiredLocatePath = 1;
-  const path2 = require$$0__default$3.default;
-  const fs2 = require$$0__default$2.default;
-  const { promisify } = require$$2__default$1.default;
+  const path2 = require$$0$4;
+  const fs2 = require$$0$3;
+  const { promisify } = require$$2$1;
   const pLocate2 = requirePLocate();
   const fsStat = promisify(fs2.stat);
   const fsLStat = promisify(fs2.lstat);
@@ -120742,12 +121034,12 @@ var hasRequiredFindUp;
 function requireFindUp() {
   if (hasRequiredFindUp) return findUp.exports;
   hasRequiredFindUp = 1;
-  (function(module2) {
-    const path2 = require$$0__default$3.default;
+  (function(module) {
+    const path2 = require$$0$4;
     const locatePath2 = requireLocatePath();
     const pathExists2 = requirePathExists();
     const stop = Symbol("findUp.stop");
-    module2.exports = async (name, options2 = {}) => {
+    module.exports = async (name, options2 = {}) => {
       let directory = path2.resolve(options2.cwd || "");
       const { root } = path2.parse(directory);
       const paths = [].concat(name);
@@ -120775,7 +121067,7 @@ function requireFindUp() {
         directory = path2.dirname(directory);
       }
     };
-    module2.exports.sync = (name, options2 = {}) => {
+    module.exports.sync = (name, options2 = {}) => {
       let directory = path2.resolve(options2.cwd || "");
       const { root } = path2.parse(directory);
       const paths = [].concat(name);
@@ -120803,9 +121095,9 @@ function requireFindUp() {
         directory = path2.dirname(directory);
       }
     };
-    module2.exports.exists = pathExists2;
-    module2.exports.sync.exists = pathExists2.sync;
-    module2.exports.stop = stop;
+    module.exports.exists = pathExists2;
+    module.exports.sync.exists = pathExists2.sync;
+    module.exports.stop = stop;
   })(findUp);
   return findUp.exports;
 }
@@ -120815,7 +121107,7 @@ var hasRequiredPolyfills;
 function requirePolyfills() {
   if (hasRequiredPolyfills) return polyfills;
   hasRequiredPolyfills = 1;
-  var constants2 = require$$0__default$7.default;
+  var constants2 = require$$0$8;
   var origCwd = process.cwd;
   var cwd = null;
   var platform = process.env.GRACEFUL_FS_PLATFORM || process.platform;
@@ -121103,7 +121395,7 @@ var hasRequiredLegacyStreams;
 function requireLegacyStreams() {
   if (hasRequiredLegacyStreams) return legacyStreams;
   hasRequiredLegacyStreams = 1;
-  var Stream3 = require$$0__default$5.default.Stream;
+  var Stream3 = require$$0$6.Stream;
   legacyStreams = legacy;
   function legacy(fs2) {
     return {
@@ -121223,11 +121515,11 @@ var hasRequiredGracefulFs;
 function requireGracefulFs() {
   if (hasRequiredGracefulFs) return gracefulFs;
   hasRequiredGracefulFs = 1;
-  var fs2 = require$$0__default$2.default;
+  var fs2 = require$$0$3;
   var polyfills2 = requirePolyfills();
   var legacy = requireLegacyStreams();
   var clone2 = requireClone();
-  var util2 = require$$2__default$1.default;
+  var util2 = require$$2$1;
   var gracefulQueue;
   var previousSymbol;
   if (typeof Symbol === "function" && typeof Symbol.for === "function") {
@@ -121286,7 +121578,7 @@ function requireGracefulFs() {
     if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || "")) {
       process.on("exit", function() {
         debug(fs2[gracefulQueue]);
-        require$$0__default$4.default.equal(fs2[gracefulQueue].length, 0);
+        require$$0$5.equal(fs2[gracefulQueue].length, 0);
       });
     }
   }
@@ -124506,7 +124798,7 @@ var hasRequiredWhichPm;
 function requireWhichPm() {
   if (hasRequiredWhichPm) return whichPm;
   hasRequiredWhichPm = 1;
-  const path2 = require$$0__default$3.default;
+  const path2 = require$$0$4;
   const pathExists2 = requirePathExists();
   const loadYamlFile2 = requireLoadYamlFile();
   whichPm = async function(pkgPath) {
@@ -124546,7 +124838,7 @@ function requirePreferredPm() {
   hasRequiredPreferredPm = 1;
   const findYarnWorkspaceRoot = requireFindYarnWorkspaceRoot2();
   const findUp2 = requireFindUp();
-  const path2 = require$$0__default$3.default;
+  const path2 = require$$0$4;
   const pathExists2 = requirePathExists();
   const whichPM = requireWhichPm();
   preferredPm = async function preferredPM(pkgPath) {
@@ -129108,8 +129400,8 @@ _enum([
   "published"
 ]).describe("Filter by publication status");
 string().describe("Search query string");
-const byBytes = (a, b) => a < b ? -1 : a > b ? 1 : 0;
-const sorted = (values) => [...values].sort(byBytes);
+const byBytes$1 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+const sorted = (values) => [...values].sort(byBytes$1);
 const canonical = (value) => {
   if (Array.isArray(value)) {
     return value.map(canonical);
@@ -129123,7 +129415,7 @@ const canonical = (value) => {
   }
   return value;
 };
-const sha256 = (value) => crypto$1.createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
+const sha256$1 = (value) => createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
 const defaultPrivateAttributes = (schema2) => [
   ...schema2?.options?.privateAttributes ?? [],
   ...Object.entries(schema2?.attributes ?? {}).filter(([, attribute]) => Boolean(attribute?.private)).map(([name]) => name)
@@ -129251,11 +129543,14 @@ const renderFields = (schema2, privateOf) => {
 const renderContentType = (uid, schema2, components, previewPaths, tier, privateOf) => {
   const displayName = schema2?.info?.displayName ?? uid;
   const kind2 = isSingleType(schema2) ? "single" : "collection";
-  const lines = [
-    `- ${uid} — "${displayName}" (${kind2})`,
+  const lines = [`- ${uid} — "${displayName}" (${kind2})`];
+  if (tier === "index") {
+    return lines;
+  }
+  lines.push(
     `  draft & publish: ${hasDraftAndPublish(schema2) ? "yes" : "no"}   localized: ${isLocalized(schema2) ? "yes" : "no"}`,
     `  preview target: ${previewPaths[uid] ? "configured" : "none"}`
-  ];
+  );
   if (tier !== "names-only") {
     lines.push(...renderFields(schema2, privateOf));
   }
@@ -129275,6 +129570,11 @@ const renderTier = (input, tier, uids) => {
   blocks2.push("#### Content types");
   if (uids.length === 0) {
     blocks2.push("(none readable by this account)");
+  }
+  if (tier === "index" && uids.length > 0) {
+    blocks2.push(
+      "(Identities only — this install exceeds the description budget. Use the read tools for fields, media slots and structure.)"
+    );
   }
   for (const uid of uids) {
     blocks2.push(
@@ -129312,7 +129612,7 @@ const renderTier = (input, tier, uids) => {
 };
 const renderInstallDescription = (input) => {
   const allUids = sorted(Object.keys(input.readable));
-  const tiers = ["full", "no-components", "names-only"];
+  const tiers = ["full", "no-components", "names-only", "index"];
   const result = (text2, tier2, uids, omitted) => ({
     text: text2,
     partial: tier2 !== "full" || omitted > 0,
@@ -129329,7 +129629,7 @@ const renderInstallDescription = (input) => {
       return result(text2, tier2, allUids, 0);
     }
   }
-  const tier = "names-only";
+  const tier = "index";
   for (let keep = allUids.length - 1; keep >= 0; keep -= 1) {
     const uids = allUids.slice(0, keep);
     const omitted = allUids.length - keep;
@@ -129372,7 +129672,7 @@ const groundingService = ({ strapi: strapi2 }) => {
   const service = {
     /** sha256 over the canonically serialized `api::*` schemas plus components (§5). */
     schemaFingerprint() {
-      return sha256({ contentTypes: apiContentTypes(), components: allComponents() });
+      return sha256$1({ contentTypes: apiContentTypes(), components: allComponents() });
     },
     /**
      * The uids the CALLER may read, sorted — the same live `can.read()` every tool makes, so the
@@ -129402,7 +129702,7 @@ const groundingService = ({ strapi: strapi2 }) => {
       }
       const { maxChars } = strapi2.plugin("ai-content-studio").service("config").getGroundingOptions();
       const schemaFingerprint = service.schemaFingerprint();
-      const readableFingerprint = sha256(readableUids);
+      const readableFingerprint = sha256$1(readableUids);
       const key = `${schemaFingerprint}:${readableFingerprint}`;
       const hit = cache2.get(key);
       if (hit && hit.maxChars === maxChars) {
@@ -129430,6 +129730,637 @@ const groundingService = ({ strapi: strapi2 }) => {
       });
       cache2.set(key, { schemaFingerprint, readableFingerprint, description, maxChars });
       return description;
+    }
+  };
+  return service;
+};
+const MAX_FIELD_CHARS$1 = 400;
+const MAX_SAMPLE_CHARS = 24e3;
+const RUN_LOCK_STALE_MINUTES = 30;
+const sha256 = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const byBytes = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+const textOf$1 = (reply) => {
+  const content = reply?.content;
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content.filter((part) => part?.type === "text" && typeof part.text === "string").map((part) => part.text).join("");
+  }
+  return "";
+};
+const SECTION_SYSTEM_PROMPT = `You are documenting one content type of a Strapi project for a colleague who has never seen it.
+
+You are given the content type's schema and a sample of its real entries. Write a SHORT briefing —
+plain prose, 2 to 5 sentences, no headings, no bullet lists, no JSON, no code fences.
+
+Cover, in your own words and only where the sample actually supports it:
+- what this content type is FOR in this project, in plain language;
+- how it is actually used in practice: roughly how many entries, whether they are short or long,
+  which fields carry the real substance and which are usually empty;
+- any convention a colleague would otherwise have to discover the hard way (naming or slug patterns,
+  how sections or components are typically composed, a field used for something its name does not
+  suggest).
+
+Rules:
+- Describe PATTERNS, never individual records. Do not reproduce personal data, email addresses,
+  phone numbers, credentials or long verbatim passages from any entry.
+- Say only what the sample supports. If the sample is small or the entries are mostly empty, say so
+  plainly rather than generalizing.
+- Do not restate the field list — the schema is already available separately. Add meaning, not a
+  second copy of the structure.
+- Write in English, in the third person, with no preamble and no sign-off.`;
+const OVERVIEW_SYSTEM_PROMPT = `You are writing the opening paragraph of a briefing about a Strapi project, for a colleague who has never seen it.
+
+You are given short briefings about each of the project's content types. From them, write 3 to 6
+sentences of plain prose — no headings, no bullet lists, no JSON — covering:
+- what this project appears to BE (a marketing site, a documentation portal, a shop, a publication,
+  an internal tool — say which, and say it plainly);
+- how its main content types relate to each other, and which ones carry the substance;
+- anything that characterises how this particular team works with it.
+
+Rules:
+- Infer only from the briefings you were given. If they do not support a conclusion, leave it out
+  rather than guessing at the project's purpose.
+- Describe PATTERNS, never individual records, and reproduce no personal data.
+- Do not list the content types back — the list follows this paragraph already. Say what they add up
+  to.
+- Write in English, in the third person, with no preamble and no sign-off.`;
+const contentBriefService = ({ strapi: strapi2 }) => {
+  const plugin = () => strapi2.plugin("ai-content-studio");
+  const configSvc = () => plugin().service("config");
+  const redact = () => plugin().service("redact");
+  const grounding = () => plugin().service("grounding");
+  let running = false;
+  let stalenessCache = null;
+  const STALENESS_TTL_MS = 3e4;
+  const invalidateStaleness = () => {
+    stalenessCache = null;
+  };
+  const docs = (uid) => strapi2.documents(uid);
+  const apiUids = () => Object.keys(strapi2.contentTypes).filter((uid) => uid.startsWith("api::")).sort(byBytes);
+  const schemaOf = (uid) => strapi2.contentTypes[uid];
+  const isSingle = (uid) => isSingleType(schemaOf(uid));
+  const truncate = (value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+    return value.length > MAX_FIELD_CHARS$1 ? `${value.slice(0, MAX_FIELD_CHARS$1)}… [+${value.length - MAX_FIELD_CHARS$1} chars]` : value;
+  };
+  const compactEntry = (uid, entry) => {
+    if (!entry || typeof entry !== "object") {
+      return {};
+    }
+    const schema2 = schemaOf(uid);
+    const visible = getVisibleAttributes(schema2) ?? [];
+    const excluded = /* @__PURE__ */ new Set([
+      ...getPrivateAttributes(schema2) ?? [],
+      ...getCreatorFields(schema2) ?? []
+    ]);
+    const out = {};
+    for (const name of visible) {
+      if (excluded.has(name) || !(name in entry)) {
+        continue;
+      }
+      const value = entry[name];
+      if (value === null || value === void 0) {
+        continue;
+      }
+      if (Array.isArray(value)) {
+        out[name] = `[${value.length} item(s)${value[0]?.__component ? `: ${value.map((v) => v.__component ?? "?").join(", ")}` : ""}]`;
+        continue;
+      }
+      if (typeof value === "object") {
+        out[name] = value.name ?? value.documentId ?? "[object]";
+        continue;
+      }
+      out[name] = truncate(value);
+    }
+    return out;
+  };
+  const service = {
+    /* --------------------------------------------------------------- fingerprints */
+    /**
+     * A cheap staleness signal for one content type: how many entries it has and when the newest
+     * one changed.
+     *
+     * DELIBERATELY NOT A HASH OF THE CONTENT. Hashing every entry would cost a full scan on every
+     * chat turn to answer a question — "might this be out of date?" — that a count and a high-water
+     * mark answer well enough. It misses an edit that changes no `updatedAt`, which Strapi does not
+     * do, and it misses a delete-plus-create that nets to the same count in the same instant, which
+     * is not worth a table scan per turn.
+     */
+    async contentFingerprint(uid) {
+      try {
+        const total = isSingle(uid) ? 1 : await docs(uid).count({});
+        const newest = await docs(uid).findMany({
+          sort: "updatedAt:desc",
+          limit: 1,
+          fields: ["updatedAt"]
+        });
+        const latest = Array.isArray(newest) ? newest[0]?.updatedAt ?? null : null;
+        return sha256({ total, latest });
+      } catch (err) {
+        strapi2.log.warn(
+          `[ai-content-studio] could not fingerprint ${uid}: ${redact().describeError(err)}`
+        );
+        return sha256({ error: true, uid });
+      }
+    },
+    /* ------------------------------------------------------------------ the walk */
+    /**
+     * Sample entries for one content type, from BOTH ENDS of the update order.
+     *
+     * Taking only the newest would describe a project by its most recent burst of work, which is
+     * precisely the period least representative of the whole. Half newest and half oldest shows the
+     * assistant what the project has settled into as well as what it is doing now.
+     */
+    async sample(uid, limit2) {
+      if (isSingle(uid)) {
+        const one = await docs(uid).findFirst({ populate: "*" });
+        return { entries: one ? [compactEntry(uid, one)] : [], total: one ? 1 : 0 };
+      }
+      const total = await docs(uid).count({});
+      const half = Math.max(1, Math.floor(limit2 / 2));
+      const newest = await docs(uid).findMany({ sort: "updatedAt:desc", limit: half, populate: "*" });
+      const oldest = total > half ? await docs(uid).findMany({
+        sort: "updatedAt:asc",
+        limit: Math.min(half, total - half),
+        populate: "*"
+      }) : [];
+      const seen = /* @__PURE__ */ new Set();
+      const entries = [];
+      for (const entry of [...newest ?? [], ...oldest ?? []]) {
+        const id = entry?.documentId;
+        if (id && seen.has(id)) {
+          continue;
+        }
+        if (id) {
+          seen.add(id);
+        }
+        entries.push(compactEntry(uid, entry));
+      }
+      return { entries, total };
+    },
+    /* -------------------------------------------------------------- generation */
+    /**
+     * Write one content type's section. Returns null when the model produced nothing usable, so a
+     * single bad section never fails a whole run.
+     */
+    async generateSection(uid, depth, model, providerId, modelId, schemaFingerprint, signal) {
+      const limit2 = configSvc().briefSampleSize(depth);
+      const { entries, total } = await service.sample(uid, limit2);
+      const schema2 = schemaOf(uid);
+      const displayName = schema2?.info?.displayName ?? uid;
+      let payload = JSON.stringify({ entries }, null, 1);
+      if (payload.length > MAX_SAMPLE_CHARS) {
+        payload = `${payload.slice(0, MAX_SAMPLE_CHARS)}
+… [sample truncated to fit]`;
+      }
+      const fieldSummary = (getVisibleAttributes(schema2) ?? []).map((name) => `${name}: ${schema2?.attributes?.[name]?.type ?? "unknown"}`).join(", ");
+      const human = [
+        `Content type: ${uid} — "${displayName}" (${isSingle(uid) ? "single type" : "collection type"})`,
+        `Fields: ${fieldSummary || "(none)"}`,
+        `Total entries in this project: ${total}. Entries sampled below: ${entries.length}.`,
+        "",
+        "Sample:",
+        payload
+      ].join("\n");
+      const { maxSectionChars } = configSvc().getContentBriefOptions();
+      const reply = await model.invoke(
+        [new SystemMessage(SECTION_SYSTEM_PROMPT), new HumanMessage(human)],
+        signal ? { signal } : {}
+      );
+      const text2 = textOf$1(reply).trim();
+      if (!text2) {
+        return null;
+      }
+      return {
+        uid,
+        text: text2.length > maxSectionChars ? `${text2.slice(0, maxSectionChars)}…` : text2,
+        schemaFingerprint,
+        contentFingerprint: await service.contentFingerprint(uid),
+        sampledCount: entries.length,
+        totalCount: total,
+        generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        provider: providerId,
+        model: modelId
+      };
+    },
+    /**
+     * Write the whole-platform paragraph from the sections a run just produced.
+     *
+     * Returns null rather than throwing: a run that produced good sections but no overview is a
+     * usable brief, and failing the whole run over its opening paragraph would be the wrong trade.
+     */
+    async generateOverview(sections, model, signal) {
+      if (sections.length === 0) {
+        return null;
+      }
+      const { maxSectionChars } = configSvc().getContentBriefOptions();
+      const digest = sections.map((section) => {
+        const schema2 = schemaOf(section.uid);
+        const displayName = schema2?.info?.displayName ?? section.uid;
+        return `${section.uid} — "${displayName}" (${section.totalCount} entries): ${section.text}`;
+      }).join("\n\n");
+      try {
+        const reply = await model.invoke(
+          [
+            new SystemMessage(OVERVIEW_SYSTEM_PROMPT),
+            new HumanMessage(
+              digest.length > MAX_SAMPLE_CHARS ? `${digest.slice(0, MAX_SAMPLE_CHARS)}
+… [further content types omitted to fit]` : digest
+            )
+          ],
+          signal ? { signal } : {}
+        );
+        const text2 = textOf$1(reply).trim();
+        if (!text2) {
+          return null;
+        }
+        return text2.length > maxSectionChars ? `${text2.slice(0, maxSectionChars)}…` : text2;
+      } catch (err) {
+        strapi2.log.warn(
+          `[ai-content-studio] brief overview failed: ${redact().describeError(err)}`
+        );
+        return null;
+      }
+    },
+    /* ----------------------------------------------------------------- storage */
+    async storedSections() {
+      const rows = await docs(UID.contentBrief).findMany({ limit: 1e3 });
+      return (Array.isArray(rows) ? rows : []).map((row) => ({
+        uid: row.uid,
+        text: row.text,
+        schemaFingerprint: row.schemaFingerprint,
+        contentFingerprint: row.contentFingerprint,
+        sampledCount: row.sampledCount ?? 0,
+        totalCount: row.totalCount ?? 0,
+        generatedAt: row.generatedAt,
+        provider: row.provider ?? null,
+        model: row.model ?? null
+      }));
+    },
+    /** Upsert one section by uid — a regenerated section replaces, never duplicates. */
+    async saveSection(section) {
+      const existing = await docs(UID.contentBrief).findMany({
+        filters: { uid: section.uid },
+        limit: 1
+      });
+      const found = Array.isArray(existing) ? existing[0] : null;
+      if (found) {
+        await docs(UID.contentBrief).update({ documentId: found.documentId, data: section });
+        return;
+      }
+      await docs(UID.contentBrief).create({ data: section });
+    },
+    /** Drop sections for content types that no longer exist, so a removed type cannot linger. */
+    async pruneSections() {
+      const live = new Set(apiUids());
+      const sections = await service.storedSections();
+      let removed = 0;
+      for (const section of sections) {
+        if (live.has(section.uid)) {
+          continue;
+        }
+        const rows = await docs(UID.contentBrief).findMany({
+          filters: { uid: section.uid },
+          limit: 1
+        });
+        const found = Array.isArray(rows) ? rows[0] : null;
+        if (found) {
+          await docs(UID.contentBrief).delete({ documentId: found.documentId });
+          removed += 1;
+        }
+      }
+      return removed;
+    },
+    /* --------------------------------------------------------------- staleness */
+    /**
+     * Which stored sections no longer match the live schema or content, plus which content types
+     * have no section at all. Both are "needs generating"; they are reported apart so the settings
+     * page can say which.
+     *
+     * ⚠ CACHED, AND THE CACHE IS NOT OPTIONAL. This walks every content type and issues a count
+     * plus a one-row lookup for each, so it is O(content types) database round trips. The settings
+     * page polls `status` every three seconds while a run is in progress, which without a cache
+     * would put a few hundred queries per poll onto an install that is already busy generating.
+     *
+     * A short TTL is the right cache here rather than a fingerprint key, because the thing being
+     * cached IS the freshness check — there is no cheaper key that would not itself be the query.
+     * Staleness is a hint that drives a "re-run?" prompt, so being up to thirty seconds behind
+     * costs nothing, and a run invalidates it explicitly on the way out.
+     */
+    async staleness() {
+      if (stalenessCache && Date.now() - stalenessCache.at < STALENESS_TTL_MS) {
+        return stalenessCache.value;
+      }
+      const value = await service.computeStaleness();
+      stalenessCache = { at: Date.now(), value };
+      return value;
+    },
+    /** The uncached walk. Public so a run can force a fresh read after it finishes. */
+    async computeStaleness() {
+      const sections = new Map((await service.storedSections()).map((s) => [s.uid, s]));
+      const schemaFingerprint = grounding().schemaFingerprint();
+      const stale = [];
+      const missing = [];
+      for (const uid of apiUids()) {
+        const section = sections.get(uid);
+        if (!section) {
+          missing.push(uid);
+          continue;
+        }
+        if (section.schemaFingerprint !== schemaFingerprint) {
+          stale.push(uid);
+          continue;
+        }
+        if (await service.contentFingerprint(uid) !== section.contentFingerprint) {
+          stale.push(uid);
+        }
+      }
+      return { stale, missing };
+    },
+    /* ------------------------------------------------------------------- the run */
+    /**
+     * Start a full run in the BACKGROUND and return immediately.
+     *
+     * A `deep` run over a large install is minutes of sequential provider calls, which no HTTP
+     * request should hold open — so the route starts it, the store carries the progress, and the
+     * settings page polls. The run is never awaited by a request handler.
+     */
+    async startRun({
+      userAbility,
+      userId,
+      depth,
+      uids
+    }) {
+      const options2 = configSvc().getContentBriefOptions();
+      if (!options2.enabled) {
+        return {
+          ok: false,
+          error: "disabled",
+          message: "The content brief is turned off for this deployment by plugin configuration."
+        };
+      }
+      const current = await configSvc().getBriefRun();
+      if (running || service.isRunActive(current)) {
+        return {
+          ok: false,
+          error: "already_running",
+          message: "A brief run is already in progress."
+        };
+      }
+      const readable = grounding().readableUids(userAbility);
+      const targets = (uids ? readable.filter((uid) => uids.includes(uid)) : readable).sort(byBytes);
+      if (targets.length === 0) {
+        return {
+          ok: false,
+          error: "nothing_readable",
+          message: "Your account cannot read any content type, so there is nothing to describe."
+        };
+      }
+      let active;
+      try {
+        active = await plugin().service("registry").getActiveModel();
+      } catch (err) {
+        return {
+          ok: false,
+          error: "provider",
+          message: redact().describeError(err)
+        };
+      }
+      running = true;
+      await configSvc().setBriefRun({
+        state: "running",
+        depth,
+        startedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        completedAt: null,
+        currentUid: targets[0],
+        doneCount: 0,
+        totalCount: targets.length,
+        error: null,
+        lastRunByUserId: userId
+      });
+      void service.executeRun(targets, depth, active).catch(async (err) => {
+        strapi2.log.error(
+          `[ai-content-studio] brief run failed: ${redact().describeError(err)}`
+        );
+        await configSvc().setBriefRun({
+          state: "failed",
+          error: redact().describeError(err),
+          currentUid: null,
+          completedAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+      }).finally(() => {
+        running = false;
+      });
+      return { ok: true, total: targets.length };
+    },
+    /** The sequential body of a run. One content type at a time, progress persisted per section. */
+    async executeRun(targets, depth, active) {
+      const providerId = active.provider;
+      const modelId = active.modelId;
+      const schemaFingerprint = grounding().schemaFingerprint();
+      let done = 0;
+      let failures = 0;
+      for (const uid of targets) {
+        await configSvc().setBriefRun({ currentUid: uid, doneCount: done });
+        try {
+          const section = await service.generateSection(
+            uid,
+            depth,
+            active.model,
+            providerId,
+            modelId,
+            schemaFingerprint
+          );
+          if (section) {
+            await service.saveSection(section);
+          } else {
+            failures += 1;
+          }
+        } catch (err) {
+          failures += 1;
+          strapi2.log.warn(
+            `[ai-content-studio] brief section for ${uid} failed: ${redact().describeError(err)}`
+          );
+        }
+        done += 1;
+      }
+      await service.pruneSections();
+      invalidateStaleness();
+      await configSvc().setBriefRun({ currentUid: "overview", doneCount: done });
+      const overview = await service.generateOverview(await service.storedSections(), active.model);
+      await configSvc().setBriefRun({
+        state: "ready",
+        currentUid: null,
+        doneCount: done,
+        overview,
+        completedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        error: failures > 0 ? `${failures} of ${targets.length} content type(s) could not be described. The rest were.` : null
+      });
+    },
+    /** True while a run record is both `running` and recent enough not to be an abandoned lock. */
+    isRunActive(run) {
+      if (run.state !== "running") {
+        return false;
+      }
+      const startedAt = run.startedAt ? Date.parse(run.startedAt) : NaN;
+      if (!Number.isFinite(startedAt)) {
+        return false;
+      }
+      return Date.now() - startedAt < RUN_LOCK_STALE_MINUTES * 60 * 1e3;
+    },
+    /* --------------------------------------------------------- automatic refresh */
+    /**
+     * Regenerate a BOUNDED number of stale sections, if enough time has passed. Never throws, never
+     * blocks the caller — a chat turn calls this without awaiting it.
+     *
+     * Three independent bounds keep unattended spend predictable, and each answers a different
+     * failure: the throttle stops a busy install from refreshing on every turn, the section cap
+     * stops one pass from regenerating a whole large install, and the staleness filter stops
+     * anything being regenerated that did not actually change.
+     */
+    async refreshIfDue(userAbility) {
+      const options2 = configSvc().getContentBriefOptions();
+      if (!options2.enabled || !options2.autoRefresh || running) {
+        return;
+      }
+      const run = await configSvc().getBriefRun();
+      if (run.state !== "ready" || service.isRunActive(run)) {
+        return;
+      }
+      const last = run.lastAutoRefreshAt ? Date.parse(run.lastAutoRefreshAt) : 0;
+      if (Date.now() - last < options2.refreshThrottleMinutes * 60 * 1e3) {
+        return;
+      }
+      const { stale, missing } = await service.staleness();
+      const candidates = [...stale, ...missing].slice(0, options2.maxAutoRefreshSections);
+      if (candidates.length === 0) {
+        return;
+      }
+      await configSvc().setBriefRun({ lastAutoRefreshAt: (/* @__PURE__ */ new Date()).toISOString() });
+      const readable = new Set(grounding().readableUids(userAbility));
+      const targets = candidates.filter((uid) => readable.has(uid));
+      if (targets.length === 0) {
+        return;
+      }
+      await service.startRun({
+        userAbility,
+        userId: run.lastRunByUserId ?? 0,
+        depth: run.depth,
+        uids: targets
+      });
+    },
+    /* ------------------------------------------------------- the caller's brief */
+    /**
+     * Assemble the brief. ONE BRIEF, THE SAME FOR EVERY ACCOUNT — see the file header.
+     *
+     * The default path does no per-caller filtering: every account with chat access is given the
+     * whole thing, overview included, because the brief is a shared description of the platform and
+     * two colleagues comparing the assistant's answers should not be reading different ones.
+     *
+     * `scopeToReader` is the deploy-time opt-out for installs where that is not acceptable —
+     * multi-tenant, or a content type only one team may know exists. It is OFF by default, and the
+     * settings page states which of the two an install is running under, so the disclosure is never
+     * a surprise.
+     */
+    async describeFor(userAbility) {
+      const options2 = configSvc().getContentBriefOptions();
+      if (!options2.enabled) {
+        return null;
+      }
+      const all = (await service.storedSections()).sort((a, b) => byBytes(a.uid, b.uid));
+      const sections = options2.scopeToReader ? (() => {
+        const readable = new Set(grounding().readableUids(userAbility));
+        return all.filter((section) => readable.has(section.uid));
+      })() : all;
+      if (sections.length === 0) {
+        return null;
+      }
+      const run = await configSvc().getBriefRun();
+      const overview = !options2.scopeToReader && run.overview ? run.overview.trim() : "";
+      const render3 = (section) => {
+        const schema2 = schemaOf(section.uid);
+        const displayName = schema2?.info?.displayName ?? section.uid;
+        return `- ${section.uid} — "${displayName}"
+  ${section.text.replace(/\n+/g, "\n  ")}`;
+      };
+      const kept = [];
+      let charCount = 0;
+      let omitted = 0;
+      if (overview) {
+        kept.push(overview);
+        charCount += overview.length + 2;
+      }
+      for (const section of sections) {
+        const block = render3(section);
+        if (charCount + block.length + 2 > options2.maxChars) {
+          omitted += 1;
+          continue;
+        }
+        kept.push(block);
+        charCount += block.length + 2;
+      }
+      if (kept.length === 0 || overview && kept.length === 1) {
+        return null;
+      }
+      const note = omitted > 0 ? `
+
+(${omitted} further content type(s) omitted to fit the size budget. Use the read tools for those.)` : "";
+      const text2 = kept.join("\n\n") + note;
+      return {
+        text: text2,
+        // The overview is not a content type, so it is not counted as one.
+        sectionCount: overview ? kept.length - 1 : kept.length,
+        partial: omitted > 0,
+        charCount: text2.length
+      };
+    },
+    /** The settings page's view: run state, coverage and staleness. Super-admin only, by route. */
+    async status(userAbility) {
+      const options2 = configSvc().getContentBriefOptions();
+      const run = await configSvc().getBriefRun();
+      const sections = await service.storedSections();
+      const { stale, missing } = await service.staleness();
+      const readable = grounding().readableUids(userAbility);
+      return {
+        enabled: options2.enabled,
+        /** Which of the two visibility modes this install runs under, so the panel can say so. */
+        scopeToReader: options2.scopeToReader,
+        autoRefresh: options2.autoRefresh,
+        refreshThrottleMinutes: options2.refreshThrottleMinutes,
+        maxAutoRefreshSections: options2.maxAutoRefreshSections,
+        maxChars: options2.maxChars,
+        run: { ...run, active: service.isRunActive(run) },
+        sectionCount: sections.length,
+        readableCount: readable.length,
+        staleCount: stale.length,
+        missingCount: missing.length,
+        /**
+         * What one run would cost, in the units an operator can reason about.
+         *
+         * `modelCalls` is one per content type PLUS ONE for the project overview, which is written
+         * last from the finished sections. Understating it by the overview would make the stated
+         * cost wrong in the one direction a cost warning must never be wrong in.
+         */
+        estimate: {
+          contentTypes: readable.length,
+          entriesPerType: configSvc().briefSampleSize(run.depth),
+          modelCalls: readable.length + (options2.scopeToReader ? 0 : 1)
+        },
+        /** The stored overview, so an operator reads exactly what every account is being told. */
+        overview: options2.scopeToReader ? null : run.overview,
+        sections: sections.filter((section) => !options2.scopeToReader || readable.includes(section.uid)).sort((a, b) => byBytes(a.uid, b.uid)).map((section) => ({
+          uid: section.uid,
+          text: section.text,
+          sampledCount: section.sampledCount,
+          totalCount: section.totalCount,
+          generatedAt: section.generatedAt,
+          stale: stale.includes(section.uid)
+        }))
+      };
     }
   };
   return service;
@@ -129964,7 +130895,7 @@ const changeSetsService = ({ strapi: strapi2 }) => {
     } catch {
       serialized = String(value);
     }
-    return crypto__default.default.createHash("sha256").update(serialized).digest("hex").slice(0, 32);
+    return crypto$1.createHash("sha256").update(serialized).digest("hex").slice(0, 32);
   };
   const fingerprint = (doc, field) => ({
     updatedAt: doc?.updatedAt ? String(doc.updatedAt) : null,
@@ -130813,7 +131744,7 @@ ${lines.join(
       }
       const ingested = [];
       for (const file of files) {
-        const contentHash = file.idempotencyKey ?? crypto__default.default.createHash("sha256").update(file.bytes).digest("hex");
+        const contentHash = file.idempotencyKey ?? crypto$1.createHash("sha256").update(file.bytes).digest("hex");
         const key = `${threadId}:${file.ordinal}:${contentHash}`;
         const previous = ingestLedger.get(key);
         if (previous) {
@@ -130822,11 +131753,11 @@ ${lines.join(
         }
         let tempPath = null;
         try {
-          tempPath = path__default.default.join(
-            os__default.default.tmpdir(),
-            `ai-studio-${crypto__default.default.randomUUID()}-${file.filename.replace(/[^\w.\-]/g, "_")}`
+          tempPath = path$4.join(
+            os.tmpdir(),
+            `ai-studio-${crypto$1.randomUUID()}-${file.filename.replace(/[^\w.\-]/g, "_")}`
           );
-          await fs__default.default.writeFile(tempPath, file.bytes);
+          await fs.writeFile(tempPath, file.bytes);
           const uploaded = await strapi2.plugin("upload").service("upload").upload({
             data: {},
             files: {
@@ -130865,7 +131796,7 @@ ${lines.join(
           };
         } finally {
           if (tempPath) {
-            await fs__default.default.rm(tempPath, { force: true }).catch(() => void 0);
+            await fs.rm(tempPath, { force: true }).catch(() => void 0);
           }
         }
       }
@@ -131010,7 +131941,7 @@ const previewService = ({ strapi: strapi2 }) => {
         };
       }
       const opts = options2();
-      const sessionId = crypto__default.default.randomUUID();
+      const sessionId = crypto$1.randomUUID();
       const expiresAtMs = Date.now() + opts.ttlMinutes * 6e4;
       const payload = {
         sessionId,
@@ -131030,7 +131961,7 @@ const previewService = ({ strapi: strapi2 }) => {
           );
           continue;
         }
-        const fileId = crypto__default.default.randomUUID();
+        const fileId = crypto$1.randomUUID();
         const meta = {
           fileId,
           ordinal: file.ordinal,
@@ -131469,6 +132400,8 @@ const services = {
   agent: agentService,
   prompt: promptService,
   grounding: groundingService,
+  // Referenced as service('content-brief').
+  "content-brief": contentBriefService,
   threads: threadsService,
   // Referenced as service('change-sets').
   "change-sets": changeSetsService,
@@ -131495,101 +132428,103 @@ const index = {
   services,
   policies
 };
-exports.Annotation = Annotation;
-exports.AnthropicError = AnthropicError;
-exports.AsyncBatchedStore = AsyncBatchedStore;
-exports.AsyncLocalStorageProviderSingleton = AsyncLocalStorageProviderSingleton;
-exports.BaseChannel = BaseChannel;
-exports.BaseCheckpointSaver = BaseCheckpointSaver;
-exports.BaseLangGraphError = BaseLangGraphError;
-exports.BaseStore = BaseStore2;
-exports.BinaryOperatorAggregate = BinaryOperatorAggregate;
-exports.COMMAND_SYMBOL = COMMAND_SYMBOL;
-exports.ChatModelStream = ChatModelStream;
-exports.Command = Command;
-exports.CommandInstance = CommandInstance;
-exports.CompiledStateGraph = CompiledStateGraph;
-exports.DEFAULT_MEMORY_SYNC_INTERVAL_MS = DEFAULT_MEMORY_SYNC_INTERVAL_MS;
-exports.DeltaChannel = DeltaChannel;
-exports.DeltaValue = DeltaValue;
-exports.END = END;
-exports.EmptyChannelError = EmptyChannelError;
-exports.EmptyInputError = EmptyInputError;
-exports.Graph$1 = Graph$1;
-exports.GraphBubbleUp = GraphBubbleUp;
-exports.GraphDrained = GraphDrained;
-exports.GraphInterrupt = GraphInterrupt;
-exports.GraphRecursionError = GraphRecursionError;
-exports.GraphRunStream = GraphRunStream;
-exports.GraphValueError = GraphValueError;
-exports.INTERRUPT = INTERRUPT$1;
-exports.InvalidUpdateError = InvalidUpdateError;
-exports.MIN_MEMORY_SYNC_INTERVAL_MS = MIN_MEMORY_SYNC_INTERVAL_MS;
-exports.MessagesAnnotation = MessagesAnnotation;
-exports.MessagesDeltaValue = MessagesDeltaValue;
-exports.MessagesValue = MessagesValue;
-exports.MessagesZodMeta = MessagesZodMeta;
-exports.MessagesZodState = MessagesZodState;
-exports.MultipleSubgraphsError = MultipleSubgraphsError;
-exports.NodeError = NodeError;
-exports.NodeInterrupt = NodeInterrupt;
-exports.NodeTimeoutError = NodeTimeoutError;
-exports.Overwrite = Overwrite;
-exports.ParentCommand = ParentCommand;
-exports.REMOVE_ALL_MESSAGES = REMOVE_ALL_MESSAGES;
-exports.ReducedValue = ReducedValue;
-exports.RemoteException = RemoteException;
-exports.RunControl = RunControl;
-exports.START = START;
-exports.STREAM_EVENTS_V3_MODES = STREAM_EVENTS_V3_MODES;
-exports.Send = Send;
-exports.StateGraph = StateGraph;
-exports.StateGraphInputError = StateGraphInputError;
-exports.StateSchema = StateSchema;
-exports.StreamChannel = StreamChannel;
-exports.SubgraphRunStream = SubgraphRunStream;
-exports.TASKS = TASKS;
-exports.UnreachableNodeError = UnreachableNodeError;
-exports.UntrackedValue = UntrackedValue;
-exports.UntrackedValueChannel = UntrackedValueChannel;
-exports.WRITES_IDX_MAP = WRITES_IDX_MAP;
-exports.coerceMessageLikeToMessage = coerceMessageLikeToMessage;
-exports.convertToProtocolEvent = convertToProtocolEvent;
-exports.copyCheckpoint = copyCheckpoint;
-exports.createGraphRunStream = createGraphRunStream;
-exports.createLifecycleTransformer = createLifecycleTransformer;
-exports.createMessagesTransformer = createMessagesTransformer;
-exports.createSubgraphDiscoveryTransformer = createSubgraphDiscoveryTransformer;
-exports.createValuesTransformer = createValuesTransformer;
-exports.emptyCheckpoint = emptyCheckpoint;
-exports.ensureLangGraphConfig = ensureLangGraphConfig;
-exports.entrypoint = entrypoint;
-exports.filterLifecycleEntries = filterLifecycleEntries;
-exports.filterSubgraphHandles = filterSubgraphHandles;
-exports.getCheckpointId = getCheckpointId;
-exports.getConfig = getConfig;
-exports.getCurrentTaskInput = getCurrentTaskInput;
-exports.getJsonSchemaFromSchema = getJsonSchemaFromSchema;
-exports.getPreviousState = getPreviousState;
-exports.getSchemaDefaultGetter = getSchemaDefaultGetter;
-exports.getStore = getStore;
-exports.getSubgraphsSeenSet = getSubgraphsSeenSet;
-exports.getWriter = getWriter;
-exports.index = index;
-exports.interrupt = interrupt;
-exports.isCheckpointEnvelope = isCheckpointEnvelope;
-exports.isCommand = isCommand;
-exports.isGraphBubbleUp = isGraphBubbleUp;
-exports.isGraphDrained = isGraphDrained;
-exports.isGraphInterrupt = isGraphInterrupt;
-exports.isInterrupted = isInterrupted;
-exports.isNativeTransformer = isNativeTransformer;
-exports.isNodeError = isNodeError;
-exports.isNodeTimeoutError = isNodeTimeoutError;
-exports.isParentCommand = isParentCommand;
-exports.isSerializableSchema = isSerializableSchema;
-exports.isStandardSchema = isStandardSchema;
-exports.maxChannelVersion = maxChannelVersion;
-exports.messagesDeltaReducer = messagesDeltaReducer;
-exports.messagesStateReducer = messagesStateReducer;
-exports.task = task;
+export {
+  START as $,
+  AsyncLocalStorageProviderSingleton as A,
+  BaseCheckpointSaver as B,
+  COMMAND_SYMBOL as C,
+  DeltaChannel as D,
+  END as E,
+  GraphValueError as F,
+  Graph$1 as G,
+  InvalidUpdateError as H,
+  INTERRUPT$1 as I,
+  MessagesDeltaValue as J,
+  MessagesValue as K,
+  MessagesZodMeta as L,
+  MessagesAnnotation as M,
+  MessagesZodState as N,
+  MultipleSubgraphsError as O,
+  NodeError as P,
+  NodeInterrupt as Q,
+  NodeTimeoutError as R,
+  StateGraph as S,
+  TASKS as T,
+  Overwrite as U,
+  ParentCommand as V,
+  WRITES_IDX_MAP as W,
+  REMOVE_ALL_MESSAGES as X,
+  ReducedValue as Y,
+  RemoteException as Z,
+  RunControl as _,
+  BaseStore2 as a,
+  STREAM_EVENTS_V3_MODES as a0,
+  Send as a1,
+  StateGraphInputError as a2,
+  StateSchema as a3,
+  SubgraphRunStream as a4,
+  UnreachableNodeError as a5,
+  UntrackedValue as a6,
+  UntrackedValueChannel as a7,
+  convertToProtocolEvent as a8,
+  createGraphRunStream as a9,
+  isSerializableSchema as aA,
+  isStandardSchema as aB,
+  messagesDeltaReducer as aC,
+  task as aD,
+  AnthropicError as aE,
+  DEFAULT_MEMORY_SYNC_INTERVAL_MS as aF,
+  MIN_MEMORY_SYNC_INTERVAL_MS as aG,
+  index as aH,
+  createLifecycleTransformer as aa,
+  createMessagesTransformer as ab,
+  createSubgraphDiscoveryTransformer as ac,
+  createValuesTransformer as ad,
+  emptyCheckpoint as ae,
+  entrypoint as af,
+  filterLifecycleEntries as ag,
+  filterSubgraphHandles as ah,
+  getConfig as ai,
+  getCurrentTaskInput as aj,
+  getJsonSchemaFromSchema as ak,
+  getPreviousState as al,
+  getSchemaDefaultGetter as am,
+  getStore as an,
+  getSubgraphsSeenSet as ao,
+  getWriter as ap,
+  isCheckpointEnvelope as aq,
+  isCommand as ar,
+  isGraphBubbleUp as as,
+  isGraphDrained as at,
+  isGraphInterrupt as au,
+  isInterrupted as av,
+  isNativeTransformer as aw,
+  isNodeError as ax,
+  isNodeTimeoutError as ay,
+  isParentCommand as az,
+  messagesStateReducer as b,
+  copyCheckpoint as c,
+  coerceMessageLikeToMessage as d,
+  ensureLangGraphConfig as e,
+  Annotation as f,
+  getCheckpointId as g,
+  AsyncBatchedStore as h,
+  interrupt as i,
+  BaseChannel as j,
+  BaseLangGraphError as k,
+  BinaryOperatorAggregate as l,
+  maxChannelVersion as m,
+  ChatModelStream as n,
+  Command as o,
+  CommandInstance as p,
+  CompiledStateGraph as q,
+  DeltaValue as r,
+  EmptyChannelError as s,
+  EmptyInputError as t,
+  StreamChannel as u,
+  GraphBubbleUp as v,
+  GraphDrained as w,
+  GraphInterrupt as x,
+  GraphRecursionError as y,
+  GraphRunStream as z
+};

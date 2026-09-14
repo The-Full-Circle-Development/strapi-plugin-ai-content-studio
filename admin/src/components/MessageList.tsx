@@ -150,10 +150,28 @@ function useCyclingWord(active: boolean, words: string[], intervalMs = 2500): st
   return word;
 }
 
-/** A `proposeChanges` tool result carries the id of the pending plan it recorded. */
+/**
+ * A `proposeChanges` tool result carries the id of the pending plan it recorded.
+ *
+ * THE JSON-TEXT FORM IS ACCEPTED TOO, and that is not defensive padding. LangChain serializes a
+ * tool's object return into its `ToolMessage` content, and the LangGraph bridge forwards that
+ * content verbatim as `output` — so this part held a STRING, and the card never rendered. The server
+ * now normalizes the chunk back to the object, but transcripts stored before it did still hold the
+ * string, and those conversations must show their approval card on reload rather than staying
+ * silently unapprovable. No migration rewrites them; this read does.
+ */
 const changeSetIdOf = (part: unknown): string | null => {
-  const output = (part as { output?: { ok?: boolean; changeSetId?: string } }).output;
-  return output?.ok && typeof output.changeSetId === 'string' ? output.changeSetId : null;
+  const raw = (part as { output?: unknown }).output;
+  let output: unknown = raw;
+  if (typeof raw === 'string') {
+    try {
+      output = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  const result = output as { ok?: boolean; changeSetId?: unknown } | null;
+  return result?.ok && typeof result.changeSetId === 'string' ? result.changeSetId : null;
 };
 
 interface ApplyReportPart {

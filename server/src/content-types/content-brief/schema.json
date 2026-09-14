@@ -1,0 +1,58 @@
+{
+  "kind": "collectionType",
+  "collectionName": "ai_studio_content_briefs",
+  "info": {
+    "singularName": "content-brief",
+    "pluralName": "content-briefs",
+    "displayName": "AI Studio content brief",
+    "description": "One human-readable section per content type, generated once and shared by every account. Rows are never served whole: the brief is assembled per caller from the sections that caller's own permissions allow them to read."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {
+    "content-manager": {
+      "visible": false
+    },
+    "content-type-builder": {
+      "visible": false
+    }
+  },
+  "attributes": {
+    "uid": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "text": {
+      "type": "text",
+      "required": true
+    },
+    "schemaFingerprint": {
+      "type": "string",
+      "required": true
+    },
+    "contentFingerprint": {
+      "type": "string",
+      "required": true
+    },
+    "sampledCount": {
+      "type": "integer",
+      "default": 0
+    },
+    "totalCount": {
+      "type": "integer",
+      "default": 0
+    },
+    "generatedAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "provider": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    }
+  }
+}

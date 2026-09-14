@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Core } from '@strapi/strapi';
 import { PROVIDER_IDS } from './providers';
+import { BRIEF_DEPTH_SAMPLE, type BriefDepth, type BriefRun, type GroundingSource } from '../types';
 
 /**
  * Plugin configuration persisted in the Strapi plugin store.
@@ -40,6 +41,16 @@ export interface StudioSettings {
   /** The RUNTIME grounding switch. Narrowed by, and never able to override, the plugin-config
    *  hard off-switch — see `isGroundingEnabled()`. */
   grounding: { enabled: boolean };
+  /**
+   * Which generated context the instructions carry, and how deep a brief run reads
+   * (contracts/content-brief.md §2). Both are administrator choices made in Settings, so they live
+   * beside the provider selection rather than in deploy-time plugin config.
+   *
+   * `source` defaults to `schema`: an install that upgrades into this feature keeps exactly the
+   * behaviour it had, and gains nothing it did not ask for — there is no brief until someone runs
+   * one, and selecting `brief` before then would silently empty the prompt's structural section.
+   */
+  contentBrief: { source: GroundingSource; depth: BriefDepth };
 }
 
 export interface MaskedProviderState {
@@ -55,6 +66,7 @@ export interface MaskedStudioConfig {
   activeModel: string;
   providers: Record<string, MaskedProviderState>;
   grounding: { enabled: boolean };
+  contentBrief: { source: GroundingSource; depth: BriefDepth };
 }
 
 /* --------------------------------------------------- static plugin options (config/index.ts) */
@@ -79,10 +91,91 @@ export interface GroundingOptions {
   maxChars: number;
 }
 
+export interface ContentBriefOptions {
+  /** The HARD off-switch for the whole feature, set at deploy time. No runtime control lifts it. */
+  enabled: boolean;
+  /** Declared character budget for the assembled brief, clamped 2,000..80,000. */
+  maxChars: number;
+  /** Per-section output ceiling, so one verbose section cannot consume the whole budget. */
+  maxSectionChars: number;
+  /** Whether a stale section may be regenerated without anyone pressing Run. */
+  autoRefresh: boolean;
+  /** Floor between two automatic refreshes. A human pressing Run is never throttled. */
+  refreshThrottleMinutes: number;
+  /** Hard ceiling on sections one AUTOMATIC pass may regenerate — the unattended-spend bound. */
+  maxAutoRefreshSections: number;
+  /**
+   * OFF by default: one brief, the same for every account, overview included.
+   *
+   * Turned on, each reader is served only the sections their own live `can.read()` allows, and the
+   * overview is withheld entirely because it is synthesized across every content type and so cannot
+   * be filtered. For installs where the shared default is not acceptable — multi-tenant, or a
+   * content type only one team may know exists.
+   */
+  scopeToReader: boolean;
+}
+
 /** Seeded from the provider table so there is no second copy of the shipped id list. */
 export const PROVIDERS: ProviderId[] = [...PROVIDER_IDS];
 
 const STORE_PARAMS = { type: 'plugin', name: 'ai-content-studio', key: 'settings' } as const;
+
+/**
+ * The brief RUN state lives under its own store key, not inside `settings`.
+ *
+ * Two reasons, and the first is the load-bearing one: a run writes progress every few seconds from a
+ * background task, while `settings` is written by an administrator saving a form — sharing one key
+ * would make a save during a run clobber the run, or the run clobber the save. The second is that a
+ * settings read happens on every chat turn and has no use for run progress.
+ */
+const RUN_STORE_PARAMS = { type: 'plugin', name: 'ai-content-studio', key: 'brief-run' } as const;
+
+const GROUNDING_SOURCES: readonly GroundingSource[] = ['schema', 'brief', 'both'];
+const BRIEF_DEPTHS = Object.keys(BRIEF_DEPTH_SAMPLE) as BriefDepth[];
+
+/** The run state an install that has never generated a brief reads back. */
+export const emptyBriefRun = (): BriefRun => ({
+  state: 'never-run',
+  depth: 'deep',
+  overview: null,
+  startedAt: null,
+  completedAt: null,
+  currentUid: null,
+  doneCount: 0,
+  totalCount: 0,
+  error: null,
+  lastRunByUserId: null,
+  lastAutoRefreshAt: null,
+});
+
+/**
+ * Normalize a stored run record. Pure and exported so the suite can assert it with no Strapi
+ * runtime, and total by construction: every field falls back to its default, so a record written by
+ * an older build — or a half-written one from a process that died mid-run — still reads.
+ */
+export const normalizeBriefRun = (raw: Partial<BriefRun> | null | undefined): BriefRun => {
+  const base = emptyBriefRun();
+  if (!raw) {
+    return base;
+  }
+  const state: BriefRun['state'] =
+    raw.state === 'running' || raw.state === 'ready' || raw.state === 'failed'
+      ? raw.state
+      : 'never-run';
+  return {
+    state,
+    depth: BRIEF_DEPTHS.includes(raw.depth as BriefDepth) ? (raw.depth as BriefDepth) : base.depth,
+    overview: typeof raw.overview === 'string' && raw.overview.trim() !== '' ? raw.overview : null,
+    startedAt: typeof raw.startedAt === 'string' ? raw.startedAt : null,
+    completedAt: typeof raw.completedAt === 'string' ? raw.completedAt : null,
+    currentUid: typeof raw.currentUid === 'string' ? raw.currentUid : null,
+    doneCount: Number.isInteger(raw.doneCount) ? (raw.doneCount as number) : 0,
+    totalCount: Number.isInteger(raw.totalCount) ? (raw.totalCount as number) : 0,
+    error: typeof raw.error === 'string' ? raw.error : null,
+    lastRunByUserId: Number.isInteger(raw.lastRunByUserId) ? (raw.lastRunByUserId as number) : null,
+    lastAutoRefreshAt: typeof raw.lastAutoRefreshAt === 'string' ? raw.lastAutoRefreshAt : null,
+  };
+};
 
 /* --------------------------------------------------------------- base URL validation */
 
@@ -149,6 +242,8 @@ const defaults = (): StudioSettings => ({
   activeModel: '',
   providers: Object.fromEntries(PROVIDERS.map((id) => [id, emptyProvider()])),
   grounding: { enabled: true },
+  // `schema` by default — see the field's own comment: an upgrade must change no behaviour.
+  contentBrief: { source: 'schema', depth: 'deep' },
 });
 
 /**
@@ -193,6 +288,21 @@ export const normalizeSettings = (
     providers,
     // A missing `grounding` defaults to ON, so an existing install gains it on upgrade (FR-036).
     grounding: { enabled: raw.grounding?.enabled !== false },
+    /*
+     * An unrecognized value falls back to the DEFAULT rather than being preserved, which is the
+     * opposite of the rule the `providers` map above follows — deliberately. A provider key this
+     * build does not offer is configuration worth keeping through a downgrade; a grounding source
+     * this build cannot assemble is a prompt this build cannot compose, so it must resolve to one
+     * that works rather than to a stored string nothing honours.
+     */
+    contentBrief: {
+      source: GROUNDING_SOURCES.includes(raw.contentBrief?.source as GroundingSource)
+        ? (raw.contentBrief!.source as GroundingSource)
+        : base.contentBrief.source,
+      depth: BRIEF_DEPTHS.includes(raw.contentBrief?.depth as BriefDepth)
+        ? (raw.contentBrief!.depth as BriefDepth)
+        : base.contentBrief.depth,
+    },
   };
 };
 
@@ -217,6 +327,7 @@ const num = (value: unknown, fallback: number, min: number, max: number): number
 
 const configService = ({ strapi }: { strapi: Core.Strapi }) => {
   const store = () => strapi.store(STORE_PARAMS);
+  const runStore = () => strapi.store(RUN_STORE_PARAMS);
   const cryptoSvc = () => strapi.plugin('ai-content-studio').service('crypto');
   const option = <T>(key: string, fallback: T): T =>
     strapi.config.get(`plugin::ai-content-studio.${key}`, fallback) as T;
@@ -278,6 +389,22 @@ const configService = ({ strapi }: { strapi: Core.Strapi }) => {
       await service.set(current);
     },
 
+    /**
+     * Patch the content-brief selection. Each field is applied only if present, so changing the
+     * source never resets the depth an operator chose for their next run — and vice versa.
+     */
+    async setContentBrief(patch: {
+      source?: GroundingSource;
+      depth?: BriefDepth;
+    }): Promise<void> {
+      const current = await service.get();
+      current.contentBrief = {
+        source: patch.source ?? current.contentBrief.source,
+        depth: patch.depth ?? current.contentBrief.depth,
+      };
+      await service.set(current);
+    },
+
     /** Decrypts and returns a provider's raw key, or null. SERVER-INTERNAL ONLY. */
     async getDecryptedKey(provider: ProviderId): Promise<string | null> {
       const current = await service.get();
@@ -311,6 +438,7 @@ const configService = ({ strapi }: { strapi: Core.Strapi }) => {
         activeModel: current.activeModel,
         providers,
         grounding: current.grounding,
+        contentBrief: current.contentBrief,
       };
     },
 
@@ -377,6 +505,52 @@ const configService = ({ strapi }: { strapi: Core.Strapi }) => {
         enabled: raw.enabled !== false,
         maxChars: num(raw.maxChars, 24000, 2000, 80000),
       };
+    },
+
+    /**
+     * Content-brief options. `enabled` defaults to TRUE, but that grants nothing on its own: an
+     * install has no brief until an administrator presses Run, and the stored source defaults to
+     * `schema`, so an upgrade changes no prompt and spends no provider token.
+     *
+     * The automatic refresh is bounded by THREE independent limits, and every one of them is a
+     * spend bound rather than a correctness one: only sections whose fingerprint actually moved are
+     * eligible, `refreshThrottleMinutes` floors how often a pass may run at all, and
+     * `maxAutoRefreshSections` caps how many sections any single pass may regenerate. A host that
+     * wants none of it sets `autoRefresh: false` and keeps the manual button.
+     */
+    getContentBriefOptions(): ContentBriefOptions {
+      const raw = option<Record<string, unknown>>('contentBrief', {});
+      return {
+        enabled: raw.enabled !== false,
+        maxChars: num(raw.maxChars, 24000, 2000, 80000),
+        maxSectionChars: num(raw.maxSectionChars, 1200, 200, 8000),
+        autoRefresh: raw.autoRefresh !== false,
+        refreshThrottleMinutes: num(raw.refreshThrottleMinutes, 60, 5, 10080),
+        maxAutoRefreshSections: num(raw.maxAutoRefreshSections, 3, 1, 50),
+        // Explicit `true` only — the shared brief is the stated default, so a typo never silently
+        // narrows what every account sees.
+        scopeToReader: raw.scopeToReader === true,
+      };
+    },
+
+    /** How many entries one run reads per content type, for the stored depth. */
+    briefSampleSize(depth: BriefDepth): number {
+      return BRIEF_DEPTH_SAMPLE[depth] ?? BRIEF_DEPTH_SAMPLE.deep;
+    },
+
+    /* ------------------------------------------------------- the brief run record */
+
+    async getBriefRun(): Promise<BriefRun> {
+      const raw = (await runStore().get({})) as Partial<BriefRun> | null;
+      return normalizeBriefRun(raw);
+    },
+
+    /** Merge a patch into the run record. Callers only ever state the fields they changed. */
+    async setBriefRun(patch: Partial<BriefRun>): Promise<BriefRun> {
+      const current = await service.getBriefRun();
+      const next = normalizeBriefRun({ ...current, ...patch });
+      await runStore().set({ value: next });
+      return next;
     },
   };
 

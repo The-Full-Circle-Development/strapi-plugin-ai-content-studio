@@ -1,5 +1,7 @@
 import {
   normalizeSettings,
+  normalizeBriefRun,
+  emptyBriefRun,
   parseBaseUrl,
   isGroundingEnabledFrom,
   type StudioSettings,
@@ -76,6 +78,122 @@ describe('normalizeSettings — upgrade safety', () => {
     expect(normalizeSettings({}).grounding.enabled).toBe(true);
     expect(normalizeSettings({ grounding: { enabled: false } }).grounding.enabled).toBe(false);
     expect(normalizeSettings({ grounding: { enabled: true } }).grounding.enabled).toBe(true);
+  });
+});
+
+/**
+ * The content-brief selection (contracts/content-brief.md §2).
+ *
+ * The rule this suite exists to hold is that installing this feature changes nothing until someone
+ * asks for it — an upgrade must not silently start reading content or composing a different prompt.
+ */
+describe('normalizeSettings — the content-brief selection', () => {
+  it('defaults to the schema source, so an upgrade changes no prompt', () => {
+    expect(normalizeSettings(null).contentBrief).toEqual({ source: 'schema', depth: 'deep' });
+    // An install written before the feature existed reads back the same way.
+    expect(
+      normalizeSettings({ activeProvider: 'openai', activeModel: 'x', providers: {} }).contentBrief
+    ).toEqual({ source: 'schema', depth: 'deep' });
+  });
+
+  it('honours every valid source and depth', () => {
+    for (const source of ['schema', 'brief', 'both'] as const) {
+      expect(normalizeSettings({ contentBrief: { source, depth: 'light' } } as never).contentBrief)
+        .toEqual({ source, depth: 'light' });
+    }
+    for (const depth of ['light', 'standard', 'deep'] as const) {
+      expect(normalizeSettings({ contentBrief: { source: 'both', depth } } as never).contentBrief)
+        .toEqual({ source: 'both', depth });
+    }
+  });
+
+  it('falls back to the default for an unrecognized value rather than preserving it', () => {
+    /*
+     * The OPPOSITE of the unknown-provider rule above, deliberately. A provider key this build does
+     * not offer is configuration worth carrying through a downgrade; a grounding source this build
+     * cannot assemble is a prompt it cannot compose, so it must resolve to one that works.
+     */
+    const settings = normalizeSettings({
+      contentBrief: { source: 'telepathy', depth: 'exhaustive' },
+    } as never);
+    expect(settings.contentBrief).toEqual({ source: 'schema', depth: 'deep' });
+  });
+
+  it('takes each field independently, so a half-written record still reads', () => {
+    expect(normalizeSettings({ contentBrief: { source: 'brief' } } as never).contentBrief).toEqual({
+      source: 'brief',
+      depth: 'deep',
+    });
+    expect(normalizeSettings({ contentBrief: { depth: 'light' } } as never).contentBrief).toEqual({
+      source: 'schema',
+      depth: 'light',
+    });
+  });
+});
+
+/**
+ * The run record is written by a background task every few seconds and read by a settings page. It
+ * is therefore the one record in this plugin most likely to be read half-written — after a process
+ * died mid-run — so `normalizeBriefRun` has to be total.
+ */
+describe('normalizeBriefRun — total by construction', () => {
+  it('reads an unwritten store as never-run', () => {
+    for (const empty of [null, undefined]) {
+      expect(normalizeBriefRun(empty)).toEqual(emptyBriefRun());
+    }
+  });
+
+  it('gives every missing field its default', () => {
+    const run = normalizeBriefRun({ state: 'running' });
+    expect(run.state).toBe('running');
+    expect(run.doneCount).toBe(0);
+    expect(run.totalCount).toBe(0);
+    expect(run.startedAt).toBeNull();
+    expect(run.error).toBeNull();
+  });
+
+  it('refuses a state it does not know, rather than carrying it', () => {
+    // A state nothing can interpret would leave the settings page unable to say what is happening,
+    // and `isRunActive` unable to decide whether a lock is held.
+    expect(normalizeBriefRun({ state: 'thinking' } as never).state).toBe('never-run');
+  });
+
+  it('treats a blank overview as none, so an empty paragraph never reaches a prompt', () => {
+    expect(normalizeBriefRun({ overview: '   \n ' } as never).overview).toBeNull();
+    expect(normalizeBriefRun({ overview: 42 } as never).overview).toBeNull();
+    expect(normalizeBriefRun({ overview: 'A documentation portal.' }).overview).toBe(
+      'A documentation portal.'
+    );
+  });
+
+  it('rejects non-integer counters and non-string timestamps', () => {
+    const run = normalizeBriefRun({
+      doneCount: 2.5,
+      totalCount: 'many',
+      startedAt: 12345,
+      lastRunByUserId: 'me',
+    } as never);
+    expect(run.doneCount).toBe(0);
+    expect(run.totalCount).toBe(0);
+    expect(run.startedAt).toBeNull();
+    expect(run.lastRunByUserId).toBeNull();
+  });
+
+  it('keeps a valid record intact through a round trip', () => {
+    const record = {
+      state: 'ready' as const,
+      depth: 'standard' as const,
+      overview: 'A marketing site built around landing pages and a small blog.',
+      startedAt: '2026-09-14T10:00:00.000Z',
+      completedAt: '2026-09-14T10:04:00.000Z',
+      currentUid: null,
+      doneCount: 12,
+      totalCount: 12,
+      error: null,
+      lastRunByUserId: 7,
+      lastAutoRefreshAt: '2026-09-14T11:00:00.000Z',
+    };
+    expect(normalizeBriefRun(record)).toEqual(record);
   });
 });
 

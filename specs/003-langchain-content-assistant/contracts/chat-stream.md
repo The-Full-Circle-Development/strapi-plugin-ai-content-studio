@@ -184,11 +184,40 @@ That is exactly what the existing renderer consumes:
 | Rendered surface | How it is found | Must still work |
 |---|---|---|
 | Tool pill ("Using X…" / "Used X" / "X failed") | `isToolUIPart(part)` + `part.state` | yes |
-| Change plan card | `getToolName(part) === 'proposeChanges'` && `state === 'output-available'` && `output.ok && output.changeSetId` | yes — this is the approval surface |
+| Change plan card | `getToolName(part) === 'proposeChanges'` && `state === 'output-available'` && `output.ok && output.changeSetId` — see the normalization rule below | yes — this is the approval surface |
 | Apply report | persisted `data-apply-report` part | yes |
 | Interrupted notice | persisted `data-interrupted` part | yes |
 | Reasoning text | `part.type === 'reasoning'` | yes, where the provider emits it |
 | Audit report card | deleted | **no** — falls through to a generic tool pill on replay (see §7) |
+
+### Tool output must be normalized before the renderer sees it
+
+**A tool result reaches the browser as JSON TEXT, not as the object the tool returned**, and the
+approval surface is what that costs. This was verified against the installed packages, not assumed:
+
+- LangChain's `tool()` wraps a non-string return in a `ToolMessage` whose `content` is
+  `JSON.stringify(result)` — `_formatToolOutput` → `_stringify` in `@langchain/core`. Probed
+  directly: invoking a tool that returns `{ ok: true, changeSetId: '…' }` yields a `ToolMessage`
+  whose `content` is `typeof 'string'`.
+- The bridge forwards that content **verbatim** as the chunk payload — `output: dataSource.content`
+  in `@ai-sdk/langchain@2.0.285`'s LangGraph `messages` branch.
+
+So the assembled UI part holds a string, `output.ok && output.changeSetId` is `undefined` on every
+turn, and the change-plan card silently degrades to a generic "Used proposeChanges" pill. A plugin
+whose entire guarantee is "nothing is written until you approve" therefore renders **no approve
+buttons at all**. This is a defect of the transport encoding, not of the model's behaviour — the
+plan was recorded correctly every time.
+
+**The controller therefore normalizes `tool-output-available` chunks** before they are merged: a
+string payload that parses to a plain **object** is replaced by that object; a string, number or
+array payload is left exactly as it is, so a tool that deliberately returns prose keeps its prose.
+Normalizing on the server rather than in the browser is what makes the **stored** transcript right
+too, since the normalized chunk is what `onFinish` assembles into the persisted `parts`.
+
+The renderer additionally accepts the JSON-text form when reading `proposeChanges` output. That is
+not redundancy: transcripts stored before this normalization existed still hold the string, and those
+conversations must show their approval card on reload rather than staying permanently unapprovable.
+No migration rewrites them.
 
 `tool-approval-request` / `tool-approval-response` are LangChain's own human-in-the-loop mechanism and
 are **deliberately unused**. Approval here is structural: the model can only record a pending plan,

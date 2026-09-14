@@ -13,6 +13,12 @@
  *   attachments.*  — per-conversation budget for files held in the browser before ingestion.
  *   grounding.*    — the generated description of THIS install's schema, embedded in the
  *                    assistant's instructions. ON by default (see below).
+ *   contentBrief.* — the model-written briefing about what this install's CONTENT actually is. The
+ *                    key is on by default but grants nothing on its own: an install has no brief
+ *                    until an administrator runs one from Settings, and the stored source defaults
+ *                    to `schema`, so an upgrade changes no prompt and spends no provider token.
+ *                    This is the only feature in the plugin that can spend money without a click —
+ *                    `autoRefresh` is what does it, and turning it off keeps the manual button.
  *
  * REMOVED: `audit.*`. The QA scan and security audit capabilities are retired, so the key is
  * ignored. An unknown key is harmless, but remove it from `config/plugins.ts` — it no longer does
@@ -32,6 +38,15 @@
  *       },
  *       attachments: { totalBudgetMb: 50 },
  *       grounding: { enabled: true, maxChars: 24000 },
+ *       contentBrief: {
+ *         enabled: true,
+ *         maxChars: 24000,
+ *         maxSectionChars: 1200,
+ *         autoRefresh: true,
+ *         refreshThrottleMinutes: 60,
+ *         maxAutoRefreshSections: 3,
+ *         scopeToReader: false,   // false = one brief, identical for every account
+ *       },
  *     },
  *   }
  */
@@ -71,6 +86,48 @@ export default {
        * ordinary project in full. Exceeding it degrades by tier, deterministically, and says so.
        */
       maxChars: 24000,
+    },
+    contentBrief: {
+      /**
+       * The HARD off-switch for the whole feature, the same shape `grounding.enabled` has. With it
+       * off, the Run control renders disabled and names this key, and no brief text can reach a
+       * prompt even if one was generated before the key was set.
+       *
+       * ON by default, and unlike grounding that costs nothing on its own: an install has no brief
+       * until someone presses Run, and the stored source defaults to `schema`.
+       */
+      enabled: true,
+      /** Declared character budget for the ASSEMBLED brief, clamped 2,000..80,000. Its own budget,
+       *  separate from `grounding.maxChars`, so selecting both cannot double one ceiling. */
+      maxChars: 24000,
+      /** Per-section ceiling, so one verbose section cannot consume the whole budget. */
+      maxSectionChars: 1200,
+      /**
+       * ⚠ THE ONLY SETTING IN THIS PLUGIN THAT SPENDS PROVIDER MONEY WITHOUT A CLICK.
+       *
+       * With it on, sections whose schema or content fingerprint moved are regenerated during chat
+       * sessions, bounded by the two keys below. With it off, a stale brief stays stale and says so
+       * in Settings until an administrator re-runs it — nothing else changes.
+       */
+      autoRefresh: true,
+      /** Floor between two automatic passes, in minutes. A human pressing Run is never throttled. */
+      refreshThrottleMinutes: 60,
+      /** Hard ceiling on sections ONE automatic pass may regenerate — the unattended-spend bound. */
+      maxAutoRefreshSections: 3,
+      /**
+       * ONE BRIEF, THE SAME FOR EVERY ACCOUNT — the default, and `false` is that default.
+       *
+       * The briefing describes the platform, so every account with chat access reads the same text,
+       * project overview included. It never describes a content type the super-admin who ran it
+       * could not read, and it changes nothing about what the assistant may DO: every tool still
+       * RBAC-checks the calling account before touching content.
+       *
+       * Set `true` where that disclosure is not acceptable — multi-tenant, or a content type only
+       * one team may know exists. Each reader is then served only the sections their own
+       * permissions allow, and the project overview is withheld entirely, because it is synthesized
+       * across every content type and so cannot be filtered.
+       */
+      scopeToReader: false,
     },
   },
   validator() {},

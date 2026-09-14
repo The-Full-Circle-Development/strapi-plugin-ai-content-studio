@@ -5,6 +5,7 @@ import registry from './registry';
 import agent from './agent';
 import prompt from './prompt';
 import grounding from './grounding';
+import contentBrief from './content-brief';
 import threads from './threads';
 import changeSets from './change-sets';
 import attachments from './attachments';
@@ -19,6 +20,8 @@ export default {
   agent,
   prompt,
   grounding,
+  // Referenced as service('content-brief').
+  'content-brief': contentBrief,
   threads,
   // Referenced as service('change-sets').
   'change-sets': changeSets,

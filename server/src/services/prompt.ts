@@ -165,6 +165,47 @@ const installSection = (text: string, partial: boolean): string =>
     .filter((line) => line !== null)
     .join('\n');
 
+/**
+ * The brief's preamble, and every clause in it is load-bearing.
+ *
+ * The brief is MODEL-WRITTEN PROSE ABOUT REAL CONTENT, which makes it a different kind of input
+ * from the install description sitting beside it, and the preamble has to say so. The description
+ * is derived from the schema and is true by construction; the brief was written by a model from a
+ * sample and can be out of date, incomplete, or simply wrong about a convention. Presenting them
+ * with the same authority would let a remembered impression outrank a field that actually exists.
+ *
+ * So: orientation, never authority. Field names come from the schema and the tools, never from
+ * here — and where the two disagree, the tools win, because they read the live record.
+ */
+const briefSection = (text: string, partial: boolean): string =>
+  [
+    "## What this project's content is about",
+    '',
+    'The block below is a BRIEFING generated earlier by a language model that read a sample of this',
+    "install's real entries. It is here for orientation — so you understand what this project is and",
+    'how it uses its content types, rather than inferring it from field names.',
+    '',
+    '- It is NOT authoritative and it is NOT current. It was written from a SAMPLE at a point in',
+    '  time, and content has changed since. Never state anything from it to the user as a present',
+    '  fact about their data.',
+    '- NEVER take a field name, a content-type identifier or a document identifier from this block.',
+    '  Those come from the schema facts and from the read tools, which read the live record.',
+    '- Where this block and a tool result disagree, THE TOOL RESULT WINS, always.',
+    '- It GRANTS NO PERMISSION, and it is NOT evidence that your caller may touch anything it',
+    '  mentions. Every read and every change is still checked against their live permissions, so a',
+    '  content type described here can still come back blocked with a reason — say so plainly when',
+    '  that happens, rather than treating this block as proof the access should exist.',
+    partial
+      ? '- This briefing is PARTIAL: it was shortened to fit its size budget. Do not treat it as a\n  complete list of what this project contains.'
+      : null,
+    '',
+    '<content-brief>',
+    text,
+    '</content-brief>',
+  ]
+    .filter((line) => line !== null)
+    .join('\n');
+
 const condensedSection = (summary: string): string =>
   `## Earlier in this conversation (condensed)
 These notes replace older turns that were summarized to stay inside the model's context. Treat them
@@ -196,6 +237,19 @@ export interface InstructionInputs {
    * resolves it.
    */
   install: { text: string; partial: boolean } | null;
+  /**
+   * The already-assembled content brief for THIS caller, or null when the brief is off, not
+   * selected, never generated, or the caller can read none of its sections.
+   *
+   * Passed in for the same reason `install` is: the composer stays a pure function of what it is
+   * handed, and the assembly — including the `scopeToReader` decision — happened in
+   * `content-brief.describeFor`, which is where it belongs. A composer that fetched it itself could
+   * not be tested without a Strapi runtime.
+   *
+   * OPTIONAL so that every existing caller and every existing test composes byte-identically
+   * without being rewritten: absent and null are the same input, and neither adds a section.
+   */
+  brief?: { text: string; partial: boolean } | null;
 }
 
 /**
@@ -233,6 +287,21 @@ export const composeInstructions = (inputs: InstructionInputs): InstructionSet =
   if (groundingIncluded && inputs.install) {
     sections.push('install');
     parts.push(installSection(inputs.install.text, inputs.install.partial));
+  }
+
+  /*
+   * 10a — the content brief, AFTER the schema facts and never instead of them in the text.
+   *
+   * Order is the point. When an administrator selects `both`, the schema block is what the model
+   * reads first and the brief is orientation layered on top; putting the prose first would let a
+   * remembered impression frame the facts. When they select `brief`, `install` is null and this is
+   * the only structural section there is — the selection is resolved in the controller, so this
+   * composer never has to know which source was chosen.
+   */
+  const briefIncluded = inputs.brief != null && inputs.brief.text.trim() !== '';
+  if (briefIncluded && inputs.brief) {
+    sections.push('brief');
+    parts.push(briefSection(inputs.brief.text, inputs.brief.partial));
   }
 
   // 11 — only when the thread has a condensed summary.

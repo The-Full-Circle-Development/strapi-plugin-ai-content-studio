@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
-const index = require("./index-B9qZv_2A.js");
+const index = require("./index-Bcyu31Tu.js");
 const POLLUTION_KEYS = /* @__PURE__ */ new Set([
   "__proto__",
   "constructor",

@@ -292,11 +292,19 @@ const renderContentType = (
 ): string[] => {
   const displayName = schema?.info?.displayName ?? uid;
   const kind = ctUtils.isSingleType(schema as never) ? 'single' : 'collection';
-  const lines: string[] = [
-    `- ${uid} — "${displayName}" (${kind})`,
+  const lines: string[] = [`- ${uid} — "${displayName}" (${kind})`];
+
+  // `index` is IDENTITY AND NOTHING ELSE — one line, no flags, no preview target, no media paths.
+  // It is what lets a very large install still name every content type it can read; see the ladder
+  // in `renderInstallDescription`.
+  if (tier === 'index') {
+    return lines;
+  }
+
+  lines.push(
     `  draft & publish: ${ctUtils.hasDraftAndPublish(schema as never) ? 'yes' : 'no'}   localized: ${isLocalized(schema) ? 'yes' : 'no'}`,
-    `  preview target: ${previewPaths[uid] ? 'configured' : 'none'}`,
-  ];
+    `  preview target: ${previewPaths[uid] ? 'configured' : 'none'}`
+  );
 
   // `names-only` keeps identity, kind, flags, preview target and the media paths — and no other
   // field detail. The media paths stay because they answer the most common structural question.
@@ -354,6 +362,21 @@ const renderTier = (
   if (uids.length === 0) {
     blocks.push('(none readable by this account)');
   }
+  /*
+   * At `index` the list is identities only, so it has to SAY so — otherwise a content type with no
+   * fields listed reads as a content type that HAS no fields, and the assistant would propose
+   * against a structure it never saw. Naming the tools next to the list is what turns a shortened
+   * description into a usable one rather than a misleading one.
+   *
+   * KEPT SHORT DELIBERATELY. This note is the only thing `index` adds over `names-only`, so a
+   * verbose one could make the lower rung of the ladder the LARGER one and let the ladder skip
+   * straight past it into dropping content types — the exact outcome this tier exists to avoid.
+   */
+  if (tier === 'index' && uids.length > 0) {
+    blocks.push(
+      '(Identities only — this install exceeds the description budget. Use the read tools for fields, media slots and structure.)'
+    );
+  }
   for (const uid of uids) {
     blocks.push(
       renderContentType(
@@ -395,16 +418,29 @@ const renderTier = (
 /**
  * Render the description, degrading by TIER until it fits (§6, FR-032).
  *
- *   full -> no-components -> names-only -> drop content types from the END of the sorted order
+ *   full -> no-components -> names-only -> index -> drop content types from the END of the sorted
+ *   order
  *
- * Dropping deterministically from a fixed order is arbitrary but REPRODUCIBLE, which is what the
- * requirement asks for. Dropping "the least important" would require a judgement that varies.
+ * WHY `index` SITS BETWEEN `names-only` AND DROPPING. A large install — many content types, deep
+ * dynamic zones, long dotted media paths — blows the budget at `names-only` too, and the ladder used
+ * to go straight from there to dropping content types. A dropped content type is not merely
+ * described in less detail: it is INVISIBLE. The assistant cannot ask about a uid it was never
+ * shown, so it either invents one (which `listContentTypes` then rejects) or never considers the
+ * page the user is asking about. An identity line costs on the order of fifty characters, so
+ * `index` keeps every readable content type nameable at a fraction of what one `names-only` entry
+ * costs — and the tools can fill in the rest, which is exactly what the note rendered with that tier
+ * tells the assistant to do.
+ *
+ * Dropping survives as the final rung because `charCount <= maxChars` is unconditional (SC-011) and
+ * some budget is always small enough. Dropping deterministically from a fixed order is arbitrary but
+ * REPRODUCIBLE, which is what the requirement asks for. Dropping "the least important" would require
+ * a judgement that varies.
  *
  * Any tier below `full` sets `partial`. `charCount` must never exceed `maxChars` (SC-011).
  */
 export const renderInstallDescription = (input: RenderInput): InstallDescription => {
   const allUids = sorted(Object.keys(input.readable));
-  const tiers: GroundingTier[] = ['full', 'no-components', 'names-only'];
+  const tiers: GroundingTier[] = ['full', 'no-components', 'names-only', 'index'];
 
   const result = (
     text: string,
@@ -429,9 +465,9 @@ export const renderInstallDescription = (input: RenderInput): InstallDescription
     }
   }
 
-  // `names-only` still exceeds the budget: drop from the end of the sorted order, stating the
-  // count. The note itself is inside the budget, which is why it is measured with the text.
-  const tier: GroundingTier = 'names-only';
+  // Even `index` exceeds the budget: drop from the end of the sorted order, stating the count. The
+  // note itself is inside the budget, which is why it is measured with the text.
+  const tier: GroundingTier = 'index';
   for (let keep = allUids.length - 1; keep >= 0; keep -= 1) {
     const uids = allUids.slice(0, keep);
     const omitted = allUids.length - keep;

@@ -174,15 +174,35 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
      */
     const groundingSvc = plugin.service('grounding');
     const groundingEnabled = await plugin.service('config').isGroundingEnabled();
+
+    /**
+     * WHICH generated context this turn carries (contracts/content-brief.md §2).
+     *
+     * One administrator choice — `schema`, `brief` or `both` — resolved here rather than in the
+     * prompt composer, so the composer stays a pure function of what it is handed and never has to
+     * know a setting exists. Both sources sit behind the SAME grounding switch: it is the one
+     * control that means "put generated context in the prompt at all", and a second off-switch with
+     * the same meaning would be a way to have it half-off.
+     */
+    const briefSource = (await plugin.service('config').get()).contentBrief.source;
+    const wantSchema = groundingEnabled && briefSource !== 'brief';
+    const wantBrief = groundingEnabled && briefSource !== 'schema';
+
     let readableUids: string[] = [];
     let schemaFingerprint = '';
     let install: { text: string; partial: boolean } | null = null;
+    let brief: { text: string; partial: boolean } | null = null;
     if (groundingEnabled) {
       try {
+        // Resolved even when only the brief is selected: the composer uses the uid list to decide
+        // whether there is anything to describe at all, and the fingerprint records what the turn
+        // ran against.
         readableUids = groundingSvc.readableUids(userAbility);
         schemaFingerprint = groundingSvc.schemaFingerprint();
-        const description = groundingSvc.describe(userAbility);
-        install = description ? { text: description.text, partial: description.partial } : null;
+        if (wantSchema) {
+          const description = groundingSvc.describe(userAbility);
+          install = description ? { text: description.text, partial: description.partial } : null;
+        }
       } catch (err) {
         // Grounding is an enhancement, never a prerequisite: if it fails, the turn proceeds with
         // tool-based discovery instead of failing the request.
@@ -193,6 +213,39 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       }
     }
 
+    if (wantBrief) {
+      try {
+        /*
+         * ONE BRIEF, THE SAME FOR EVERY ACCOUNT (contracts/content-brief.md §3). The ability is
+         * still passed, because an install that set `contentBrief.scopeToReader` narrows the
+         * result to the caller's own readable sections inside the service — the default does not.
+         */
+        const assembled = await plugin.service('content-brief').describeFor(userAbility);
+        brief = assembled ? { text: assembled.text, partial: assembled.partial } : null;
+      } catch (err) {
+        // Same rule as the description above: an enhancement that fails costs the turn nothing.
+        strapi.log.warn(
+          `[ai-content-studio] could not assemble the content brief: ${redact().describeError(err)}`
+        );
+        brief = null;
+      }
+
+      /*
+       * The automatic refresh (contracts/content-brief.md §4). Deliberately NOT awaited and
+       * deliberately AFTER the text above was assembled: this turn ships the brief as it stands,
+       * and any regeneration lands in a later turn. Awaiting it would put a chain of provider calls
+       * in front of the user's first token.
+       */
+      void plugin
+        .service('content-brief')
+        .refreshIfDue(userAbility)
+        .catch((err: unknown) => {
+          strapi.log.warn(
+            `[ai-content-studio] brief auto-refresh failed: ${redact().describeError(err)}`
+          );
+        });
+    }
+
     const instructions = plugin.service('prompt').build({
       supportsVision,
       hasAttachments: manifest.length > 0,
@@ -201,6 +254,7 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       schemaFingerprint,
       contextSummary: context?.summary ?? null,
       install,
+      brief,
     });
 
     /**
@@ -256,6 +310,53 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
       }
       return 'The AI provider returned an error. Please try again or check the provider settings.';
     };
+
+    /**
+     * ⚠ TOOL RESULTS ARRIVE AS JSON TEXT, NOT AS OBJECTS — and the approval surface is what that
+     * costs (contracts/chat-stream.md §6).
+     *
+     * LangChain's `tool()` wraps a non-string return in a `ToolMessage` whose `content` is
+     * `JSON.stringify(result)` — verified in the installed `@langchain/core`, where
+     * `_formatToolOutput` routes anything that is not already a string or a content-block array
+     * through `_stringify`. The bridge then forwards that content VERBATIM as the chunk's payload:
+     * `output: dataSource.content` in `@ai-sdk/langchain@2.0.285`'s LangGraph `messages` branch.
+     *
+     * So the UI part assembled from it holds a STRING, and `output.ok && output.changeSetId` — the
+     * exact test §6 names for the change-plan card — is `undefined` on every single turn. The card
+     * falls through to a generic "Used proposeChanges" pill, which is why a plugin whose entire
+     * guarantee is "nothing is written until you approve" renders no approve buttons at all.
+     *
+     * Parsing HERE rather than in the browser is what makes the stored transcript right too: the
+     * normalized chunk is what `onFinish` assembles into the persisted `parts`, so a reloaded thread
+     * and a live turn carry the same value, and every consumer of a tool result sees what the tool
+     * actually returned rather than its transport encoding.
+     *
+     * Only a parse that yields a plain OBJECT replaces the string. A tool that deliberately returns
+     * prose keeps its prose, and a bare number, string or array is never silently retyped.
+     */
+    const asToolOutputObject = (output: unknown): unknown => {
+      if (typeof output !== 'string') {
+        return output;
+      }
+      try {
+        const parsed: unknown = JSON.parse(output);
+        return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? parsed
+          : output;
+      } catch {
+        return output;
+      }
+    };
+
+    const normalizeToolOutput = new TransformStream<UIMessageChunk, UIMessageChunk>({
+      transform(chunk, controller) {
+        controller.enqueue(
+          chunk.type === 'tool-output-available'
+            ? { ...chunk, output: asToolOutputObject(chunk.output) }
+            : chunk
+        );
+      },
+    });
 
     /**
      * ⚠ THE MASK THAT ACTUALLY GUARDS THE CREDENTIAL PATH (FR-008, SC-009,
@@ -353,7 +454,11 @@ const chatController = ({ strapi }: { strapi: Core.Strapi }) => ({
                   '[ai-content-studio] generation stopped by the user; no further step will run'
                 );
               },
-            }).pipeThrough(guardChunks)
+            })
+              // Order matters: normalization only ever rewrites a tool payload, so the error mask
+              // below still sees — and still masks — every `error` chunk the bridge enqueues.
+              .pipeThrough(normalizeToolOutput)
+              .pipeThrough(guardChunks)
           );
         },
         /**

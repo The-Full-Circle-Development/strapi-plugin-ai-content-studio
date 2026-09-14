@@ -90,6 +90,35 @@ export default {
           ],
         },
       },
+
+      /**
+       * The content brief (contracts/content-brief.md §5). SUPER-ADMIN ONLY, the same gate the
+       * provider settings carry and deliberately NOT the narrower `chat.use`:
+       *
+       *   - `run` spends provider money and walks every content type the runner can read. That is
+       *     an operator action with a bill attached, not a chat action.
+       *   - `status` returns the generated prose ABOUT CONTENT, which by default is one briefing
+       *     shared by every account (contracts/content-brief.md §3). Super-admin is therefore the
+       *     right gate for the surface that shows it whole and can rewrite it — not because the
+       *     text is secret from chat users, who are given the same briefing in their prompts, but
+       *     because running and inspecting it is an operator's job with a bill attached.
+       */
+      {
+        method: 'GET',
+        path: '/content-brief',
+        handler: 'content-brief.status',
+        config: {
+          policies: ['admin::isAuthenticatedAdmin', 'plugin::ai-content-studio.is-super-admin'],
+        },
+      },
+      {
+        method: 'POST',
+        path: '/content-brief/run',
+        handler: 'content-brief.run',
+        config: {
+          policies: ['admin::isAuthenticatedAdmin', 'plugin::ai-content-studio.is-super-admin'],
+        },
+      },
     ],
   },
 

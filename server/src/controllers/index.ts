@@ -4,6 +4,7 @@ import changeSets from './change-sets';
 import attachments from './attachments';
 import preview from './preview';
 import settings from './settings';
+import contentBrief from './content-brief';
 
 export default {
   chat,
@@ -13,4 +14,6 @@ export default {
   attachments,
   preview,
   settings,
+  // Route handlers reference this as `content-brief.<handler>`.
+  'content-brief': contentBrief,
 };

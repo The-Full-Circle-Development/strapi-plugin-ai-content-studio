@@ -223,7 +223,7 @@ describe('the tier ladder and the size budget (FR-032, SC-011)', () => {
     expect(result.omittedContentTypeCount).toBe(0);
   });
 
-  it('enters full -> no-components -> names-only -> dropped, in that order, as the budget shrinks', () => {
+  it('enters full -> no-components -> names-only -> index -> dropped, in that order, as the budget shrinks', () => {
     // Drive maxChars down across its whole range and record the tier sequence actually entered.
     const seen: Array<{ tier: GroundingTier; omitted: number }> = [];
     for (let maxChars = 4000; maxChars >= 60; maxChars -= 10) {
@@ -234,7 +234,7 @@ describe('the tier ladder and the size budget (FR-032, SC-011)', () => {
       }
     }
     const stages = seen.map((s) => `${s.tier}${s.omitted > 0 ? '+dropped' : ''}`);
-    expect(stages).toEqual(['full', 'no-components', 'names-only', 'names-only+dropped']);
+    expect(stages).toEqual(['full', 'no-components', 'names-only', 'index', 'index+dropped']);
   });
 
   it('drops the component section at `no-components` but still NAMES the references', () => {
@@ -265,6 +265,29 @@ describe('the tier ladder and the size budget (FR-032, SC-011)', () => {
     // No field-detail lines survive.
     expect(result.text).not.toContain('  fields:');
     expect(result.text).not.toContain('- title: string');
+  });
+
+  it('keeps identity and NOTHING else at `index`, and says the detail is missing', () => {
+    let result = render({ maxChars: 400 });
+    let budget = 400;
+    while (result.tier !== 'index' && budget > 60) {
+      budget -= 10;
+      result = render({ maxChars: budget });
+    }
+    expect(result.tier).toBe('index');
+    // Every readable content type is still NAMED — that is the whole point of the tier.
+    expect(result.contentTypeCount).toBe(2);
+    expect(result.text).toContain('api::author.author');
+    expect(result.text).toContain('api::page.page');
+    // …and nothing below identity survives.
+    expect(result.text).not.toMatch(/draft & publish:/);
+    expect(result.text).not.toContain('media fields:');
+    expect(result.text).not.toContain('  fields:');
+    // The assistant is told the detail is absent and how to recover it — the same "read tools"
+    // wording the drop note uses, so a shortened description never reads as a complete one.
+    expect(result.text).toContain('Identities only');
+    expect(result.text).toContain('read tools');
+    expect(result.partial).toBe(true);
   });
 
   it('sets partial on every tier below full', () => {
@@ -304,5 +327,86 @@ describe('the tier ladder and the size budget (FR-032, SC-011)', () => {
   it('never exceeds a budget even at the declared 2,000 floor', () => {
     const result = render({ maxChars: 2000 });
     expect(result.charCount).toBeLessThanOrEqual(2000);
+  });
+});
+
+/**
+ * The case a two-content-type fixture cannot reach: an install whose schema is far larger than the
+ * budget. Before the `index` tier the ladder went from `names-only` straight to dropping, so a
+ * project like this lost whole content types from the end of the sorted order — and a content type
+ * the assistant is never shown is one it cannot ask about.
+ */
+describe('a large install stays fully nameable within the default budget (FR-032)', () => {
+  /** `count` content types, each with enough fields and media depth to blow `names-only` outright. */
+  const largeInstall = (count: number): Omit<RenderInput, 'maxChars'> => {
+    const readable: Record<string, any> = {};
+    for (let i = 0; i < count; i += 1) {
+      const name = `type-${String(i).padStart(3, '0')}`;
+      readable[`api::${name}.${name}`] = {
+        kind: 'collectionType',
+        info: { displayName: `Type ${i}` },
+        options: { draftAndPublish: true },
+        attributes: {
+          title: { type: 'string', required: true },
+          body: { type: 'richtext' },
+          cover: { type: 'media' },
+          gallery: { type: 'media', multiple: true },
+          hero: { type: 'component', component: 'blocks.hero' },
+          sections: { type: 'dynamiczone', components: ['blocks.hero', 'blocks.gallery'] },
+        },
+      };
+    }
+    return {
+      readable,
+      components: {
+        'blocks.hero': {
+          attributes: {
+            headline: { type: 'string' },
+            image: { type: 'media' },
+            background: { type: 'media' },
+            nested: { type: 'component', component: 'blocks.hero' },
+          },
+        },
+        'blocks.gallery': {
+          attributes: { images: { type: 'media', multiple: true }, caption: { type: 'string' } },
+        },
+      },
+      previewPaths: {},
+      schemaFingerprint: 'fp-large',
+      readableFingerprint: 'fp-large-readable',
+    };
+  };
+
+  it('names every content type at the default budget, dropping none', () => {
+    const count = 120;
+    const result = renderInstallDescription({ ...largeInstall(count), maxChars: 24000 });
+
+    expect(result.charCount).toBeLessThanOrEqual(24000);
+    expect(result.omittedContentTypeCount).toBe(0);
+    expect(result.contentTypeCount).toBe(count);
+    // Both ends of the sorted order survive — the END is what used to go first.
+    expect(result.text).toContain('api::type-000.type-000');
+    const last = String(count - 1).padStart(3, '0');
+    expect(result.text).toContain(`api::type-${last}.type-${last}`);
+    // It is shortened, and it says so — both in the flag and in the text the model reads.
+    expect(result.partial).toBe(true);
+    expect(result.text).toContain('Identities only');
+  });
+
+  it('still honours the budget when the install is larger still (SC-011)', () => {
+    for (const count of [200, 400, 800]) {
+      const result = renderInstallDescription({ ...largeInstall(count), maxChars: 24000 });
+      expect(result.charCount).toBeLessThanOrEqual(24000);
+      expect(result.text.length).toBe(result.charCount);
+      // Whatever it had to drop, it states the count rather than trimming silently.
+      if (result.omittedContentTypeCount > 0) {
+        expect(result.text).toMatch(/content type\(s\) omitted to fit the size budget/);
+      }
+    }
+  });
+
+  it('is still deterministic at that size', () => {
+    const input = { ...largeInstall(300), maxChars: 24000 };
+    expect(renderInstallDescription(input).text).toBe(renderInstallDescription(input).text);
   });
 });

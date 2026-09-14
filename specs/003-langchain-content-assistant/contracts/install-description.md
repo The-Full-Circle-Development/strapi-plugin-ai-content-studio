@@ -137,11 +137,26 @@ Degradation is by **tier**, applied by the same rule every time (FR-032):
 | `full` | within budget | everything in §2 |
 | `no-components` | `full` exceeds budget | content types keep all fields; the `#### Components` section is dropped and component references are named but not expanded |
 | `names-only` | `no-components` exceeds budget | per content type: uid, display name, kind, draft-and-publish, localization, preview target, and the media-field paths. No other field detail |
+| `index` | `names-only` exceeds budget | per content type: **uid, display name and kind only** — one line each. No flags, no preview target, no media paths. The `#### Preview targets` section is still rendered, and a short note states that this is identities only and that the read tools recover the rest |
 
-If `names-only` still exceeds the budget, content types are dropped from the **end of the sorted
-order** and the count dropped is stated. Dropping deterministically from a fixed order is arbitrary
-but reproducible, which is what the requirement asks for; dropping "the least important" would
-require a judgement that varies.
+**Why `index` sits between `names-only` and dropping.** A large install blows the budget at
+`names-only` too, and the ladder previously went straight from there to dropping content types. A
+dropped content type is not described in less detail — it is **invisible**: the assistant cannot ask
+about a uid it was never shown, so it either invents one (which `listContentTypes` rejects) or never
+considers the page the user is asking about. Measured against a synthetic install of 120 content
+types with dynamic zones at the default 24,000-character budget, the old ladder described 88 and
+dropped 32; at 400 content types it still described 88 and dropped 312 — the count it described was
+capped by the per-entry cost of `names-only`, not by the size of the install. With `index`, all 120
+and all 400 are named, and 800 content types still yield 459 named within the same budget.
+
+The note `index` adds is deliberately **short**. It is the only thing that tier adds over
+`names-only`, so a verbose note could make the lower rung the larger one and let the ladder skip past
+it into dropping — the exact outcome the tier exists to prevent.
+
+If `index` still exceeds the budget, content types are dropped from the **end of the sorted order**
+and the count dropped is stated. Dropping deterministically from a fixed order is arbitrary but
+reproducible, which is what the requirement asks for; dropping "the least important" would require a
+judgement that varies.
 
 Any tier below `full` sets `partial: true`, and the preamble states that the description is partial
 and that the assistant must discover the remainder with tools. `charCount` must never exceed the
